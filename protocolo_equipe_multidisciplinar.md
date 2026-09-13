@@ -33,7 +33,7 @@
 
 **Interleaving leve (Rohrer).** Alternar temas melhora discriminação. → Desatraso à noite ≠ conteúdo do dia.
 
-**Autocompaixão estruturada (Sirois).** Válvulas de escape planejadas cortam o ciclo procrastinação-culpa e a ruminação da TAG. → "Se o dia render (senão, o sábado absorve, sem culpa)".
+**Autocompaixão estruturada (Sirois).** Válvulas de escape planejadas cortam o ciclo procrastinação-culpa e a ruminação da TAG. → "Se o dia render (senão, mova o bloco para o domingo ativo, sem culpa — o app avisa a carga)".
 
 **Janela do estimulante.** Lisdexanfetamina ~10–13h; o platô deve cair no bloco de maior demanda de cada dia — que muda por dia. Janelas na §2, **a validar com a psiquiatra**.
 
@@ -44,9 +44,9 @@
 **Regra de ouro universal: Anki ANTES de qualquer rede social.**
 
 - **Dias livres (a maioria):** acordar 07h00–07h30 fixo → meditação 15min → Anki 35min → café/higiene → primeiro bloco no pico. *Janela do estimulante:* cedo nos dias-motor (qui, sex, seg); mais tarde na quarta (alvo = aula 17h–22h) — **validar**.
-- **Plantão diurno (06h–19h):** acordar ~05h15 → água+luz, café proteico → saída (Anki 20min no trajeto). *Janela:* ao acordar, se o alvo for o plantão; conversar com a psiquiatra se quiser preservar foco para a noite. Tempos mortos = aulas em áudio/vídeo + questões.
+- **Plantão diurno (06h–19h):** acordar ~05h15 → água+luz, café proteico → saída (Anki 20min no trajeto; meditação 10min no almoço ou à noite — o app já troca o bloco de Anki nesses dias e marca a academia como opcional). *Janela:* ao acordar, se o alvo for o plantão; conversar com a psiquiatra se quiser preservar foco para a noite. Tempos mortos = aulas em áudio/vídeo + questões.
 - **Véspera de noturno (18h–07h):** manhã leve (2h de questões/smartcards), tarde de descanso real, saída ~17h15.
-- **Pós-noturno:** chegar ~07h → **DORMIR até ~12h30–13h** (inegociável) → tarde leve, Anki opcional → dormir cedo. No sanduíche (noturno após noturno), o dia inteiro é sono + comida de verdade.
+- **Pós-noturno:** chegar ~07h → **DORMIR até ~12h30–13h** (inegociável) → tarde leve, Anki opcional, **sem academia** (o app remove o treino desse dia) → dormir cedo. No sanduíche (noturno após noturno), o dia inteiro é sono + comida de verdade.
 
 ---
 
@@ -60,7 +60,7 @@
 
 ## 4 · Academia — 6x/semana, agora flexível
 
-Sem horários fixos: encaixe 1 treino em 6 dos 7 dias. Prioridades da equipe: nos dias livres, **antes** de um bloco importante (ganho agudo de função executiva); nos plantões de 13h, opcional e curto; **nunca** no dia pós-noturno (esse é o descanso da semana). Exercício regular também é ansiolítico não-farmacológico.
+Sem horários fixos: encaixe 1 treino em 6 dos 7 dias. Prioridades da equipe: nos dias livres, **antes** de um bloco importante (ganho agudo de função executiva); nos plantões de 13h, opcional e curto; **nunca** no dia pós-noturno (esse é o descanso da semana) — o app aplica as duas regras sozinho: bloco "Academia — opcional" nos diurnos e nenhum bloco de treino no pós-noturno. Exercício regular também é ansiolítico não-farmacológico.
 
 ---
 
@@ -68,13 +68,15 @@ Sem horários fixos: encaixe 1 treino em 6 dos 7 dias. Prioridades da equipe: no
 
 Cada bloco tem sua escadinha completa, colada na própria aula:
 
-- **Dia 0 · Quarta:** 10q pré-aula (priming) + **aula presencial A e B** (o gatilho da semana) + D+1 relâmpago. *Política de colisão:* se um plantão engolir a quarta, a presencial é vista **no dia seguinte, gravada/online, no lugar das aulas 1.5x daquela semana**.
-- **Dia 1 · Quinta:** **aula online do Bloco A → D2-A (30q + caderno + Anki dos erros)** no mesmo dia — teste a 1 dia da presencial, no topo da curva. Noite: fio A · toque 2 (15–20q do bloco antigo) — *se o dia render; senão, o sábado absorve, sem culpa*.
-- **Dia 2 · Sexta:** **aula online do Bloco B → D2-B (30q)** + **apostila do A dirigida pelos erros de ONTEM** + Feynman. (Quinzenalmente: SIMULADO, §11.)
-- **Dia 3 · Sábado:** apostila do B pelos erros + resumos · **selar o fio B da semana passada** · fio A toque 3 (apostila) · **fio B toque 1 (AULA)** · PLAN (intenções + recompensa + pomodoros + backup) · **tarde e noite protegidas** (ou estágio — nunca os dois).
-- **Domingo:** descanso dopaminérgico — Anki 30min e mais nada (salvo plantão datado).
-- **Dia 5 · Segunda:** **banco A+B + smartcards** (2ª recuperação espaçada) + fio B toques 2–3 + revisão adaptativa.
-- **Terça:** **selar o fio A da semana passada** (10q + smartcards + 4 checks — 3 dias após a apostila) → abrir o novo fio A pela AULA · temas fracos · (aula da faculdade 19h–21h até 11/10).
+- **Dia 0 · Quarta:** 10q pré-aula (priming) + **aula presencial A e B** (o gatilho da semana) + D+1 relâmpago. *Política de colisão:* se um plantão engolir a quarta, a presencial é vista **no dia seguinte, gravada/online, no lugar das aulas 1.5x daquela semana** — a 1.5x do B vira um resumo rápido (20min) antes do D2-B, sem dupla exposição sem teste (ex.: 07→08→09/10).
+- **Dia 1 · Quinta:** **aula online do Bloco A → D2-A (30q + caderno + Anki dos erros)** no mesmo dia — teste a 1 dia da presencial, no topo da curva. + **Fio 1 · toque 1 (AULA do bloco antigo)**.
+- **Dia 2 · Sexta:** **aula online do Bloco B → D2-B (30q)** + **apostila do A dirigida pelos erros de ONTEM** + Feynman + Fio 1 · questões (ritmo ≥3: + Fio 3 · aula). (Quinzenalmente: SIMULADO, §11 — a aula B + D2-B e a apostila do A deslizam para o domingo.)
+- **Dia 3 · Sábado:** **DIA LEVE — SEM Venvanse** (sugestão de janela a validar com a psiquiatra): Anki 30min + PLAN (intenções + recompensa + pomodoros + backup) · sem fios · **tarde e noite protegidas** (ou estágio — nunca os dois). É o vale de recuperação após o arco qui+sex.
+- **Dia 4 · Domingo:** **dia ATIVO** (com remédio, descansada de ontem): apostila do B pelos erros de sexta + Fio 1 · apostila + Fio 2 · aula (ritmo ≥3: + Fio 3 · questões) + academia. Em semana de simulado: aula B + D2-B deslocados + apostila do A (erros de quinta).
+- **Dia 5 · Segunda:** **banco A+B + smartcards** (2ª recuperação espaçada) + Fio 2 · questões (ritmo ≥3: + Fio 3 · apostila) + revisão adaptativa. Em semana de simulado: + apostila do B (erros de domingo).
+- **Terça:** **selar os fios FECHADOS na semana passada** (10q + smartcards + 4 checks) → Fio 2 · apostila (ritmo 4: + Fio 4 · aula, que continua na semana seguinte pelo seu check) · temas fracos · (aula da faculdade 19h–21h até 11/10).
+
+*Ritmo dos fios (1–4 na aba Desatraso) = `FIO_PAT`: Fio 1 qui→sex→dom · Fio 2 dom→seg→ter · Fio 3 sex→dom→seg · Fio 4 ter (continua na semana seguinte). Dois fios no mesmo dia são sempre módulos distintos.*
 
 Registre o **%** em toda bateria — é ele que calibra as revisões.
 
@@ -98,7 +100,7 @@ Registre o **%** em toda bateria — é ele que calibra as revisões.
 
 Por módulo: **toque 1 = AULA** (sempre primeiro; se você marcou a aula como vista há ≤8 semanas, direto às questões; há mais tempo, reexposição rápida — só o SEU check no app conta) → **toque 2 = questões** (+2 dias, com sono no meio; registre o %) → **toque 3 = apostila dos erros** → **SELAGEM** (+3 dias): 10 questões + smartcards + os 4 checks — o % da selagem entrega o módulo ao motor de revisões D+7/D+30. Sem selagem, o módulo está riscado; com ela, está *medido e agendado para ser lembrado*.
 
-Ferramentas: **📌 fixar/trocar** qualquer módulo da fila (a sugestão automática por recência continua o padrão); **planejador de pomodoros** (minutos da aula → nº de pomodoros 60/10/35 + divisão sugerida); **projeção de zeramento viva** (ritmos honestos: ~2/sem agora, 2/sem na recuperação, 4/sem na reta final; meta 31/12, pode ultrapassar — o horizonte do app acompanha).
+Ferramentas: **📌 fixar/trocar** qualquer módulo da fila (a sugestão automática por recência continua o padrão); **planejador de pomodoros** (minutos da aula → nº de pomodoros 60/10/35 + divisão sugerida — dimensionamento apenas; na execução, siga o Flowtime se estiver rendendo); **projeção de zeramento viva** (ritmos honestos: ~2/sem agora, 2/sem na recuperação, 4/sem na reta final; meta 31/12, pode ultrapassar — o horizonte do app acompanha).
 
 ---
 
@@ -128,7 +130,7 @@ Quinzenais, **sextas, âncora 14/08** — o app mostra sozinho qual sexta é de 
 
 ## 12 · O mapa das fases (automático no app)
 
-Até 09/09: regime anterior ("vale o que estava antes") · **10/09–11/10: grade real** — 11 plantões datados (diurnos 06h–19h, noturnos 18h–07h), aula da faculdade terças 19h, cascata nos dias livres, plantões com estudo nos tempos mortos · **12/10 em diante: provisório** — tudo livre, fixo só o Medcurso de quarta, até a nova grade · **25/11: recuperação** (fios A/B, simulados sextas) · **15/12: reta final** (1 fio/dia, domingo restaurado) · horizonte de semanas cresce com a projeção. Ferramentas transversais: mover atividades **nunca apaga nada** (aviso de tempo hábil ~14,5h + sua confirmação), selo ⚠️ em dia sobrecarregado, **backup e sincronização** na aba Sono (exporte antes de toda atualização; mesmo site = dados intactos).
+Até 09/09: regime anterior ("vale o que estava antes") · **10/09–11/10: grade real** — 11 plantões datados (diurnos 06h–19h, noturnos 18h–07h), aula da faculdade terças 19h, cascata nos dias livres, plantões com estudo nos tempos mortos · **12/10 em diante: provisório** — tudo livre, fixo só o Medcurso de quarta, até a nova grade · **25/11: recuperação — PROVISÓRIO até a nova grade** (dias livres, sem ambulatório e sem aula da faculdade: Fio A qua→qui→sex, Fio B sáb→dom→seg, selagem na terça, academia livre, simulados sextas) · **15/12: reta final** (1 fio/dia, domingo restaurado) · horizonte de semanas cresce com a projeção. Ferramentas transversais: mover atividades **nunca apaga nada** (aviso de tempo hábil ~14,5h + sua confirmação), selo ⚠️ em dia sobrecarregado, **backup e sincronização** na aba Sono (exporte antes de toda atualização; mesmo site = dados intactos).
 
 ---
 
