@@ -209,7 +209,7 @@ const SLEEP_TIPS = [
     { icon: "📖", tip: "30 min antes: só leitura (papel), podcast relaxante ou conversa." },
     { icon: "🌙", tip: "Night Shift ativado + brilho mínimo se precisar do celular." },
     { icon: "⏰", tip: "Acordar no mesmo horário todo dia — incluindo fins de semana (max +1h)." },
-    { icon: "💊", tip: "Dia leve sem Venvanse (sábado nesta fase; domingo volta na reta final) = recuperação dopaminérgica. Sono melhora — sugestão a validar com a psiquiatra." },
+    { icon: "💊", tip: "Dia sem Venvanse = o dia de menor carga da semana (o app marca com 🌿 no Cronograma; sábado por padrão, ajustável) — recuperação dopaminérgica, o sono melhora. Sugestão a validar com a psiquiatra." },
     { icon: "🌫️", tip: "Modo CINZA no celular a partir das 21h30 — cor é dopamina barata; cinza desarma o scroll." },
     { icon: "⏳", tip: "Redes/celular: SÓ das 21h30 às 22h15, como recompensa do dia cumprido. Depois, carregador fora do quarto." },
     { icon: "🚑", tip: "Véspera de plantão de 06h: janela de celular encurta para 21h00–21h30; luzes baixas 21h15; dormir 21h45." },
@@ -358,8 +358,8 @@ const WEEK_SCHEDULE_AMB = [
 // continua até ~fim de dezembro só com desatraso + revisão espaçada.
 // PROVISÓRIO — nova grade pendente da paciente: sem ambulatório recorrente e sem aula da faculdade
 // (decisões explícitas da paciente). Dias livres com dois fios de 3 toques em dias diferentes:
-//   Fio A = QUA aula → QUI questões → SEX apostila · Fio B = SÁB aula → DOM questões → SEG apostila
-//   TER = selagem dos fios fechados na semana passada · academia livre (6 dos 7 dias) · simulados quinzenais na sexta.
+//   Fio A = QUA aula → QUI questões → SEX apostila · Fio B = DOM aula → SEG questões → TER apostila · SÁB = template leve
+//   Selagem: Fio A na TER; Fio B na SEX sem simulado (com simulado desliza p/ o DOM) · academia livre (6 dos 7 dias) · simulados quinzenais na sexta.
 const CATCHUP_START = "2026-11-25";
 // ── FASE DE RECUPERAÇÃO A (25/11 a 14/12) — PROVISÓRIO — nova grade pendente da paciente ──
 const WEEK_SCHEDULE_CATCHUP = [
@@ -379,43 +379,45 @@ const WEEK_SCHEDULE_CATCHUP = [
             { d: "GYM", color: "#1D4ED8", text: "Academia — horário livre", time: "1h" },
             { d: "LAZER", color: "#6B7280", text: "Lazer à noite ❤️", time: "livre" },
         ] },
-    { day: "SEX", full: "Sexta", phase1_venv: "SIMULADO quinzenal OU dia livre · Fio A fecha pela apostila", emoji: "🎯",
+    { day: "SEX", full: "Sexta", phase1_venv: "SIMULADO quinzenal OU dia livre · Fio A fecha pela apostila · selar o Fio B da semana passada", emoji: "🎯",
         activities: [
             { d: "ANKI", color: "#0369A1", text: "Anki + Meditação 15min", time: "35min" },
             { d: "D7", color: "#0F766E", text: "D7 · SIMULADO NA ÍNTEGRA (quinzenal): manhã, cronometrado", time: "5h" },
             { d: "D7", color: "#0F766E", text: "D7 · CORREÇÃO DO SIMULADO: erro → entender → caderno → tema fraco", time: "3h" },
-            { d: "DESAT", color: "#B91C1C", text: "Fio A · toque 3: apostila dos erros do bloco antigo + Feynman — fecha o fio (dia de simulado: se não der, mova p/ sábado)", time: "1.5h" },
+            { d: "DESAT", color: "#B91C1C", text: "Fio A · toque 3: apostila dos erros do bloco antigo + Feynman — fecha o fio (dia de simulado: se não der, mova p/ domingo)", time: "1.5h" },
+            { d: "REV", color: "#15803D", text: "Sem simulado · Selar o Fio B da semana passada: 10 questões + smartcards + os 4 checks — o % agenda as revisões D+7/D+30", time: "40min" },
             { d: "REV", color: "#15803D", text: "Sem simulado: questões dos temas fracos do caderno de erros", time: "1.5h" },
             { d: "GYM", color: "#1D4ED8", text: "Academia — horário livre (dia de simulado: pós-correção)", time: "1h" },
             { d: "LAZER", color: "#6B7280", text: "Lazer à noite ❤️", time: "livre" },
         ] },
-    { day: "SAB", full: "Sábado", phase1_venv: "Fio B abre pela AULA de manhã → tarde/noite INTOCÁVEIS", emoji: "🌿",
+    { day: "SAB", full: "Sábado", phase1_venv: "DIA LEVE (template): só Anki + PLAN → tarde/noite INTOCÁVEIS — o dia SEM Venvanse é o do selo 🌿", emoji: "🌿",
+        activities: [
+            { d: "ANKI", color: "#0369A1", text: "Anki — 30min. Único estudo do dia (sem culpa).", time: "30min" },
+            { d: "PLAN", color: "#0F766E", text: "Implementação de intenção + RECOMPENSA por escrito · pomodoros: aba Desatraso · backup semanal", time: "15min" },
+            { d: "LAZER", color: "#6B7280", text: "Tarde e noite INTOCÁVEIS ❤️", time: "livre" },
+        ] },
+    { day: "DOM", full: "Domingo", phase1_venv: "Dia ATIVO · Fio B abre pela AULA (semana de simulado: + selagem do Fio B deslizada da sexta)", emoji: "🔥",
         activities: [
             { d: "ANKI", color: "#0369A1", text: "Anki + Meditação 15min", time: "35min" },
             { d: "DESAT", color: "#B91C1C", text: "Fio B · toque 1: aula online do bloco antigo (1.5x) + resumo — aula antes das questões, sempre", time: "1.7h" },
-            { d: "PLAN", color: "#0F766E", text: "Implementação de intenção + RECOMPENSA por escrito · pomodoros: aba Desatraso · backup semanal", time: "15min" },
+            { d: "REV", color: "#15803D", text: "Semana de simulado · Selar o Fio B da semana passada (deslizado da sexta): 10 questões + smartcards + os 4 checks — o % agenda as revisões D+7/D+30", time: "40min" },
+            { d: "REV", color: "#15803D", text: "Revisão D+30 adaptativa + caderno de erros", time: "1h" },
             { d: "GYM", color: "#1D4ED8", text: "Academia — horário livre", time: "1h" },
-            { d: "LAZER", color: "#6B7280", text: "Tarde e noite INTOCÁVEIS ❤️", time: "livre" },
+            { d: "LAZER", color: "#6B7280", text: "Noite leve — dormir bem para a segunda", time: "livre" },
         ] },
-    { day: "DOM", full: "Domingo", phase1_venv: "Dia livre · Fio B: questões + revisão D+30", emoji: "🔥",
+    { day: "SEG", full: "Segunda", phase1_venv: "Dia livre · Fio B: questões (uma noite de sono depois da aula)", emoji: "✍️",
         activities: [
             { d: "ANKI", color: "#0369A1", text: "Anki + Meditação 15min", time: "35min" },
             { d: "DESAT", color: "#B91C1C", text: "Fio B · toque 2: 30 questões do bloco antigo + caderno + Anki dos erros — registre o %", time: "2h" },
-            { d: "REV", color: "#15803D", text: "Revisão D+30 adaptativa + caderno de erros", time: "1h" },
-            { d: "LAZER", color: "#6B7280", text: "Noite leve — dormir bem (sem academia: descanso do treino na semana)", time: "livre" },
-        ] },
-    { day: "SEG", full: "Segunda", phase1_venv: "Dia livre · Fio B fecha pela apostila (manhã, pico)", emoji: "🔥",
-        activities: [
-            { d: "ANKI", color: "#0369A1", text: "Anki + Meditação 15min", time: "35min" },
-            { d: "DESAT", color: "#B91C1C", text: "Fio B · toque 3: apostila dos erros do bloco antigo + Feynman — fecha o fio", time: "1.5h" },
             { d: "REV", color: "#15803D", text: "Revisão adaptativa + Anki dos erros", time: "1h" },
             { d: "GYM", color: "#1D4ED8", text: "Academia — horário livre", time: "1h" },
             { d: "LAZER", color: "#6B7280", text: "Noite livre ❤️", time: "livre" },
         ] },
-    { day: "TER", full: "Terça", phase1_venv: "Selar os fios da semana passada · noite livre (âncora de descanso)", emoji: "📚",
+    { day: "TER", full: "Terça", phase1_venv: "Selar o Fio A da semana passada · Fio B fecha pela apostila · noite livre (âncora de descanso)", emoji: "📚",
         activities: [
             { d: "ANKI", color: "#0369A1", text: "Anki + Meditação 15min", time: "35min" },
-            { d: "REV", color: "#15803D", text: "Selar os fios FECHADOS na semana passada: 10 questões + smartcards + os 4 checks por módulo — o % agenda as revisões D+7/D+30", time: "40min" },
+            { d: "REV", color: "#15803D", text: "Selar o Fio A da semana passada: 10 questões + smartcards + os 4 checks — o % agenda as revisões D+7/D+30", time: "40min" },
+            { d: "DESAT", color: "#B91C1C", text: "Fio B · toque 3: apostila dos erros do bloco antigo + Feynman — fecha o fio", time: "1.5h" },
             { d: "REV", color: "#15803D", text: "Questões dos temas fracos + Smartcards", time: "1h" },
             { d: "GYM", color: "#1D4ED8", text: "Academia — horário livre", time: "1h" },
             { d: "LAZER", color: "#6B7280", text: "Noite livre ❤️", time: "livre" },
@@ -455,9 +457,9 @@ const WEEK_SCHEDULE_G2 = [
             { d: "GYM", color: "#1D4ED8", text: "Academia — horário livre (dia de simulado: pós-correção)", time: "1h" },
             { d: "LAZER", color: "#6B7280", text: "Lazer à noite ❤️", time: "livre" },
         ] },
-    { day: "SAB", full: "Sábado", phase1_venv: "DIA LEVE — SEM Venvanse: reset dopaminérgico após o arco qui+sex", emoji: "🌿",
+    { day: "SAB", full: "Sábado", phase1_venv: "DIA LEVE (template): só Anki + PLAN — o dia SEM Venvanse desta semana é o do selo 🌿 (sábado por padrão)", emoji: "🌿",
         activities: [
-            { d: "ANKI", color: "#0369A1", text: "Anki — 30min. Único estudo do dia (sem remédio, sem culpa).", time: "30min" },
+            { d: "ANKI", color: "#0369A1", text: "Anki — 30min. Único estudo do dia (sem culpa).", time: "30min" },
             { d: "PLAN", color: "#0F766E", text: "Implementação de intenção + RECOMPENSA por escrito · pomodoros: aba Desatraso · backup semanal", time: "15min" },
             { d: "LAZER", color: "#6B7280", text: "Dia inteiro de descanso — família, namorado (ou estágio voluntário, se escolher) ❤️", time: "livre" },
         ] },
@@ -516,9 +518,9 @@ const WEEK_SCHEDULE_POST = [
             { d: "GYM", color: "#1D4ED8", text: "Academia — horário livre (dia de simulado: pós-correção)", time: "1h" },
             { d: "LAZER", color: "#6B7280", text: "Lazer à noite ❤️", time: "livre" },
         ] },
-    { day: "SAB", full: "Sábado", phase1_venv: "DIA LEVE — SEM Venvanse: reset dopaminérgico após o arco qui+sex", emoji: "🌿",
+    { day: "SAB", full: "Sábado", phase1_venv: "DIA LEVE (template): só Anki + PLAN — o dia SEM Venvanse desta semana é o do selo 🌿 (sábado por padrão)", emoji: "🌿",
         activities: [
-            { d: "ANKI", color: "#0369A1", text: "Anki — 30min. Único estudo do dia (sem remédio, sem culpa).", time: "30min" },
+            { d: "ANKI", color: "#0369A1", text: "Anki — 30min. Único estudo do dia (sem culpa).", time: "30min" },
             { d: "PLAN", color: "#0F766E", text: "Implementação de intenção + RECOMPENSA por escrito · pomodoros: aba Desatraso · backup semanal", time: "15min" },
             { d: "LAZER", color: "#6B7280", text: "Dia inteiro de descanso — família, namorado (ou estágio voluntário, se escolher) ❤️", time: "livre" },
         ] },
@@ -621,23 +623,24 @@ const WEEK_SCHEDULE_FREE = [
             { d: "GYM", color: "#1D4ED8", text: "Academia — manhã (dia de simulado: fim de tarde)", time: "1h" },
             { d: "LAZER", color: "#6B7280", text: "Lazer à noite ❤️", time: "livre" },
         ] },
-    { day: "SAB", full: "Sábado", phase1_venv: "Manhã: fechar a semana → tarde/noite livres", emoji: "🌿",
+    { day: "SAB", full: "Sábado", phase1_venv: "DIA LEVE (template): só Anki + PLAN → tarde/noite livres — o dia SEM Venvanse é o do selo 🌿", emoji: "🌿",
+        activities: [
+            { d: "ANKI", color: "#0369A1", text: "Anki — 30min. Único estudo do dia (sem culpa).", time: "30min" },
+            { d: "PLAN", color: "#0F766E", text: "Implementação de intenção + RECOMPENSA por escrito · pomodoros: aba Desatraso · backup semanal", time: "15min" },
+            { d: "LAZER", color: "#6B7280", text: "Tarde e noite livres ❤️", time: "livre" },
+        ] },
+    { day: "DOM", full: "Domingo", phase1_venv: "Dia ATIVO — fechar os fios da semana (selagem) + fio do dia", emoji: "🔥",
         activities: [
             { d: "ANKI", color: "#0369A1", text: "Anki + Meditação 15min", time: "35min" },
             { d: "DESAT", color: "#B91C1C", text: "Fechar fios da semana: apostila pendente + questões dos erros do bloco antigo → smartcards + 4 checks (revisões adaptativas assumem)", time: "2.5h" },
-            { d: "PLAN", color: "#0F766E", text: "Implementação de intenção + RECOMPENSA por escrito · pomodoros: aba Desatraso", time: "15min" },
+            { d: "DESAT", color: "#B91C1C", text: "Fio do dia: aula online do bloco antigo (1.5x) → 30 questões + caderno — registre o %", time: "4h" },
             { d: "GYM", color: "#1D4ED8", text: "Academia", time: "1h" },
-            { d: "LAZER", color: "#6B7280", text: "Tarde e noite livres ❤️", time: "livre" },
-        ] },
-    { day: "DOM", full: "Domingo", phase1_venv: "SEM Venvanse — descanso dopaminérgico RESTAURADO", emoji: "🌿",
-        activities: [
-            { d: "ANKI", color: "#0369A1", text: "Anki — 30min. Único estudo do dia.", time: "30min" },
-            { d: "LAZER", color: "#6B7280", text: "Família, namorado, descanso total — domingo voltou a ser intocável ❤️", time: "livre" },
+            { d: "LAZER", color: "#6B7280", text: "Noite leve — dormir bem para a segunda", time: "livre" },
         ] },
     { day: "SEG", full: "Segunda", phase1_venv: "Reta final — dia-motor · Gym FIXA 17h30", emoji: "🔥",
         activities: [
             { d: "ANKI", color: "#0369A1", text: "Anki + Meditação 15min", time: "35min" },
-            { d: "DESAT", color: "#B91C1C", text: "Fio do dia: aula online do bloco antigo → 30 questões + caderno — registre o %", time: "4h" },
+            { d: "DESAT", color: "#B91C1C", text: "Fechar fio de ontem: apostila dos erros → fio do dia: aula online do bloco antigo + 30 questões + caderno — registre o %", time: "4h" },
             { d: "REV", color: "#15803D", text: "Revisão adaptativa + Anki dos erros", time: "1h" },
             { d: "GYM", color: "#1D4ED8", text: "Academia FIXA 17h30–19h30", time: "2h" },
             { d: "LAZER", color: "#6B7280", text: "Lazer à noite ❤️", time: "livre" },
@@ -663,6 +666,7 @@ const TAG_OPTIONS = ["D1", "D2", "D3", "D4", "D5", "D6", "D7", "REV", "ANKI", "G
 const PROGRESS_FIELDS = ["aula", "questoesD2", "apostila", "smartcard"];
 const PROGRESS_LABELS = { aula: "Aula ✓", questoesD2: "D2 (30q por bloco) ✓", apostila: "Apostila ✓", smartcard: "Smartcard ✓" };
 const WEEKDAY_ABBR = WEEK_SCHEDULE.map(d => d.day); // QUA,QUI,SEX,SAB,DOM,SEG,TER
+const DAY_LBL = ["QUA", "QUI", "SEX", "SÁB", "DOM", "SEG", "TER"]; // rótulos de exibição
 // ── DATE HELPERS ─────────────────────────────────────────────────────────────
 function todayISO() {
     const d = new Date();
@@ -711,6 +715,7 @@ const STUDY_WARN_H = 8; // acima disso o rendimento cai — o app avisa, você m
 function studyHours(list) { return (list || []).filter(a => ["GYM", "AMB", "LAZER", "SONO"].indexOf(a.d) === -1).reduce((s, a) => s + actHours(a), 0); }
 // ── MOTOR DE FIOS DINÂMICO (ritmo configurável, ordem aula→questões→apostila) ──
 let __SIM_SAVE = null;
+let __LIGHT_SAVE = null; // grava config.lightDayOverrides[isoDaQuarta] = dayIdx (ausente = automático)
 const FIO_PAT = [
     [[1, "aula"], [2, "quest"], [4, "apost"]],
     [[4, "aula"], [5, "quest"], [6, "apost"]],
@@ -990,13 +995,13 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, onSaveSchedule
     const catchupForDay = (dayIdx) => {
         const iso = weekDayISO(startISO, week, dayIdx);
         if (iso >= FREE_START) {
-            const map = { 0: 0, 1: 1, 2: 2, 3: 3, 5: 4, 6: 5 }; // Reta final: 1 fio por dia (domingo = descanso)
+            const map = { 0: 0, 1: 1, 2: 2, 4: 3, 5: 4, 6: 5 }; // Reta final: 1 fio por dia (sábado = template leve; domingo ativo)
             return (dayIdx in map) ? (targets[map[dayIdx]] || null) : null;
         }
         if (iso >= CATCHUP_START) {
-            // Fio A = 1º alvo (Qua→Qui→Sex); Fio B = 2º alvo (Sáb→Dom→Seg); Ter = selagem (sem fio novo)
+            // Fio A = 1º alvo (Qua→Qui→Sex); Fio B = 2º alvo (Dom→Seg→Ter); Sáb = template leve (sem fio)
             if (dayIdx <= 2) return targets[0] || null;
-            if (dayIdx <= 5) return targets[1] || targets[0] || null;
+            if (dayIdx >= 4) return targets[1] || targets[0] || null;
             return null;
         }
         if (iso >= G2_START) {
@@ -1025,14 +1030,15 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, onSaveSchedule
         if (iso >= AMB_START && iso <= AMB_END) return WEEK_SCHEDULE_AMB;
         return WEEK_SCHEDULE;
     };
+    // Sexta de simulado? override manual → sexta de plantão = não → paridade quinzenal (âncora 14/08)
+    const simFor = (fri) => { const ovr = ((config && config.simOverrides) || {})[fri]; return ovr !== undefined ? ovr : (DATED_SHIFTS[fri] ? false : (((diffDays(SIMULADO_ANCHOR, fri) % 14) + 14) % 14 === 0)); };
     const genActivities = (dayIdx) => {
         const iso = weekDayISO(startISO, week, dayIdx);
         let acts = schedFor(iso)[dayIdx].activities;
         if (iso >= AMB_START) {
             if (dayIdx === 2 || dayIdx === 3 || dayIdx === 4 || dayIdx === 5) {
                 const fri = weekDayISO(startISO, week, 2);
-                const ovr = ((config && config.simOverrides) || {})[fri];
-                const isSim = ovr !== undefined ? ovr : (DATED_SHIFTS[fri] ? false : (((diffDays(SIMULADO_ANCHOR, fri) % 14) + 14) % 14 === 0));
+                const isSim = simFor(fri);
                 acts = acts.filter(a => {
                     if (/SIMULADO NA ÍNTEGRA|CORREÇÃO DO SIMULADO/.test(a.text)) return isSim;
                     if (/^Sem simulado/.test(a.text)) return !isSim;
@@ -1129,6 +1135,37 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, onSaveSchedule
         }
         return null;
     };
+    // ── DIA SEM VENVANSE: domingo é SEMPRE dia de estudo; o dia sem remédio varia pela demanda da semana ──
+    // Candidatos: os 7 dias da semana visível, menos a quarta enquanto houver presencial (até 24/11), os dias com
+    // plantão datado e a sexta de simulado. Vence a menor carga de estudo (studyHours da lista REAL do dia; empate → sábado).
+    // Se a menor carga passar de STUDY_WARN_H (8h), não há dia leve natural: aviso. Override por semana em config.lightDayOverrides.
+    // O selo 🌿 NÃO altera os blocos do dia — "faça só o leve, mova o pesado". Pausa de medicação: validar com a psiquiatra.
+    const showLight = dateFor(6) >= G2_START; // semanas totalmente históricas (antes de 10/09) não mostram o seletor
+    const lightDayFor = () => {
+        const isSim = simFor(dateFor(2));
+        let best = null;
+        for (let i = 0; i < 7; i++) {
+            const iso = dateFor(i);
+            if (i === 0 && iso <= "2026-11-24") continue;   // quarta com aula presencial
+            if (DATED_SHIFTS[iso]) continue;                 // plantão datado
+            if (i === 2 && isSim) continue;                  // sexta de simulado
+            const hrs = studyHours(listFor(i));
+            if (!best || hrs < best.hours - 1e-9 || (Math.abs(hrs - best.hours) < 1e-9 && i === 3)) best = { idx: i, hours: hrs };
+        }
+        if (!best) return { idx: null, hours: null, min: null, source: "auto" };
+        if (best.hours > STUDY_WARN_H) return { idx: null, hours: null, min: best.hours, source: "auto" };
+        return { idx: best.idx, hours: best.hours, min: best.hours, source: "auto" };
+    };
+    const lightAuto = lightDayFor();
+    const lightOvRaw = ((config && config.lightDayOverrides) || {})[dateFor(0)];
+    const lightOv = (lightOvRaw === undefined || lightOvRaw === null || lightOvRaw === "") ? null : Number(lightOvRaw);
+    const lightDay = lightOv != null ? { idx: lightOv, hours: studyHours(listFor(lightOv)), min: lightAuto.min, source: "manual" } : lightAuto;
+    const setLightOverride = (val) => {
+        const o = { ...((config && config.lightDayOverrides) || {}) };
+        if (val === "auto") delete o[dateFor(0)]; else o[dateFor(0)] = Number(val);
+        __LIGHT_SAVE && __LIGHT_SAVE(o);
+    };
+    const fmtHrs = (x) => (Math.round(x * 10) / 10).toFixed(1).replace(".", ",") + "h";
     const day = schedFor(dateFor(activeIdx))[activeIdx];
     const dayDate = dateFor(activeIdx);
     const list = listFor(activeIdx);
@@ -1139,19 +1176,19 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, onSaveSchedule
             React.createElement("div", { style: { color: "#94a3b8", fontSize: 11, marginBottom: 10 } }, "ESTRUTURA DOS DIAS D"),
             React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 6 } }, (dayDate >= FREE_START ? [
                 { d: "—", label: "Reta final", desc: "Sem ambulatório — dias 100% livres", color: "#6B7280" },
-                { d: "DESAT", label: "Seg–Sáb", desc: "Desatraso pesado (recência 1º)", color: "#B91C1C" },
+                { d: "DESAT", label: "Dom–Ter · Qua–Sex", desc: "1 fio por dia (recência 1º) · sábado = template leve", color: "#B91C1C" },
                 { d: "D7", label: "Sexta", desc: "Simulado quinzenal + correção", color: "#0F766E" },
-                { d: "REV", label: "Domingo", desc: "Descanso dopaminérgico restaurado", color: "#15803D" },
+                { d: "🌿", label: "Sem remédio", desc: "Dia de menor carga da semana (selo 🌿), sábado por padrão", color: "#15803D" },
             ] : dayDate >= CATCHUP_START ? [
                 { d: "—", label: "Curso", desc: "Aulas presenciais encerradas — fase de recuperação", color: "#6B7280" },
-                { d: "DESAT", label: "Fio A qua→qui→sex · Fio B sáb→dom→seg", desc: "Aula → questões → apostila em dias diferentes · selagem na terça (provisório até a nova grade)", color: "#B91C1C" },
+                { d: "DESAT", label: "Fio A qua→qui→sex · Fio B dom→seg→ter", desc: "Aula → questões → apostila em dias diferentes · selagem: A na terça, B na sexta (domingo em semana de simulado) · sáb = template leve (provisório até a nova grade)", color: "#B91C1C" },
                 { d: "REV", label: "Espaçada", desc: "D+7/D+30 do que já foi visto", color: "#15803D" },
                 { d: "D7", label: "Sexta", desc: "Simulado quinzenal mantido", color: "#0F766E" },
             ] : dayDate >= G2_START ? [
                 { d: "D1", label: "Quarta", desc: "Dia 0: 10q pré-aula (priming) + presencial A e B", color: "#2980B9" },
                 { d: "D3→D2", label: "Qui / Sex", desc: "Aula online do bloco → 30q no MESMO dia (A qui · B sex) — registre o %", color: "#C2410C" },
                 { d: "D4", label: "Sex+Dom", desc: "Apostila pelos erros (A sex, de quinta · B dom, de sexta) + Feynman", color: "#7E22CE" },
-                { d: "D5/D6", label: "Seg", desc: "Banco A+B · SÁB = descanso sem Venvanse · DOM ativo · fios: ritmo 1–4 na aba Desatraso", color: "#B45309" },
+                { d: "D5/D6", label: "Seg", desc: "Banco A+B · SÁB = template leve · DOM ativo · dia sem Venvanse = selo 🌿 (menor carga) · fios: ritmo 1–4 na aba Desatraso", color: "#B45309" },
             ] : dayDate >= AMB_START && dayDate <= AMB_END ? [
                 { d: "D1", label: "Quarta", desc: "10q pré-aula (priming) + presencial A e B", color: "#2980B9" },
                 { d: "D3", label: "Qui+Sex", desc: "Aulas online: áudio no plantão (A) + vídeo sexta (B) — aula ANTES das questões", color: "#7E22CE" },
@@ -1176,6 +1213,14 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, onSaveSchedule
                 "\u23F1\uFE0F ",
                 React.createElement("strong", { style: { color: "#94a3b8" } }, "Flowtime"),
                 ", n\u00E3o Pomodoro: trabalhe at\u00E9 sentir a queda real de foco, registre e pause proporcional ao bloco. Reentrada: antes de parar, deixe a pr\u00F3xima linha escrita (\"retomar em: ___\").")),
+        showLight && React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", background: "#0f2e1a", border: "1px solid #14532d", borderRadius: 10, padding: "8px 12px" } },
+            React.createElement("span", { style: { color: "#86efac", fontSize: 11, fontWeight: 800, whiteSpace: "nowrap" } }, "🌿 Sem remédio:"),
+            React.createElement("select", { value: lightOv == null ? "auto" : String(lightOv), onChange: e => setLightOverride(e.target.value), title: "Dia sem Venvanse desta semana — Auto = menor carga entre os dias livres (sábado por padrão) · validar com a psiquiatra", style: { background: "#0f172a", border: "1px solid #14532d", borderRadius: 8, color: "#86efac", fontSize: 11, fontWeight: 700, padding: "5px 8px", cursor: "pointer" } },
+                React.createElement("option", { value: "auto" }, "Auto · " + (lightAuto.idx != null ? DAY_LBL[lightAuto.idx] : "—")),
+                DAY_LBL.map((nm, i) => React.createElement("option", { key: i, value: String(i) }, nm))),
+            lightDay.idx != null
+                ? React.createElement("span", { style: { color: "#64748b", fontSize: 10, lineHeight: 1.4 } }, DAY_LBL[lightDay.idx] + " " + fmtBR(dateFor(lightDay.idx)) + " · " + fmtHrs(lightDay.hours) + " de estudo" + (lightDay.source === "manual" ? " · escolha manual" : " · menor carga entre os dias livres") + " · validar com a psiquiatra")
+                : React.createElement("span", { style: { color: "#f5c518", fontSize: 10, fontWeight: 800, lineHeight: 1.4 } }, "🌿 Nenhum dia leve natural esta semana" + (lightAuto.min != null ? " (menor carga: " + fmtHrs(lightAuto.min) + ")" : "") + " — considere reduzir o ritmo")),
         React.createElement("div", { style: { display: "flex", gap: 6, overflowX: "auto", paddingBottom: 4 } }, WEEK_SCHEDULE.map((_d, i) => {
             const dt = dateFor(i);
             const d = schedFor(dt)[i];
@@ -1202,7 +1247,8 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, onSaveSchedule
                             fmtBR(dayDate))),
                     React.createElement("div", { style: { color: "#f5c518", fontSize: 11, marginTop: 4 } },
                         "\uD83D\uDC8A ",
-                        day.phase1_venv)),
+                        day.phase1_venv),
+                    (showLight && lightDay.idx === activeIdx) && React.createElement("div", { style: { color: "#86efac", fontSize: 11, marginTop: 4, fontWeight: 700, lineHeight: 1.4 } }, "🌿 Hoje sem Venvanse — faça só o leve, mova o pesado (pausa variável: validar com a psiquiatra)")),
                 React.createElement("div", { style: { textAlign: "right" } },
                     React.createElement(Badge, { label: `Sem.${week}`, color: "#92400e" }),
                     React.createElement("div", { style: { color: "#64748b", fontSize: 10, marginTop: 4 } },
@@ -1530,8 +1576,8 @@ function PlanejadorSemana({ progress, onUpdate, effWeek, config, onSaveConfig })
     const projW = rawWeekOf(proj);
     const zerado = proj <= todayISO();
     const tISO = todayISO();
-    const dayCaps = tISO >= FREE_START ? [["QUA", 3], ["QUI", 3], ["SEX", 3], ["S\u00c1B", 2], ["SEG", 3], ["TER", 3]]
-        : tISO >= CATCHUP_START ? [["QUA", 3], ["QUI", 2], ["S\u00c1B", 3], ["DOM", 2]]
+    const dayCaps = tISO >= FREE_START ? [["QUA", 3], ["QUI", 3], ["SEX", 3], ["DOM", 3], ["SEG", 3], ["TER", 3]]
+        : tISO >= CATCHUP_START ? [["QUA", 3], ["QUI", 2], ["DOM", 3], ["SEG", 2]]
             : tISO >= G2_START ? [["QUI", 2], ["SEX", 2], ["DOM", 3], ["SEG", 3], ["TER", 3]]
             : [["TER (noite)", 1], ["SEX", 3], ["S\u00c1B", 2]];
     const capLeft = dayCaps.map(d => d[1]);
@@ -1627,8 +1673,8 @@ function CatchUp({ progress, onUpdate, effWeek, config, onSaveConfig }) {
     const onTrack = remaining === 0 || proj <= "2026-12-31";
     const slotFor = (i) => {
         const t = todayISO();
-        if (t >= FREE_START) return ["QUA", "QUI", "SEX", "SÁB", "SEG", "TER"][i] || "…";
-        if (t >= CATCHUP_START) return i === 0 ? "FIO A · Qua/Qui/Sex" : "FIO B · Sáb/Dom/Seg";
+        if (t >= FREE_START) return ["QUA", "QUI", "SEX", "DOM", "SEG", "TER"][i] || "…";
+        if (t >= CATCHUP_START) return i === 0 ? "FIO A · Qua/Qui/Sex" : "FIO B · Dom/Seg/Ter";
         if (t >= G2_START) return "FIO " + (i + 1);
         if (t >= AMB_START && t <= AMB_END) return i === 0 ? "FIO · Ter→Sex→Sáb" : "PRÓXIMO · Dom (áudio)";
         return i === 0 ? "SEX" : i === 1 ? "TER" : "SÁB";
@@ -1947,6 +1993,7 @@ function App() {
     setDynTW(progress); // horizonte dinâmico: acompanha a projeção de zeramento
     setCatchupPins(config && config.catchupPins);
     __SIM_SAVE = (ov) => saveConfig({ ...config, simOverrides: ov });
+    __LIGHT_SAVE = (ov) => saveConfig({ ...config, lightDayOverrides: ov });
     const markReviewDone = useCallback((id, kind, pct) => {
         setProgress(prev => {
             const cur = prev[id] || {};

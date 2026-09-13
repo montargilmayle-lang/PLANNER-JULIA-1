@@ -51,7 +51,7 @@ pré-03/08  → histórico (template antigo intacto, prova sáb, aula 18h20)
 10/09–11/10 → G2 (grade real com plantões DATADOS — ver §6)
 > 11/10     → POST (provisório: tudo livre, só Medcurso qua — até nova grade)
 25/11–14/12 → CATCHUP (PROVISÓRIO — nova grade pendente: dias livres, Fio A qua→qui→sex, Fio B sáb→dom→seg, selagem ter, academia livre, simulados)
-15/12+      → FREE (1 fio/dia, domingo restaurado sem Venvanse)
+15/12+      → FREE (1 fio/dia; sábado = template leve; domingo recebe o fio do dia)
 ```
 
 **Cada fase tem seu próprio `WEEK_SCHEDULE_*`:** `WEEK_SCHEDULE_AMB`, `WEEK_SCHEDULE_G2`, `WEEK_SCHEDULE_POST`, `WEEK_SCHEDULE_CATCHUP`, `WEEK_SCHEDULE_FREE`.
@@ -67,8 +67,8 @@ Esta é a distribuição **correta e validada pela equipe**. Não alterar sem re
 | **QUA (Dia 0)** | 10q pré-aula (priming) + **aula presencial A e B** (17h–22h) + D+1 relâmpago | Pretesting (Kornell 2009); gatilho da semana |
 | **QUI (Dia 1)** | **Aula online Bloco A (1.5x) → D2-A (30q) no mesmo dia** + **Fio 1 · aula** | Testing effect a 1 dia da presencial (Roediger 2006) |
 | **SEX (Dia 2)** | **Aula online Bloco B → D2-B (30q)** + **Apostila do A pelos erros de ontem** + Fio 1 · questões (ritmo ≥3: + Fio 3 · aula) | Erro→releitura em 24h; prática distribuída (Cepeda 2006) |
-| **SÁB (Dia 3)** | **DIA LEVE — SEM Venvanse** (Anki 30min + PLAN) — sem fios | Reset dopaminérgico após arco qui+sex; domingo descansado vira dia ativo pleno |
-| **DOM (Dia 4)** | **Dia ATIVO** (com remédio): Apostila do B + Fio 1 · apostila + Fio 2 · aula (ritmo ≥3: + Fio 3 · questões) + gym | Descansado pelo sábado; alimenta a segunda |
+| **SÁB (Dia 3)** | **DIA LEVE (template)**: Anki 30min + PLAN — sem fios. O dia **sem Venvanse** é o selo 🌿 calculado pela menor carga entre os dias livres (sábado por padrão; override por semana) | Reset dopaminérgico no dia de menor demanda; domingo é sempre dia de estudo |
+| **DOM (Dia 4)** | **Dia ATIVO** (domingo é sempre dia de estudo): Apostila do B + Fio 1 · apostila + Fio 2 · aula (ritmo ≥3: + Fio 3 · questões) + gym | Descansado pelo sábado; alimenta a segunda |
 | **SEG (Dia 5)** | Banco A+B + smartcards (D5/D6) + Fio 2 · questões (ritmo ≥3: + Fio 3 · apostila) | 2ª recuperação espaçada |
 | **TER (Dia 6)** | Selar os fios FECHADOS na semana passada + Fio 2 · apostila (ritmo 4: + Fio 4 · aula, que continua na semana seguinte) + faculdade 19h (até 11/10) | Selagem = re-recuperação pós-critério (Rawson 2011) |
 
@@ -203,6 +203,7 @@ const PROJ_PACE = { amb: 1, g2: __PACE, catchup: 2, free: 4 };
 ```javascript
 const DAY_CAP_H = 14.5; // 24h − 8h sono − 1h30 refeições
 ```
+- `lightDayFor()` (Schedule): dia SEM Venvanse da semana visível = menor `studyHours(listFor(dayIdx))` entre os candidatos (7 dias menos a quarta com presencial `iso <= "2026-11-24"`, dias com `DATED_SHIFTS` e a sexta quando `isSim`); empate → sábado; menor carga > `STUDY_WARN_H` → `null` + aviso amarelo. Override: `config.lightDayOverrides[isoDaQuarta] = dayIdx` (ponte `__LIGHT_SAVE`). UI: seletor `🌿 Sem remédio: [Auto · SÁB] ▾` acima das abas dos dias + selo no cabeçalho do dia escolhido. O selo não altera blocos; semanas totalmente anteriores a 10/09 não mostram o seletor.
 - `moveAct` verifica o total do dia destino antes de mover
 - Se > 14.5h: `window.confirm` pergunta se mantém tudo ("Manter TUDO nesse dia mesmo assim?")
 - Cancela = só desfaz o movimento, nada é apagado
@@ -226,8 +227,9 @@ const DAY_CAP_H = 14.5; // 24h − 8h sono − 1h30 refeições
 |---|---|
 | Motor de fios dinâmico (FIO_PAT + fioBlocksFor) | ✅ |
 | Toggle simulado (__SIM_SAVE + botão na sexta) | ✅ |
-| SÁB = DIA LEVE sem Venvanse | ✅ |
-| DOM = Dia ATIVO com remédio | ✅ |
+| SÁB = template leve por construção (G2/POST/CATCHUP/FREE) | ✅ |
+| DOM = sempre dia de estudo (FREE: recebe o fio do dia) | ✅ |
+| Dia sem Venvanse calculado por semana (lightDayFor: menor carga entre dias livres, sábado no empate; override config.lightDayOverrides; selo 🌿; aviso se >8h) | ✅ |
 | Seletor de ritmo 1–4 na aba Desatraso | ✅ |
 | Projeção pace-aware (__PACE) | ✅ |
 | Tempos: aula 1.7h, questões 2h, apostila 1.5h | ✅ |
@@ -261,7 +263,7 @@ const DAY_CAP_H = 14.5; // 24h − 8h sono − 1h30 refeições
 ### A · RESOLVIDO (12/09) — card de Estrutura corrigido ("Sex+Dom"); blocos do sábado confirmados visualmente (só Anki + PLAN + LAZER; nos plantões, + 🚑 e lazer específico)
 
 ### F · CATCHUP (25/11+) é PROVISÓRIO — distribuição escolhida na auditoria de 13/09
-Sem ambulatório e sem aula da faculdade (decisões da paciente). Fio A = qua (aula) → qui (questões) → sex (apostila); Fio B = sáb (aula) → dom (questões) → seg (apostila); ter = selagem dos fios fechados na semana passada; academia livre em 6 dias (domingo sem); simulados quinzenais na sexta (o Fio A apostila fica no dia — o 📚 avisa; se não der, sábado). **Ponto em aberto para a paciente:** esta fase não declara um dia sem Venvanse (o sábado leve é decisão da G2/POST pelo arco qui+sex; o domingo sem remédio é decisão da fase FREE). Trocar quando a nova grade chegar.
+Sem ambulatório e sem aula da faculdade (decisões da paciente). Fio A = qua (aula) → qui (questões) → sex (apostila); Fio B = dom (aula) → seg (questões) → ter (apostila); sábado = template leve (Anki + PLAN); selagem do Fio A na terça e do Fio B na sexta sem simulado (com simulado, desliza para o domingo); academia livre em 6 dias (sábado sem); simulados quinzenais na sexta (o Fio A apostila fica no dia — o 📚 avisa; se não der, domingo). O dia sem Venvanse segue a regra geral (decisão 15). Trocar quando a nova grade chegar.
 
 ### B · RESOLVIDO — DOM sem simulado tem apostila do B (erros de sexta) + fios; com simulado tem aula B + D2-B + apostila do A. Testado.
 
@@ -319,8 +321,8 @@ await page.waitForTimeout(1200); // aguardar React renderizar
 ## 16 · Decisões que NÃO devem ser revertidas
 
 1. **Aula SEMPRE antes de questões/apostila** — em toda fase, em todo fio, no desatraso
-2. **Sábado = dia leve SEM Venvanse** (não domingo; o argumento é o arco qui+sex + domingo ativo alimenta a segunda)
-3. **Domingo = dia ATIVO** com remédio, apostila do B + fios
+2. **Sábado = template leve por construção** (Anki + PLAN) em G2/POST/CATCHUP/FREE — o dia SEM Venvanse é calculado (decisão 15)
+3. **Domingo = sempre dia de estudo** (G2/POST: apostila do B + fios; FREE: fio do dia)
 4. **Simulados são OPCIONAIS** — override por data, 2º toque apaga e volta à paridade
 5. **Plantões datados substituem o template** — nunca acumular fios em dia de plantão de 13h
 6. **Nada é apagado ao mover** — só o movimento é desfeito se cancelado
@@ -330,8 +332,9 @@ await page.waitForTimeout(1200); // aguardar React renderizar
 10. **Backup antes de atualizar o site** — mesma URL no Netlify = dados intactos
 11. **Plantão diurno:** Anki no trajeto (20min) e academia opcional; **dia pós-noturno SEM academia** (a regra de saúde vence a "plantão não é dia morto", que protege o ESTUDO)
 12. **Colisão da presencial:** a gravada substitui as aulas 1.5x da semana toda (plural); o D2-B vem após um resumo rápido, nunca após nova exposição sem teste
-13. **CATCHUP sem ambulatório Ter/Qui/Dom e sem aula da faculdade** — provisório até a nova grade; o domingo sem Venvanse só volta na fase FREE
+13. **CATCHUP sem ambulatório Ter/Qui/Dom e sem aula da faculdade** — provisório até a nova grade; sábado = template leve, Fio B dom→seg→ter, selagem do A na terça e do B na sexta (domingo em semana de simulado)
 14. **Flowtime × Pomodoro coexistem:** Flowtime governa a EXECUÇÃO; o planejador 60/10/35 só DIMENSIONA as aulas de desatraso
+15. **Domingo sempre estudo; dia sem Venvanse calculado pela demanda** (menor carga entre os dias livres da semana), sábado por padrão, override por semana (`config.lightDayOverrides`), validar com a psiquiatra — substitui "sábado = dia leve em todas as fases"
 
 ---
 
