@@ -36,7 +36,7 @@ AMB_END       = "2026-11-24"   // fim do ambulatório
 G2_START      = "2026-09-10"   // grade real de plantões
 G2_END        = "2026-10-11"   // fim da grade real
 CATCHUP_START = "2026-11-25"   // recuperação (fios A/B)
-FREE_START    = "2026-12-15"   // reta final (1 fio/dia)
+FREE_START    = "2026-12-16"   // reta final em PIPELINE — QUARTA (a terça 15/12 fecha o Fio B da última semana CATCHUP)
 TOTAL_WEEKS   = 51             // piso; dynTW() cresce com a projeção
 SIMULADO_ANCHOR = "2026-08-14" // 1ª sexta COM simulado (âncora quinzenal real)
 ```
@@ -51,7 +51,7 @@ pré-03/08  → histórico (template antigo intacto, prova sáb, aula 18h20)
 10/09–11/10 → G2 (grade real com plantões DATADOS — ver §6)
 > 11/10     → POST (provisório: tudo livre, só Medcurso qua — até nova grade; SEM aula da faculdade — decisão fechada da paciente em 14/09)
 25/11–14/12 → CATCHUP (PROVISÓRIO — nova grade pendente: dias livres, Fio A qua→qui→sex, Fio B sáb→dom→seg, selagem ter, academia livre, simulados)
-15/12+      → FREE (1 fio/dia; sábado = template leve; domingo recebe o fio do dia)
+16/12+      → FREE em PIPELINE: cada dia livre = aula do fio de hoje + questões do de ontem + apostila do de anteontem + selagem do de há ~5 dias (6 fios/semana, Fio 1..6 = QUA·QUI·SEX·DOM·SEG·TER; sábado = template leve)
 ```
 
 **Cada fase tem seu próprio `WEEK_SCHEDULE_*`:** `WEEK_SCHEDULE_AMB`, `WEEK_SCHEDULE_G2`, `WEEK_SCHEDULE_POST`, `WEEK_SCHEDULE_CATCHUP`, `WEEK_SCHEDULE_FREE`.
@@ -124,8 +124,8 @@ const FIO_PAT = [
 **Regras dos plantões (REGRA DA PACIENTE: plantão NÃO é dia morto):**
 - `buildShiftDay` é **NÃO-DESTRUTIVO**: mantém TODOS os blocos do dia (cascata A/B, fios, gym) e ACRESCENTA o bloco do plantão. O ⚠️ (tempo hábil >14,5h) e o 📚 (estudo >8h) avisam; a paciente move o que não der.
 - Diurno 13h: bloco 🚑 no topo + blocos do dia + fechamento "dormir ~21h45". O bloco ANKI vira "Anki no trajeto — 20min (meditação 10min no almoço ou à noite)" e o GYM vira "Academia — opcional, só se sobrar energia" (30min)
-- Noturno (dia de saída): blocos do dia + bloco 🌙 no fim ("encerre até ~17h")
-- Dia seguinte a noturno: bloco 😴 (dormir até ~12h30) no topo + blocos do dia mantidos, **sem academia** (protocolo §4 — a regra de saúde vence); Anki do base mantido
+- Véspera de noturno (dia em que ENTRA às 18h) — regra da paciente (14/09): dia normal de estudo começando mais tarde. Bloco 😴 "Acordar mais tarde (~09h) — você entra no plantão às 18h e vira a noite" (tempo "—") no topo + TODOS os blocos de estudo + academia + 🌙 no fim ("encerre os blocos até ~17h · saída ~17h15")
+- Dia pós-noturno (chega às 07h) — regra da paciente (14/09): dia de ESTUDO com o sono como bloco inegociável antes. Bloco 😴 "Chegando (~07h): dormir até ~13h — bloco inegociável. Depois, dia de estudo normal: comece pelo mais pesado" (6h) no topo + blocos do template para valer; **sem academia** (veto 🏃 + 😴 mantido); o selo 📚 dispara em **5h** de estudo (`STUDY_WARN_POSTNIGHT_H`, janela desperta ~13h–22h) — sinal para mover o excedente, não freio. A linguagem de "manutenção" foi revogada
 - Arco 05→06→07/10 (noturno PM04 → recuperação + aula 19h30 → plantão diurno na quarta da presencial): o trecho mais duro da grade — 05/10 recebe os blocos da segunda + 🌙 no fim; 06/10 recebe 😴 + blocos da terça com a aula preservada e sem academia; 07/10 é a colisão (⚠️ dispara; ela decide). Grade atualizada em 14/09: o noturno de 28/09 saiu; 28/09 virou pós-noturno simples e 29/09 terça normal
 - Colisão com AULA presencial (07/10): o bloco da aula vira aviso "vista AMANHÃ, online"; a gravada substitui **as aulas 1.5x da semana (plural)**: 08/10 recebe a presencial gravada (A+B) no lugar da 1.5x do A; 09/10 troca a 1.5x do B por "Resumo rápido do Bloco B (visto na gravação de ontem) → vá direto ao D2-B" (20min) — sem dupla exposição sem teste entre elas
 - **Sexta de plantão = sem simulado por padrão** (`DATED_SHIFTS[fri] ? false : paridade`), salvo override manual
@@ -188,7 +188,7 @@ function r2Interval(p) {
 ## 10 · Projeção de zeramento (dinâmica)
 
 ```javascript
-const PROJ_PACE = { amb: 1, g2: __PACE, catchup: 2, free: 4 };
+const PROJ_PACE = { amb: 1, g2: __PACE, catchup: 2, free: 6 }; // free: o pipeline abre 6 fios/semana
 // __PACE é alimentado pelo seletor de ritmo (1–4) na aba Desatraso (setPaceCfg ANTES de setDynTW no render do App)
 // dynTW() cresce para cobrir a projeção além de TOTAL_WEEKS
 // Meta: 31/12/2026, pode ultrapassar
@@ -204,6 +204,8 @@ const PROJ_PACE = { amb: 1, g2: __PACE, catchup: 2, free: 4 };
 const DAY_CAP_H = 14.5; // 24h − 8h sono − 1h30 refeições
 ```
 - `lightDayFor()` (Schedule): dia SEM Venvanse da semana visível = menor `studyHours(listFor(dayIdx))` entre os candidatos (7 dias menos a quarta com presencial `iso <= "2026-11-24"`, dias com `DATED_SHIFTS`, dias PÓS-NOTURNO (`DATED_SHIFTS[addDaysISO(iso,-1)].kind === "noite"` — veto 🧠: pausa + privação de sono + compromisso noturno) e a sexta quando `isSim`); empate → sábado; menor carga > `STUDY_WARN_H` → o menos pesado vira DIA DE RESPIRO (`breather: true`; selo 🌬️ âmbar "Dia de respiro — o mais leve da semana. COM Venvanse…", sem texto de pausa); `null` só quando não há candidato. O selo 🌿 só aparece quando há dia realmente leve; a escolha manual é sempre "sem remédio" (dela), com selo de validação. O domingo NÃO é excluído dos candidatos: pode ser o dia sem remédio ou dia ativo, a critério da equipe em cada semana (14/09). Override: `config.lightDayOverrides[isoDaQuarta] = dayIdx` (ponte `__LIGHT_SAVE`). UI: seletor `🌿 Sem remédio: [Auto · SÁB] ▾` acima das abas dos dias + selo no cabeçalho do dia escolhido. O selo não altera blocos; semanas totalmente anteriores a 10/09 não mostram o seletor.
+- `STUDY_WARN_POSTNIGHT_H = 5`: no dia pós-noturno o selo 📚 dispara em 5h de estudo (em vez de 8h)
+- Reta final: `weekFioIds(config, progress, wk, startISO)` devolve os 6 fios da semana — snapshot `config.fioWeek[isoDaQuarta]` gravado pelo App (useEffect) na 1ª renderização da semana corrente, senão cálculo vivo. `resolveBlock` resolve "Fio N" e "Fio N (sem. passada)" por esse snapshot; a 1ª semana do pipeline omite os blocos "(sem. passada)"
 - `moveAct` verifica o total do dia destino antes de mover
 - Se > 14.5h: `window.confirm` pergunta se mantém tudo ("Manter TUDO nesse dia mesmo assim?")
 - Cancela = só desfaz o movimento, nada é apagado
@@ -234,6 +236,10 @@ const DAY_CAP_H = 14.5; // 24h − 8h sono − 1h30 refeições
 | Semana sem dia leve → 🌬️ dia de respiro COM Venvanse (o mais leve), sem pausa (🧠 + 💬, 14/09) | ✅ |
 | Card ACADEMIA: "1 treino em 6 dos 7 dias · sem treino no dia pós-noturno"; dia sem treino = "sem treino" (não "descanso") | ✅ |
 | Após 11/10 sem aula da faculdade — decisão fechada (14/09) | ✅ |
+| FREE em pipeline (aula hoje · questões ontem · apostila anteontem · selagem em bloco próprio), 6 fios/semana congelados por `config.fioWeek` (PR #4) | ✅ |
+| FREE_START = quarta 16/12; PROJ_PACE.free = 6 (PR #4) | ✅ |
+| Véspera de noturno = dia normal começando mais tarde (😴 ~09h); pós-noturno = sono até ~13h inegociável + estudo real; 📚 em 5h no pós-noturno; academia ausente no pós-noturno (4a–4d, PR #4) | ✅ |
+| Regra de trabalho da equipe registrada em §17 (PR #4) | ✅ |
 | Colisão 08→09/10 confirmada pela paciente (14/09) | ✅ |
 | Seletor de ritmo 1–4 na aba Desatraso | ✅ |
 | Projeção pace-aware (__PACE) | ✅ |
@@ -267,15 +273,15 @@ const DAY_CAP_H = 14.5; // 24h − 8h sono − 1h30 refeições
 
 ### A · RESOLVIDO (12/09) — card de Estrutura corrigido ("Sex+Dom"); blocos do sábado confirmados visualmente (só Anki + PLAN + LAZER; nos plantões, + 🚑 e lazer específico)
 
-### G · Pendências APROVADAS para o PR #3 (decisões da equipe e da paciente em 14/09 — implementar em seguida, com este desenho)
+### G · IMPLEMENTADO no PR #4 (decisões da equipe e da paciente em 14/09 — o desenho abaixo é o que está no código)
 1. **FREE em pipeline (📚 tem razão; ritmo mantido):** 1 fio novo por dia, toques escalonados entre dias — cada dia livre contém a AULA do fio de hoje, as QUESTÕES do fio de ontem e a APOSTILA do fio de anteontem (1 dia + uma noite de sono entre exposição e teste; feedback do erro em ~24h). A selagem sai desse bloco e vira bloco próprio, fechando os fios cujas apostilas ocorreram há ~3 dias. Sábado continua template leve; domingo entra no pipeline.
 2. **Dias de plantão — nova regra da paciente (revoga a "manutenção" aprovada antes pela equipe):**
    - 2a · Véspera de noturno (entra às 18h) = dia normal de estudo começando mais tarde. Em `buildShiftDay`, ramo `kind === "noite"`: prepor SONO "😴 Acordar mais tarde (~09h) — você entra no plantão às 18h e vira a noite" (time "—"); manter todos os blocos de estudo; bloco 🌙 final "…encerre os blocos até ~17h · saída ~17h15"; nenhum texto tratando o dia como leve; academia mantida.
    - 2b · Pós-noturno (chega às 07h) = dia de estudo com o sono como bloco inegociável antes. SONO no topo com "😴 Chegando (~07h): dormir até ~13h — bloco inegociável. Depois, dia de estudo normal: comece pelo mais pesado" (time "6h"). Sem linguagem de "manutenção"; blocos do template ficam e valem.
    - 2c · `STUDY_WARN_POSTNIGHT_H = 5`: o selo 📚 dispara em 5h de estudo nos dias pós-noturno (janela desperta ~13h–22h) — sinal para mover o excedente, não freio.
    - 2d · Academia no pós-noturno continua ausente (veto 🏃 + 😴 mantido; a paciente autorizou estudo, não treino). Sinalizar se ela quiser rever.
-   - Testes obrigatórios: 20/09 e 05/10 (vésperas), 21/09 e 06/10 (pós-noturno: sono até 13h, blocos reais, 📚 em 5h, sem academia).
-3. **Regra de trabalho** (§17): antes de cada mudança, a linha "membro + evidência" (sem membro que a peça → sugestão); antes de entregar, passagem pelos oito membros; conflitos apresentados, não decididos; nunca alteração silenciosa — registrar em §17 junto com o PR #3.
+   - Testado: 20/09 e 05/10 (vésperas), 21/09 e 06/10 (pós-noturno), 15/12 (ainda CATCHUP), 16–22/12 (1ª semana do pipeline) e 23–29/12 (pipeline completo com a semana anterior).
+3. **Regra de trabalho** (§17): antes de cada mudança, a linha "membro + evidência" (sem membro que a peça → sugestão); antes de entregar, passagem pelos oito membros; conflitos apresentados, não decididos; nunca alteração silenciosa — registrada em §17.
 
 ### F · CATCHUP (25/11+) é PROVISÓRIO — distribuição escolhida na auditoria de 13/09
 Sem ambulatório e sem aula da faculdade (decisões da paciente). Fio A = qua (aula) → qui (questões) → sex (apostila); Fio B = dom (aula) → seg (questões) → ter (apostila); sábado = template leve (Anki + PLAN); selagem do Fio A na terça e do Fio B na sexta sem simulado (com simulado, desliza para o domingo); academia livre em 6 dias (sábado sem); simulados quinzenais na sexta (o Fio A apostila fica no dia — o 📚 avisa; se não der, domingo). O dia sem Venvanse segue a regra geral (decisão 15). Trocar quando a nova grade chegar.
@@ -352,6 +358,8 @@ await page.waitForTimeout(1200); // aguardar React renderizar
 15. **Domingo sempre estudo; dia sem Venvanse calculado pela demanda** (menor carga entre os dias livres da semana), sábado por padrão, override por semana (`config.lightDayOverrides`), validar com a psiquiatra — substitui "sábado = dia leve em todas as fases". **Dias pós-noturno nunca são candidatos** (veto 🧠, 14/09). **Semana sem dia leve (<8h) não tem pausa:** o menos pesado vira 🌬️ dia de respiro, COM Venvanse (🧠 + 💬, 14/09). **O domingo é candidato como os demais dias:** pode ser o dia sem remédio (quando é o de menor carga) ou dia ativo — decisão da equipe/paciente em cada semana pelo seletor, nunca por regra fixa (14/09)
 16. **Após 11/10, sem aula da faculdade** — decisão fechada da paciente (14/09); a fase POST não recebe bloco de faculdade
 17. **Colisão 08→09/10 confirmada** (14/09): gravada A+B na quinta; resumo rápido de 20min do Bloco B na sexta antes do D2-B
+18. **Reta final em PIPELINE** (📚, 14/09): 1 fio novo por dia livre; aula hoje → questões amanhã → apostila depois de amanhã → selagem ~3 dias depois em bloco próprio; 6 fios/semana congelados por `config.fioWeek`; FREE_START = quarta 16/12 (a terça 15/12 fecha o Fio B da CATCHUP)
+19. **Dias de plantão — regra da paciente (14/09):** véspera de noturno = dia normal começando mais tarde (😴 ~09h, blocos completos, academia); pós-noturno = sono até ~13h como bloco inegociável (6h) + dia de estudo normal, 📚 em 5h, sem academia. Revoga a "manutenção"
 
 ---
 
@@ -364,3 +372,7 @@ await page.waitForTimeout(1200); // aguardar React renderizar
 5. Sondar bytes reais antes de deletar (memória de texto autoral falha)
 6. Sempre rodar bateria Playwright antes de copiar para outputs
 7. Sempre `cp planner.html /mnt/user-data/outputs/planner_residencia_2026_offline.html` E `index.html`
+8. **Regra da equipe (obrigatória, `EQUIPE_MULTIDISCIPLINAR_REGRA_DE_DECISAO.md`):** antes de cada mudança, escrever em uma linha **qual membro a pede e com que evidência**; se nenhum pedir, não fazer — anotar como sugestão
+9. Antes de entregar, passar a mudança pelos oito membros e verificar se **algum veta**; um veto não se negocia com "fica mais simples"
+10. Se dois membros conflitarem, **não escolher sozinho**: apresentar o conflito e esperar decisão (padrão: segurança e sono vencem volume; aprendizagem vence conveniência de calendário; dados da paciente vencem elegância de código)
+11. Decisão mais recente vence a antiga do mesmo tema; nunca restaurar modelo superado; nunca esconder inconsistência com alteração silenciosa — sinalizar, propor, esperar
