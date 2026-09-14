@@ -49,7 +49,7 @@ SIMULADO_ANCHOR = "2026-08-14" // 1ª sexta COM simulado (âncora quinzenal real
 pré-03/08  → histórico (template antigo intacto, prova sáb, aula 18h20)
 03/08–09/09 → AMB (plantão Ter/Qui/Dom 07h–17h — vale o que estava)
 10/09–11/10 → G2 (grade real com plantões DATADOS — ver §6)
-> 11/10     → POST (provisório: tudo livre, só Medcurso qua — até nova grade)
+> 11/10     → POST (provisório: tudo livre, só Medcurso qua — até nova grade; SEM aula da faculdade — decisão fechada da paciente em 14/09)
 25/11–14/12 → CATCHUP (PROVISÓRIO — nova grade pendente: dias livres, Fio A qua→qui→sex, Fio B sáb→dom→seg, selagem ter, academia livre, simulados)
 15/12+      → FREE (1 fio/dia; sábado = template leve; domingo recebe o fio do dia)
 ```
@@ -203,7 +203,7 @@ const PROJ_PACE = { amb: 1, g2: __PACE, catchup: 2, free: 4 };
 ```javascript
 const DAY_CAP_H = 14.5; // 24h − 8h sono − 1h30 refeições
 ```
-- `lightDayFor()` (Schedule): dia SEM Venvanse da semana visível = menor `studyHours(listFor(dayIdx))` entre os candidatos (7 dias menos a quarta com presencial `iso <= "2026-11-24"`, dias com `DATED_SHIFTS` e a sexta quando `isSim`); empate → sábado; menor carga > `STUDY_WARN_H` → `null` + aviso amarelo. Override: `config.lightDayOverrides[isoDaQuarta] = dayIdx` (ponte `__LIGHT_SAVE`). UI: seletor `🌿 Sem remédio: [Auto · SÁB] ▾` acima das abas dos dias + selo no cabeçalho do dia escolhido. O selo não altera blocos; semanas totalmente anteriores a 10/09 não mostram o seletor.
+- `lightDayFor()` (Schedule): dia SEM Venvanse da semana visível = menor `studyHours(listFor(dayIdx))` entre os candidatos (7 dias menos a quarta com presencial `iso <= "2026-11-24"`, dias com `DATED_SHIFTS`, dias PÓS-NOTURNO (`DATED_SHIFTS[addDaysISO(iso,-1)].kind === "noite"` — veto 🧠: pausa + privação de sono + compromisso noturno) e a sexta quando `isSim`); empate → sábado; menor carga > `STUDY_WARN_H` → o menos pesado vira DIA DE RESPIRO (`breather: true`; selo 🌬️ âmbar "Dia de respiro — o mais leve da semana. COM Venvanse…", sem texto de pausa); `null` só quando não há candidato. O selo 🌿 só aparece quando há dia realmente leve; a escolha manual é sempre "sem remédio" (dela), com selo de validação. Override: `config.lightDayOverrides[isoDaQuarta] = dayIdx` (ponte `__LIGHT_SAVE`). UI: seletor `🌿 Sem remédio: [Auto · SÁB] ▾` acima das abas dos dias + selo no cabeçalho do dia escolhido. O selo não altera blocos; semanas totalmente anteriores a 10/09 não mostram o seletor.
 - `moveAct` verifica o total do dia destino antes de mover
 - Se > 14.5h: `window.confirm` pergunta se mantém tudo ("Manter TUDO nesse dia mesmo assim?")
 - Cancela = só desfaz o movimento, nada é apagado
@@ -229,7 +229,12 @@ const DAY_CAP_H = 14.5; // 24h − 8h sono − 1h30 refeições
 | Toggle simulado (__SIM_SAVE + botão na sexta) | ✅ |
 | SÁB = template leve por construção (G2/POST/CATCHUP/FREE) | ✅ |
 | DOM = sempre dia de estudo (FREE: recebe o fio do dia) | ✅ |
-| Dia sem Venvanse calculado por semana (lightDayFor: menor carga entre dias livres, sábado no empate; override config.lightDayOverrides; selo 🌿; aviso se >8h) | ✅ |
+| Dia sem Venvanse calculado por semana (lightDayFor: menor carga entre dias livres, sábado no empate; override config.lightDayOverrides; selo 🌿) | ✅ |
+| Pós-noturno nunca é candidato ao dia sem Venvanse (veto 🧠, 14/09) | ✅ |
+| Semana sem dia leve → 🌬️ dia de respiro COM Venvanse (o mais leve), sem pausa (🧠 + 💬, 14/09) | ✅ |
+| Card ACADEMIA: "1 treino em 6 dos 7 dias · sem treino no dia pós-noturno"; dia sem treino = "sem treino" (não "descanso") | ✅ |
+| Após 11/10 sem aula da faculdade — decisão fechada (14/09) | ✅ |
+| Colisão 08→09/10 confirmada pela paciente (14/09) | ✅ |
 | Seletor de ritmo 1–4 na aba Desatraso | ✅ |
 | Projeção pace-aware (__PACE) | ✅ |
 | Tempos: aula 1.7h, questões 2h, apostila 1.5h | ✅ |
@@ -261,6 +266,16 @@ const DAY_CAP_H = 14.5; // 24h − 8h sono − 1h30 refeições
 ## 14 · Inconsistências CONHECIDAS / pendentes de correção
 
 ### A · RESOLVIDO (12/09) — card de Estrutura corrigido ("Sex+Dom"); blocos do sábado confirmados visualmente (só Anki + PLAN + LAZER; nos plantões, + 🚑 e lazer específico)
+
+### G · Pendências APROVADAS para o PR #3 (decisões da equipe e da paciente em 14/09 — implementar em seguida, com este desenho)
+1. **FREE em pipeline (📚 tem razão; ritmo mantido):** 1 fio novo por dia, toques escalonados entre dias — cada dia livre contém a AULA do fio de hoje, as QUESTÕES do fio de ontem e a APOSTILA do fio de anteontem (1 dia + uma noite de sono entre exposição e teste; feedback do erro em ~24h). A selagem sai desse bloco e vira bloco próprio, fechando os fios cujas apostilas ocorreram há ~3 dias. Sábado continua template leve; domingo entra no pipeline.
+2. **Dias de plantão — nova regra da paciente (revoga a "manutenção" aprovada antes pela equipe):**
+   - 2a · Véspera de noturno (entra às 18h) = dia normal de estudo começando mais tarde. Em `buildShiftDay`, ramo `kind === "noite"`: prepor SONO "😴 Acordar mais tarde (~09h) — você entra no plantão às 18h e vira a noite" (time "—"); manter todos os blocos de estudo; bloco 🌙 final "…encerre os blocos até ~17h · saída ~17h15"; nenhum texto tratando o dia como leve; academia mantida.
+   - 2b · Pós-noturno (chega às 07h) = dia de estudo com o sono como bloco inegociável antes. SONO no topo com "😴 Chegando (~07h): dormir até ~13h — bloco inegociável. Depois, dia de estudo normal: comece pelo mais pesado" (time "6h"). Sem linguagem de "manutenção"; blocos do template ficam e valem.
+   - 2c · `STUDY_WARN_POSTNIGHT_H = 5`: o selo 📚 dispara em 5h de estudo nos dias pós-noturno (janela desperta ~13h–22h) — sinal para mover o excedente, não freio.
+   - 2d · Academia no pós-noturno continua ausente (veto 🏃 + 😴 mantido; a paciente autorizou estudo, não treino). Sinalizar se ela quiser rever.
+   - Testes obrigatórios: 20/09 e 05/10 (vésperas), 21/09 e 06/10 (pós-noturno: sono até 13h, blocos reais, 📚 em 5h, sem academia).
+3. **Regra de trabalho** (§17): antes de cada mudança, a linha "membro + evidência" (sem membro que a peça → sugestão); antes de entregar, passagem pelos oito membros; conflitos apresentados, não decididos; nunca alteração silenciosa — registrar em §17 junto com o PR #3.
 
 ### F · CATCHUP (25/11+) é PROVISÓRIO — distribuição escolhida na auditoria de 13/09
 Sem ambulatório e sem aula da faculdade (decisões da paciente). Fio A = qua (aula) → qui (questões) → sex (apostila); Fio B = dom (aula) → seg (questões) → ter (apostila); sábado = template leve (Anki + PLAN); selagem do Fio A na terça e do Fio B na sexta sem simulado (com simulado, desliza para o domingo); academia livre em 6 dias (sábado sem); simulados quinzenais na sexta (o Fio A apostila fica no dia — o 📚 avisa; se não der, domingo). O dia sem Venvanse segue a regra geral (decisão 15). Trocar quando a nova grade chegar.
@@ -334,7 +349,9 @@ await page.waitForTimeout(1200); // aguardar React renderizar
 12. **Colisão da presencial:** a gravada substitui as aulas 1.5x da semana toda (plural); o D2-B vem após um resumo rápido, nunca após nova exposição sem teste
 13. **CATCHUP sem ambulatório Ter/Qui/Dom e sem aula da faculdade** — provisório até a nova grade; sábado = template leve, Fio B dom→seg→ter, selagem do A na terça e do B na sexta (domingo em semana de simulado)
 14. **Flowtime × Pomodoro coexistem:** Flowtime governa a EXECUÇÃO; o planejador 60/10/35 só DIMENSIONA as aulas de desatraso
-15. **Domingo sempre estudo; dia sem Venvanse calculado pela demanda** (menor carga entre os dias livres da semana), sábado por padrão, override por semana (`config.lightDayOverrides`), validar com a psiquiatra — substitui "sábado = dia leve em todas as fases"
+15. **Domingo sempre estudo; dia sem Venvanse calculado pela demanda** (menor carga entre os dias livres da semana), sábado por padrão, override por semana (`config.lightDayOverrides`), validar com a psiquiatra — substitui "sábado = dia leve em todas as fases". **Dias pós-noturno nunca são candidatos** (veto 🧠, 14/09). **Semana sem dia leve (<8h) não tem pausa:** o menos pesado vira 🌬️ dia de respiro, COM Venvanse (🧠 + 💬, 14/09)
+16. **Após 11/10, sem aula da faculdade** — decisão fechada da paciente (14/09); a fase POST não recebe bloco de faculdade
+17. **Colisão 08→09/10 confirmada** (14/09): gravada A+B na quinta; resumo rápido de 20min do Bloco B na sexta antes do D2-B
 
 ---
 
