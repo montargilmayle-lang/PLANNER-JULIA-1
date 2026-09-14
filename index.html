@@ -425,7 +425,7 @@ const WEEK_SCHEDULE_CATCHUP = [
 ];
 // ── FASE DE RECUPERAÇÃO B / RETA FINAL (a partir de 15/12): sem NENHUM ambulatório ──
 // ── GRADE REAL (10/09 a 11/10) + PROVISÓRIO até a próxima grade ──────────────
-// Sem ambulatório recorrente; plantões DATADOS abaixo; aula da faculdade: terças 19h.
+// Sem ambulatório recorrente; plantões DATADOS abaixo; aula da faculdade: terças 19h30–21h (só na G2; ausente no POST).
 const G2_START = "2026-09-10";
 const G2_END = "2026-10-11"; // depois disso: mesmo template como PROVISÓRIO até a nova grade
 const WEEK_SCHEDULE_G2 = [
@@ -481,11 +481,11 @@ const WEEK_SCHEDULE_G2 = [
             { d: "REV", color: "#15803D", text: "Revisão adaptativa da semana anterior (o app avisa pelo seu %)", time: "45min" },
             { d: "GYM", color: "#1D4ED8", text: "Academia — horário livre", time: "1h" },
         ] },
-    { day: "TER", full: "Terça", phase1_venv: "Selar os fios da semana passada + fios do desatraso · noite: faculdade 19h", emoji: "📚",
+    { day: "TER", full: "Terça", phase1_venv: "Selar os fios da semana passada + fios do desatraso · noite: faculdade 19h30", emoji: "📚",
         activities: [
             { d: "ANKI", color: "#0369A1", text: "Anki + Meditação 15min", time: "35min" },
             { d: "GYM", color: "#1D4ED8", text: "Academia — horário livre", time: "1h" },
-            { d: "AULA", color: "#9F1239", text: "Aula teórica da faculdade — 19h–21h (duração a confirmar)", time: "2h" },
+            { d: "AULA", color: "#9F1239", text: "Aula teórica da faculdade — 19h30–21h", time: "1.5h" },
         ] },
 ];
 // PROVISÓRIO pós-11/10: tudo livre, fixo APENAS o Medcurso (quarta) + cascata D1 — trocar quando a nova grade chegar
@@ -556,8 +556,8 @@ const DATED_SHIFTS = {
     "2026-09-20": { label: "CN10 · Base Centenário", hours: "18h–07h", kind: "noite" },
     "2026-09-26": { label: "CRU", hours: "06h–19h", kind: "dia" },
     "2026-09-27": { label: "IT30 · Base Itapoã", hours: "18h–07h", kind: "noite" },
-    "2026-09-28": { label: "CZ50 · Base Cajazeiras", hours: "18h–07h", kind: "noite" },
     "2026-10-03": { label: "CRU", hours: "06h–19h", kind: "dia" },
+    "2026-10-05": { label: "PM04", hours: "18h–07h", kind: "noite" },
     "2026-10-07": { label: "CRL · SUREM", hours: "06h–19h", kind: "dia" },
     "2026-10-09": { label: "PM40 · Base Pau Miúdo", hours: "06h–19h", kind: "dia" },
     "2026-10-10": { label: "CRU", hours: "06h–19h", kind: "dia" },
@@ -1137,8 +1137,10 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, onSaveSchedule
     };
     // ── DIA SEM VENVANSE: domingo é SEMPRE dia de estudo; o dia sem remédio varia pela demanda da semana ──
     // Candidatos: os 7 dias da semana visível, menos a quarta enquanto houver presencial (até 24/11), os dias com
-    // plantão datado e a sexta de simulado. Vence a menor carga de estudo (studyHours da lista REAL do dia; empate → sábado).
-    // Se a menor carga passar de STUDY_WARN_H (8h), não há dia leve natural: aviso. Override por semana em config.lightDayOverrides.
+    // plantão datado, os dias PÓS-NOTURNO (🧠: pausa + privação de sono + compromisso à noite é o que a pausa deve evitar)
+    // e a sexta de simulado. Vence a menor carga de estudo (studyHours da lista REAL do dia; empate → sábado).
+    // Se a menor carga passar de STUDY_WARN_H (8h), não há pausa nessa semana: o menos pesado vira DIA DE RESPIRO (🌬️, COM Venvanse).
+    // Override por semana em config.lightDayOverrides (escolha manual = dia sem remédio, com selo de validação).
     // O selo 🌿 NÃO altera os blocos do dia — "faça só o leve, mova o pesado". Pausa de medicação: validar com a psiquiatra.
     const showLight = dateFor(6) >= G2_START; // semanas totalmente históricas (antes de 10/09) não mostram o seletor
     const lightDayFor = () => {
@@ -1148,18 +1150,20 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, onSaveSchedule
             const iso = dateFor(i);
             if (i === 0 && iso <= "2026-11-24") continue;   // quarta com aula presencial
             if (DATED_SHIFTS[iso]) continue;                 // plantão datado
+            if ((DATED_SHIFTS[addDaysISO(iso, -1)] || {}).kind === "noite") continue; // dia pós-noturno (veto 🧠)
             if (i === 2 && isSim) continue;                  // sexta de simulado
             const hrs = studyHours(listFor(i));
             if (!best || hrs < best.hours - 1e-9 || (Math.abs(hrs - best.hours) < 1e-9 && i === 3)) best = { idx: i, hours: hrs };
         }
-        if (!best) return { idx: null, hours: null, min: null, source: "auto" };
-        if (best.hours > STUDY_WARN_H) return { idx: null, hours: null, min: best.hours, source: "auto" };
-        return { idx: best.idx, hours: best.hours, min: best.hours, source: "auto" };
+        if (!best) return { idx: null, hours: null, min: null, source: "auto", breather: false };
+        if (best.hours > STUDY_WARN_H) return { idx: best.idx, hours: best.hours, min: best.hours, source: "auto", breather: true }; // respiro, COM Venvanse
+        return { idx: best.idx, hours: best.hours, min: best.hours, source: "auto", breather: false };
     };
     const lightAuto = lightDayFor();
     const lightOvRaw = ((config && config.lightDayOverrides) || {})[dateFor(0)];
     const lightOv = (lightOvRaw === undefined || lightOvRaw === null || lightOvRaw === "") ? null : Number(lightOvRaw);
-    const lightDay = lightOv != null ? { idx: lightOv, hours: studyHours(listFor(lightOv)), min: lightAuto.min, source: "manual" } : lightAuto;
+    const lightDay = lightOv != null ? { idx: lightOv, hours: studyHours(listFor(lightOv)), min: lightAuto.min, source: "manual", breather: false } : lightAuto;
+    const isBreather = lightDay.source === "auto" && !!lightDay.breather; // escolha manual é sempre "sem remédio" (dela), com validação
     const setLightOverride = (val) => {
         const o = { ...((config && config.lightDayOverrides) || {}) };
         if (val === "auto") delete o[dateFor(0)]; else o[dateFor(0)] = Number(val);
@@ -1213,14 +1217,16 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, onSaveSchedule
                 "\u23F1\uFE0F ",
                 React.createElement("strong", { style: { color: "#94a3b8" } }, "Flowtime"),
                 ", n\u00E3o Pomodoro: trabalhe at\u00E9 sentir a queda real de foco, registre e pause proporcional ao bloco. Reentrada: antes de parar, deixe a pr\u00F3xima linha escrita (\"retomar em: ___\").")),
-        showLight && React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", background: "#0f2e1a", border: "1px solid #14532d", borderRadius: 10, padding: "8px 12px" } },
-            React.createElement("span", { style: { color: "#86efac", fontSize: 11, fontWeight: 800, whiteSpace: "nowrap" } }, "🌿 Sem remédio:"),
-            React.createElement("select", { value: lightOv == null ? "auto" : String(lightOv), onChange: e => setLightOverride(e.target.value), title: "Dia sem Venvanse desta semana — Auto = menor carga entre os dias livres (sábado por padrão) · validar com a psiquiatra", style: { background: "#0f172a", border: "1px solid #14532d", borderRadius: 8, color: "#86efac", fontSize: 11, fontWeight: 700, padding: "5px 8px", cursor: "pointer" } },
+        showLight && React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", background: isBreather ? "#2a200a" : "#0f2e1a", border: "1px solid " + (isBreather ? "#b45309" : "#14532d"), borderRadius: 10, padding: "8px 12px" } },
+            React.createElement("span", { style: { color: isBreather ? "#fbbf24" : "#86efac", fontSize: 11, fontWeight: 800, whiteSpace: "nowrap" } }, isBreather ? "🌬️ Respiro:" : "🌿 Sem remédio:"),
+            React.createElement("select", { value: lightOv == null ? "auto" : String(lightOv), onChange: e => setLightOverride(e.target.value), title: "Dia sem Venvanse desta semana — Auto = menor carga entre os dias livres (sábado por padrão; nunca pós-noturno) · validar com a psiquiatra", style: { background: "#0f172a", border: "1px solid " + (isBreather ? "#b45309" : "#14532d"), borderRadius: 8, color: isBreather ? "#fbbf24" : "#86efac", fontSize: 11, fontWeight: 700, padding: "5px 8px", cursor: "pointer" } },
                 React.createElement("option", { value: "auto" }, "Auto · " + (lightAuto.idx != null ? DAY_LBL[lightAuto.idx] : "—")),
                 DAY_LBL.map((nm, i) => React.createElement("option", { key: i, value: String(i) }, nm))),
             lightDay.idx != null
-                ? React.createElement("span", { style: { color: "#64748b", fontSize: 10, lineHeight: 1.4 } }, DAY_LBL[lightDay.idx] + " " + fmtBR(dateFor(lightDay.idx)) + " · " + fmtHrs(lightDay.hours) + " de estudo" + (lightDay.source === "manual" ? " · escolha manual" : " · menor carga entre os dias livres") + " · validar com a psiquiatra")
-                : React.createElement("span", { style: { color: "#f5c518", fontSize: 10, fontWeight: 800, lineHeight: 1.4 } }, "🌿 Nenhum dia leve natural esta semana" + (lightAuto.min != null ? " (menor carga: " + fmtHrs(lightAuto.min) + ")" : "") + " — considere reduzir o ritmo")),
+                ? (isBreather
+                    ? React.createElement("span", { style: { color: "#fbbf24", fontSize: 10, fontWeight: 700, lineHeight: 1.4 } }, DAY_LBL[lightDay.idx] + " " + fmtBR(dateFor(lightDay.idx)) + " · " + fmtHrs(lightDay.hours) + " de estudo · semana sem pausa: nenhum dia ficou abaixo de " + STUDY_WARN_H + "h — dia de respiro COM Venvanse (o mais leve da semana)")
+                    : React.createElement("span", { style: { color: "#64748b", fontSize: 10, lineHeight: 1.4 } }, DAY_LBL[lightDay.idx] + " " + fmtBR(dateFor(lightDay.idx)) + " · " + fmtHrs(lightDay.hours) + " de estudo" + (lightDay.source === "manual" ? " · escolha manual" : " · menor carga entre os dias livres") + " · validar com a psiquiatra"))
+                : React.createElement("span", { style: { color: "#f5c518", fontSize: 10, fontWeight: 800, lineHeight: 1.4 } }, "🌿 Nenhum dia candidato esta semana (todos com plantão, pós-noturno, presencial ou simulado)")),
         React.createElement("div", { style: { display: "flex", gap: 6, overflowX: "auto", paddingBottom: 4 } }, WEEK_SCHEDULE.map((_d, i) => {
             const dt = dateFor(i);
             const d = schedFor(dt)[i];
@@ -1248,7 +1254,9 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, onSaveSchedule
                     React.createElement("div", { style: { color: "#f5c518", fontSize: 11, marginTop: 4 } },
                         "\uD83D\uDC8A ",
                         day.phase1_venv),
-                    (showLight && lightDay.idx === activeIdx) && React.createElement("div", { style: { color: "#86efac", fontSize: 11, marginTop: 4, fontWeight: 700, lineHeight: 1.4 } }, "🌿 Hoje sem Venvanse — faça só o leve, mova o pesado (pausa variável: validar com a psiquiatra)")),
+                    (showLight && lightDay.idx === activeIdx) && (isBreather
+                        ? React.createElement("div", { style: { color: "#fbbf24", fontSize: 11, marginTop: 4, fontWeight: 700, lineHeight: 1.4 } }, "🌬️ Dia de respiro — o mais leve da semana. COM Venvanse (semana sem pausa: nenhum dia ficou leve o bastante)")
+                        : React.createElement("div", { style: { color: "#86efac", fontSize: 11, marginTop: 4, fontWeight: 700, lineHeight: 1.4 } }, "🌿 Hoje sem Venvanse — faça só o leve, mova o pesado (pausa variável: validar com a psiquiatra)"))),
                 React.createElement("div", { style: { textAlign: "right" } },
                     React.createElement(Badge, { label: `Sem.${week}`, color: "#92400e" }),
                     React.createElement("div", { style: { color: "#64748b", fontSize: 10, marginTop: 4 } },
@@ -1371,7 +1379,7 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, onSaveSchedule
                     r.title,
                     ")"))))) : (React.createElement("div", { style: { color: "#475569", fontSize: 12, lineHeight: 1.5 } }, "Sem revis\u00F5es D+7/D+30 vencendo aqui. Ap\u00F3s aula/estudo, mantenha o D+1: 5 quest\u00F5es rel\u00E2mpago + reler palavras-chave antes de dormir.")))),
         React.createElement("div", { style: { background: "#1e293b", borderRadius: 12, padding: 16 } },
-            React.createElement("div", { style: { color: "#94a3b8", fontSize: 11, marginBottom: 12 } }, "ACADEMIA \u2014 6x/SEMANA"),
+            React.createElement("div", { style: { color: "#94a3b8", fontSize: 11, marginBottom: 12 } }, "ACADEMIA — 1 treino em 6 dos 7 dias · sem treino no dia pós-noturno"),
             React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(7,1fr)", gap: 4 } }, (dayDate >= AMB_START
                 ? ["Qua", "Qui", "Sex", "Sab", "Dom", "Seg", "Ter"].map((nm, i) => {
                     // Reflete a lista REAL do dia (template da fase + plantões datados + suas edições): sem horário fixo;
@@ -1380,7 +1388,7 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, onSaveSchedule
                     const g = listFor(i).find(a => a.d === "GYM");
                     const tm = g && (g.text.match(/\d{1,2}h\d{0,2}(?:–\d{1,2}h\d{0,2})?/) || [])[0];
                     const prevN = (DATED_SHIFTS[addDaysISO(dt, -1)] || {}).kind === "noite";
-                    return { d: nm, gym: !!g, note: g ? (/opcional/i.test(g.text) ? "opcional" : (/horário livre/i.test(g.text) ? "livre" : (tm || "✓"))) : (prevN ? "pós-noturno" : ((dt >= G2_START && dt < CATCHUP_START && i === 3) ? "dia leve" : "descanso")) };
+                    return { d: nm, gym: !!g, note: g ? (/opcional/i.test(g.text) ? "opcional" : (/horário livre/i.test(g.text) ? "livre" : (tm || "✓"))) : (prevN ? "pós-noturno" : "sem treino") };
                 })
                 : [
                     { d: "Qua", gym: true, note: "13h30" },
