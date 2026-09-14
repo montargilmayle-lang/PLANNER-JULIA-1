@@ -75,7 +75,7 @@ Cada bloco tem sua escadinha completa, colada na própria aula:
 - **Dia 3 · Sábado:** **DIA LEVE por construção**: Anki 30min + PLAN (intenções + recompensa + pomodoros + backup) · sem fios · **tarde e noite protegidas** (ou estágio — nunca os dois). O dia **sem Venvanse** é o selo 🌿 da semana (menor carga entre os dias livres; sábado por padrão) — a validar com a psiquiatra.
 - **Dia 4 · Domingo:** **dia ATIVO** (domingo é sempre dia de estudo): apostila do B pelos erros de sexta + Fio 1 · apostila + Fio 2 · aula (ritmo ≥3: + Fio 3 · questões) + academia. Em semana de simulado: aula B + D2-B deslocados + apostila do A (erros de quinta).
 - **Dia 5 · Segunda:** **banco A+B + smartcards** (2ª recuperação espaçada) + Fio 2 · questões (ritmo ≥3: + Fio 3 · apostila) + revisão adaptativa. Em semana de simulado: + apostila do B (erros de domingo).
-- **Terça:** **selar os fios FECHADOS na semana passada** (10q + smartcards + 4 checks) → Fio 2 · apostila (ritmo 4: + Fio 4 · aula, que continua na semana seguinte pelo seu check) · temas fracos · (aula da faculdade 19h–21h até 11/10).
+- **Terça:** **selar os fios FECHADOS na semana passada** (10q + smartcards + 4 checks) → Fio 2 · apostila (ritmo 4: + Fio 4 · aula, que continua na semana seguinte pelo seu check) · temas fracos · (aula da faculdade 19h30–21h até 11/10).
 
 *Ritmo dos fios (1–4 na aba Desatraso) = `FIO_PAT`: Fio 1 qui→sex→dom · Fio 2 dom→seg→ter · Fio 3 sex→dom→seg · Fio 4 ter (continua na semana seguinte). Dois fios no mesmo dia são sempre módulos distintos.*
 
@@ -131,7 +131,7 @@ Quinzenais, **sextas, âncora 14/08** — o app mostra sozinho qual sexta é de 
 
 ## 12 · O mapa das fases (automático no app)
 
-Até 09/09: regime anterior ("vale o que estava antes") · **10/09–11/10: grade real** — 11 plantões datados (diurnos 06h–19h, noturnos 18h–07h), aula da faculdade terças 19h, cascata nos dias livres, plantões com estudo nos tempos mortos · **12/10 em diante: provisório** — tudo livre, fixo só o Medcurso de quarta, até a nova grade · **25/11: recuperação — PROVISÓRIO até a nova grade** (dias livres, sem ambulatório e sem aula da faculdade: Fio A qua→qui→sex, Fio B dom→seg→ter, sábado leve, selagem do A na terça e do B na sexta — domingo em semana de simulado —, academia livre, simulados sextas) · **15/12: reta final** (1 fio/dia; sábado = template leve; domingo recebe o fio do dia) · horizonte de semanas cresce com a projeção. Ferramentas transversais: mover atividades **nunca apaga nada** (aviso de tempo hábil ~14,5h + sua confirmação), selo ⚠️ em dia sobrecarregado, **backup e sincronização** na aba Sono (exporte antes de toda atualização; mesmo site = dados intactos).
+Até 09/09: regime anterior ("vale o que estava antes") · **10/09–11/10: grade real** — 11 plantões datados (diurnos 06h–19h, noturnos 18h–07h: 12, 19, 20🌙, 26, 27🌙/09 · 03, 05🌙, 07, 09, 10, 11/10), aula da faculdade terças 19h30–21h, cascata nos dias livres, plantões com estudo nos tempos mortos · **12/10 em diante: provisório** — tudo livre, fixo só o Medcurso de quarta, até a nova grade · **25/11: recuperação — PROVISÓRIO até a nova grade** (dias livres, sem ambulatório e sem aula da faculdade: Fio A qua→qui→sex, Fio B dom→seg→ter, sábado leve, selagem do A na terça e do B na sexta — domingo em semana de simulado —, academia livre, simulados sextas) · **15/12: reta final** (1 fio/dia; sábado = template leve; domingo recebe o fio do dia) · horizonte de semanas cresce com a projeção. Ferramentas transversais: mover atividades **nunca apaga nada** (aviso de tempo hábil ~14,5h + sua confirmação), selo ⚠️ em dia sobrecarregado, **backup e sincronização** na aba Sono (exporte antes de toda atualização; mesmo site = dados intactos).
 
 ---
 
@@ -151,7 +151,7 @@ Até 09/09: regime anterior ("vale o que estava antes") · **10/09–11/10: grad
 4. **Anki em novembro**: o acúmulo de fios vai inflar revisões — regra do corte (§8) é obrigatória, não opcional.
 5. **% muito baixo (<40%) no D2 ou na selagem**: não é "revisar antes" — é **exposição que falhou**; reassista a aula antes de novas questões. (Posso codificar essa faixa no motor, se quiser.)
 6. **Correção do simulado (8h no total)**: se duas provas seguidas terminarem com correção rasa por exaustão, adote a versão dividida (§11).
-7. **O arco 26–29/09** (diurno → noturno → noturno → recuperação+aula) é o trecho fisiologicamente mais duro do trimestre: naquela semana, a meta é **manutenção** — semana atual essencial + Anki; fio sem culpa.
+7. **O arco 05→06→07/10** (noturno → recuperação + aula → plantão diurno na quarta da presencial) é o trecho fisiologicamente mais duro do trimestre: naquela semana, a meta é **manutenção** — semana atual essencial + Anki; fio sem culpa.
 
 **A estratégia-mãe do paciente, em uma frase:** aula antes de tudo → teste cedo e registre o % → erro dirige a releitura → sele para lembrar → durma o que o plantão cobrar → proteja o lazer como parte do tratamento — e deixe o app cobrar as datas, porque memória de prospectiva não é o forte do TDAH, mas é o forte dele.
 

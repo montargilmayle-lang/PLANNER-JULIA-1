@@ -70,7 +70,7 @@ Esta é a distribuição **correta e validada pela equipe**. Não alterar sem re
 | **SÁB (Dia 3)** | **DIA LEVE (template)**: Anki 30min + PLAN — sem fios. O dia **sem Venvanse** é o selo 🌿 calculado pela menor carga entre os dias livres (sábado por padrão; override por semana) | Reset dopaminérgico no dia de menor demanda; domingo é sempre dia de estudo |
 | **DOM (Dia 4)** | **Dia ATIVO** (domingo é sempre dia de estudo): Apostila do B + Fio 1 · apostila + Fio 2 · aula (ritmo ≥3: + Fio 3 · questões) + gym | Descansado pelo sábado; alimenta a segunda |
 | **SEG (Dia 5)** | Banco A+B + smartcards (D5/D6) + Fio 2 · questões (ritmo ≥3: + Fio 3 · apostila) | 2ª recuperação espaçada |
-| **TER (Dia 6)** | Selar os fios FECHADOS na semana passada + Fio 2 · apostila (ritmo 4: + Fio 4 · aula, que continua na semana seguinte) + faculdade 19h (até 11/10) | Selagem = re-recuperação pós-critério (Rawson 2011) |
+| **TER (Dia 6)** | Selar os fios FECHADOS na semana passada + Fio 2 · apostila (ritmo 4: + Fio 4 · aula, que continua na semana seguinte) + faculdade 19h30–21h (até 11/10) | Selagem = re-recuperação pós-critério (Rawson 2011) |
 
 *Tabela reescrita em 13/09 a partir do `FIO_PAT` vigente (§5). Em semana de simulado: SEX = prova + correção; DOM = aula B + D2-B + apostila do A; SEG = + apostila do B.*
 
@@ -113,8 +113,8 @@ const FIO_PAT = [
 "2026-09-20": { label: "CN10 · Base Centenário", hours: "18h–07h", kind: "noite" },
 "2026-09-26": { label: "CRU", hours: "06h–19h", kind: "dia" },
 "2026-09-27": { label: "IT30 · Base Itapoã", hours: "18h–07h", kind: "noite" },
-"2026-09-28": { label: "CZ50 · Base Cajazeiras", hours: "18h–07h", kind: "noite" },
 "2026-10-03": { label: "CRU", hours: "06h–19h", kind: "dia" },
+"2026-10-05": { label: "PM04", hours: "18h–07h", kind: "noite" },
 "2026-10-07": { label: "CRL · SUREM", hours: "06h–19h", kind: "dia" },
 "2026-10-09": { label: "PM40 · Base Pau Miúdo", hours: "06h–19h", kind: "dia" },
 "2026-10-10": { label: "CRU", hours: "06h–19h", kind: "dia" },
@@ -126,7 +126,7 @@ const FIO_PAT = [
 - Diurno 13h: bloco 🚑 no topo + blocos do dia + fechamento "dormir ~21h45". O bloco ANKI vira "Anki no trajeto — 20min (meditação 10min no almoço ou à noite)" e o GYM vira "Academia — opcional, só se sobrar energia" (30min)
 - Noturno (dia de saída): blocos do dia + bloco 🌙 no fim ("encerre até ~17h")
 - Dia seguinte a noturno: bloco 😴 (dormir até ~12h30) no topo + blocos do dia mantidos, **sem academia** (protocolo §4 — a regra de saúde vence); Anki do base mantido
-- Sanduíche (27→28/09): 😴 até ~13h + blocos + 🌙 Cajazeiras (o ⚠️ dispara; ela decide)
+- Arco 05→06→07/10 (noturno PM04 → recuperação + aula 19h30 → plantão diurno na quarta da presencial): o trecho mais duro da grade — 05/10 recebe os blocos da segunda + 🌙 no fim; 06/10 recebe 😴 + blocos da terça com a aula preservada e sem academia; 07/10 é a colisão (⚠️ dispara; ela decide). Grade atualizada em 14/09: o noturno de 28/09 saiu; 28/09 virou pós-noturno simples e 29/09 terça normal
 - Colisão com AULA presencial (07/10): o bloco da aula vira aviso "vista AMANHÃ, online"; a gravada substitui **as aulas 1.5x da semana (plural)**: 08/10 recebe a presencial gravada (A+B) no lugar da 1.5x do A; 09/10 troca a 1.5x do B por "Resumo rápido do Bloco B (visto na gravação de ontem) → vá direto ao D2-B" (20min) — sem dupla exposição sem teste entre elas
 - **Sexta de plantão = sem simulado por padrão** (`DATED_SHIFTS[fri] ? false : paridade`), salvo override manual
 - NUNCA voltar ao modelo antigo em que o plantão substituía o dia inteiro
@@ -267,7 +267,7 @@ Sem ambulatório e sem aula da faculdade (decisões da paciente). Fio A = qua (a
 
 ### B · RESOLVIDO — DOM sem simulado tem apostila do B (erros de sexta) + fios; com simulado tem aula B + D2-B + apostila do A. Testado.
 
-### C · RESOLVIDO — plantões preservam blocos e fios (buildShiftDay não-destrutivo). Testado em 09/10, 10/10, 11/10, 20/09, 21/09, 07/10.
+### C · RESOLVIDO — plantões preservam blocos e fios (buildShiftDay não-destrutivo). Testado em 09/10, 10/10, 11/10, 20/09, 21/09, 07/10 e, na grade de 14/09, 28/09 (pós-noturno simples), 29/09 (terça normal), 05/10 (🌙 PM04) e 06/10 (😴 + aula 19h30).
 
 ### D · Ritmo 4 no planejador
 Com `catchupPace=4`, o Fio 4 só recebe aula (SEG) e questões (TER) nesta semana — a apostila vem na próxima semana. O bloco já avisa: "apostila deste fio abre na próxima semana". Isso é correto e aceito.

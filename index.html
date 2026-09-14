@@ -425,7 +425,7 @@ const WEEK_SCHEDULE_CATCHUP = [
 ];
 // ── FASE DE RECUPERAÇÃO B / RETA FINAL (a partir de 15/12): sem NENHUM ambulatório ──
 // ── GRADE REAL (10/09 a 11/10) + PROVISÓRIO até a próxima grade ──────────────
-// Sem ambulatório recorrente; plantões DATADOS abaixo; aula da faculdade: terças 19h.
+// Sem ambulatório recorrente; plantões DATADOS abaixo; aula da faculdade: terças 19h30–21h (só na G2; ausente no POST).
 const G2_START = "2026-09-10";
 const G2_END = "2026-10-11"; // depois disso: mesmo template como PROVISÓRIO até a nova grade
 const WEEK_SCHEDULE_G2 = [
@@ -481,11 +481,11 @@ const WEEK_SCHEDULE_G2 = [
             { d: "REV", color: "#15803D", text: "Revisão adaptativa da semana anterior (o app avisa pelo seu %)", time: "45min" },
             { d: "GYM", color: "#1D4ED8", text: "Academia — horário livre", time: "1h" },
         ] },
-    { day: "TER", full: "Terça", phase1_venv: "Selar os fios da semana passada + fios do desatraso · noite: faculdade 19h", emoji: "📚",
+    { day: "TER", full: "Terça", phase1_venv: "Selar os fios da semana passada + fios do desatraso · noite: faculdade 19h30", emoji: "📚",
         activities: [
             { d: "ANKI", color: "#0369A1", text: "Anki + Meditação 15min", time: "35min" },
             { d: "GYM", color: "#1D4ED8", text: "Academia — horário livre", time: "1h" },
-            { d: "AULA", color: "#9F1239", text: "Aula teórica da faculdade — 19h–21h (duração a confirmar)", time: "2h" },
+            { d: "AULA", color: "#9F1239", text: "Aula teórica da faculdade — 19h30–21h", time: "1.5h" },
         ] },
 ];
 // PROVISÓRIO pós-11/10: tudo livre, fixo APENAS o Medcurso (quarta) + cascata D1 — trocar quando a nova grade chegar
@@ -556,8 +556,8 @@ const DATED_SHIFTS = {
     "2026-09-20": { label: "CN10 · Base Centenário", hours: "18h–07h", kind: "noite" },
     "2026-09-26": { label: "CRU", hours: "06h–19h", kind: "dia" },
     "2026-09-27": { label: "IT30 · Base Itapoã", hours: "18h–07h", kind: "noite" },
-    "2026-09-28": { label: "CZ50 · Base Cajazeiras", hours: "18h–07h", kind: "noite" },
     "2026-10-03": { label: "CRU", hours: "06h–19h", kind: "dia" },
+    "2026-10-05": { label: "PM04", hours: "18h–07h", kind: "noite" },
     "2026-10-07": { label: "CRL · SUREM", hours: "06h–19h", kind: "dia" },
     "2026-10-09": { label: "PM40 · Base Pau Miúdo", hours: "06h–19h", kind: "dia" },
     "2026-10-10": { label: "CRU", hours: "06h–19h", kind: "dia" },
