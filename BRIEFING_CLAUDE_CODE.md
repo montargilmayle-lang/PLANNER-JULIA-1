@@ -70,7 +70,7 @@ Esta é a distribuição **correta e validada pela equipe**. Não alterar sem re
 | **SÁB (Dia 3)** | **DIA LEVE (template)**: Anki 30min + PLAN — sem fios. O dia **sem Venvanse** é o selo 🌿 calculado pela menor carga entre os dias livres (sábado por padrão; override por semana) | Reset dopaminérgico no dia de menor demanda; domingo é sempre dia de estudo |
 | **DOM (Dia 4)** | **Dia ATIVO** (domingo é sempre dia de estudo): Apostila do B + Fio 1 · apostila + Fio 2 · aula (ritmo ≥3: + Fio 3 · questões) + gym · ritmo 4: **Selar Fio 4 (sem. passada)** (+3d) | Descansado pelo sábado; alimenta a segunda |
 | **SEG (Dia 5)** | Banco A+B + smartcards (D5/D6 — etapa de execução, sem "registre o %") + Fio 2 · questões (ritmo ≥3: + Fio 3 · apostila) · em semana de simulado: + apostila do B e o **D6-B vai para a terça** (P3) | 2ª recuperação espaçada |
-| **TER (Dia 6)** | **Selar A e B da semana passada** (30min; +4d da apostila do A, +2d da do B) + Fio 2 · apostila (ritmo 4: + Fio 4 · aula → questões QUA e apostila QUI seguintes) + D6-B em semana de simulado + faculdade 19h30–21h (até 11/10) | Selagem = re-recuperação pós-critério (Rawson 2011) |
+| **TER (Dia 6)** | **Selar A e B desta semana** (30min; +4d da apostila do A, +2d da do B; em semana de simulado o banco B e a selagem caem na mesma terça, banco antes) + Fio 2 · apostila (ritmo 4: + Fio 4 · aula → questões QUA e apostila QUI seguintes) + D6-B em semana de simulado + faculdade 19h30–21h (até 11/10) | Selagem = re-recuperação pós-critério (Rawson 2011) |
 
 *Tabela reescrita em 13/09 a partir do `FIO_PAT` vigente (§5). Em semana de simulado: SEX = prova + correção; DOM = aula B (1.5x) + resumo + D2-B + apostila do A; SEG = + apostila do B; TER = D6-B (banco B).*
 
@@ -104,7 +104,7 @@ const FIO_SEAL_NEXT = { 0: 1, 1: 3, 2: 2, 4: 4 };  // P2: selagem por fio, bloco
 **Selagem por fio (P2, PR #5):** `fioSealBlock(n)` injeta, na semana seguinte, um bloco próprio por fio (~3 dias após a apostila daquele fio):
 > "Selar Fio N (sem. passada): 10 questões + smartcards + os 4 checks (bloco antigo) — o % da selagem agenda as revisões"
 
-**Selagem de A e B (P6):** bloco fixo na TER dos templates G2/POST — "Selar A e B da semana passada: 10 questões por bloco + smartcards + os 4 checks — registre o %" (30min); D5/D6 é a etapa 4 (banco), não selagem.
+**Selagem de A e B (P6):** bloco fixo na TER dos templates G2/POST — "Selar A e B desta semana: 10 questões por bloco + smartcards + os 4 checks — registre o %" (30min): sela os blocos A e B da semana corrente (`blockA`/`blockB`), +4d da apostila do A e +2d da do B; D5/D6 é a etapa 4 (banco), não selagem.
 
 **Regra ABSOLUTA:** Aula sempre antes de questões ou apostila. O sistema nunca deve gerar questões de um módulo sem que a aula tenha sido marcada como vista (check `p.aula`). No desatraso: entrada adaptativa — sem aula vista → toque 1 (aula); aula vista há ≤8 sem → direto às questões; aula vista há mais tempo → reexposição rápida (~40min) → questões.
 
@@ -394,7 +394,7 @@ await page.waitForTimeout(1200); // aguardar React renderizar
 22. **P3 (📚):** em semana de simulado o D6-B vai da segunda para a terça (D2-B dom → apostila seg → banco ter)
 23. **P4 (📚):** DOM de simulado diz "aula online Bloco B (1.5x) + resumo + D2-B (30q + caderno + Anki dos erros)"
 24. **P5 (🧠/😴 + 📚 + 🧩):** ritmo 4 disponível, Fio 4 em cascata cruzada (questões QUA e apostila QUI seguintes) e aviso "⚠️ Ritmo N não cabe nesta semana (X dias acima de 8h · Y plantões). Sugestão: ritmo Z." com botão — nunca limitar o seletor a 3
-25. **P6 (🩺 + 📚):** A/B ganham selagem própria na terça ("Selar A e B da semana passada", 30min); D5/D6 é a etapa 4 (banco), não selagem
+25. **P6 (🩺 + 📚):** A/B ganham selagem própria na terça ("Selar A e B desta semana", 30min; +4d da apostila do A, +2d da do B); D5/D6 é a etapa 4 (banco), não selagem
 26. **P7 (⚙️):** CATCHUP trava o ritmo em 2 com a nota "esta fase agenda 2 fios (A e B)"
 27. **P8 (🩺 + ⚙️):** quinzena 26/09–09/10 sem simulado; o botão de override existe também nas sextas de plantão
 28. **T1/T2 (🧩 + ⚙️):** marcar a etapa direto do bloco do dia (1 toque); bloco com módulo reflete o card (ida e volta); blocos sem módulo mantêm o ✓ manual; função única de gravação
