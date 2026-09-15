@@ -1,0 +1,32 @@
+name: Enable GitHub Pages (main, root)
+on:
+  push:
+    branches: [claude/enable-github-pages]
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+jobs:
+  enable:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure Pages source = main / (root)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -u
+          api="repos/${GITHUB_REPOSITORY}/pages"
+          if gh api "$api" > /tmp/current.json 2>/tmp/err.txt; then
+            echo "Pages já existe:"; cat /tmp/current.json; echo
+            gh api -X PUT "$api" -f build_type=legacy -f 'source[branch]=main' -f 'source[path]=/' && echo "PUT ok"
+          else
+            echo "Pages ainda não existe (GET falhou):"; cat /tmp/err.txt; echo
+            gh api -X POST "$api" -f build_type=legacy -f 'source[branch]=main' -f 'source[path]=/' | tee /tmp/created.json
+            echo
+          fi
+          gh api "$api" | tee /tmp/final.json
+          echo
+          url=$(jq -r '.html_url' /tmp/final.json)
+          echo "### GitHub Pages" >> "$GITHUB_STEP_SUMMARY"
+          echo "- URL: $url" >> "$GITHUB_STEP_SUMMARY"
+          echo "- source: $(jq -c '.source' /tmp/final.json) · build_type: $(jq -r '.build_type' /tmp/final.json)" >> "$GITHUB_STEP_SUMMARY"
