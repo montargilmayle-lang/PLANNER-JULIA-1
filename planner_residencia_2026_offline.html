@@ -803,13 +803,19 @@ function fioBlock(n, st, prev) {
     if (st === "quest") return { d: "DESAT", color: "#B91C1C", text: lbl + " · toque 2: 25–30 questões (bloco antigo) + caderno + Anki dos erros — registre o %", time: "2h" };
     return { d: "DESAT", color: "#B91C1C", text: lbl + " · toque 3: apostila dirigida pelos erros (bloco antigo) + Feynman — fecha o fio", time: "1.5h" };
 }
-function fioBlocksFor(dayIdx, pace, prevN) {
-    const n = Math.max(1, Math.min(4, Number(pace) || 2));
+// Blocos que FECHAM a semana passada (cascata cruzada do Fio 4 + selagem por fio, +3d da apostila). Também na 1ª semana da CATCHUP:
+// a fronteira de fase não pode deixar fio órfão (📚 + ⚙️) — os fios fechados no fim do POST são selados aqui.
+function fioPrevBlocksFor(dayIdx, prevN) {
     const pn = Math.max(0, Math.min(4, Number(prevN) || 0)); // quantos fios a semana passada abriu (0 = 1ª semana da G2: nada a fechar)
     const out = [];
     if (pn >= 4) FIO4_NEXT.forEach(p => { if (p[0] === dayIdx) out.push(fioBlock(4, p[1], true)); }); // fecha o Fio 4 de ontem antes de abrir os de hoje
     const sealN = FIO_SEAL_NEXT[dayIdx];
     if (sealN && pn >= sealN) out.push(fioSealBlock(sealN));
+    return out;
+}
+function fioBlocksFor(dayIdx, pace, prevN) {
+    const n = Math.max(1, Math.min(4, Number(pace) || 2));
+    const out = fioPrevBlocksFor(dayIdx, prevN);
     FIO_PAT.slice(0, n).forEach((pat, i) => pat.forEach(p => { if (p[0] === dayIdx) out.push(fioBlock(i + 1, p[1])); }));
     return out;
 }
@@ -861,8 +867,9 @@ function weekFioIds(config, progress, wk, startISO, n) {
     if (base.length >= want) return base;
     const queue = catchupQueue(progress || {}, wk);
     if (wk < computeWeek(startISO, todayISO())) return base.length ? base : effectiveTargets(queue, want).map(m => m.id);
-    const prevIds = weekPhase(startISO, wk - 1) === ph ? weekFioIds(config, progress, wk - 1, startISO) : [];
-    const carry = ph === "FREE" ? prevIds : (ph === "G2" && prevIds.length >= 4 ? [prevIds[3]] : []);
+    const prevPh = weekPhase(startISO, wk - 1);
+    const prevIds = prevPh !== "AMB" ? weekFioIds(config, progress, wk - 1, startISO) : []; // qualquer fase ≥ G2: a fronteira não perde estado
+    const carry = ph === "FREE" ? prevIds : (((ph === "G2") || (ph === "CATCHUP" && prevPh === "G2")) && prevIds.length >= 4 ? [prevIds[3]] : []);
     const cand = fioCandidates(queue, progress, base.concat(carry));
     return base.concat(effectiveTargets(cand, want - base.length).map(m => m.id)).slice(0, want);
 }
@@ -1118,7 +1125,8 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, onSaveSchedule
     const paceCfg = Math.max(1, Math.min(4, Number(config && config.catchupPace) || 2));
     const wkIds = wkPh === "AMB" ? [] : weekFioIds(config, reviews.progress, week, startISO, fiosWanted(wkPh, paceCfg)); // fios desta semana (congelados)
     const prevSnapLen = (((config && config.fioWeek) || {})[weekDayISO(startISO, week - 1, 0)] || []).length;
-    const prevIdsFor = (pc) => (wkPh !== "AMB" && weekPhase(startISO, week - 1) === wkPh) ? weekFioIds(config, reviews.progress, week - 1, startISO, prevSnapLen || fiosWanted(wkPh, pc)) : [];
+    const prevPh = weekPhase(startISO, week - 1);
+    const prevIdsFor = (pc) => (wkPh !== "AMB" && prevPh !== "AMB") ? weekFioIds(config, reviews.progress, week - 1, startISO, prevSnapLen || fiosWanted(prevPh, pc)) : []; // fios da semana passada em QUALQUER fase ≥ G2 (fronteira POST→CATCHUP→FREE)
     const prevIds = prevIdsFor(paceCfg); // fios da semana passada (selagens, cascata cruzada): snapshot dela; sem snapshot, o ritmo atual
     const modOfId = (id) => queue.find(m => m.id === id) || MODULES.find(m => m.id === id) || null;
     const targets = wkPh === "AMB" ? effectiveTargets(queue, 6) : wkIds.map(modOfId).filter(Boolean);
@@ -1187,6 +1195,16 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, onSaveSchedule
         }
         if (iso >= FREE_START && weekDayISO(startISO, week, 0) < addDaysISO(FREE_START, 7))
             acts = acts.filter(a => !/\(sem\. passada\)/.test(a.text)); // 1ª semana do pipeline: nada da semana passada para fechar
+        // ── FRONTEIRA DE FASE (📚 nenhuma etapa fica órfã · ⚙️ a transição de template não perde estado) ──
+        if (wkPh === "CATCHUP" && prevPh === "G2") { // 1ª semana da CATCHUP: sela os fios fechados no fim do POST (+3d) e fecha o Fio 4 cruzado; o template ainda não tem Fio A/B "da semana passada"
+            acts = acts.filter(a => !/Selar o Fio [AB] da semana passada/.test(a.text));
+            const pb = fioPrevBlocksFor(dayIdx, prevIds.length);
+            if (pb.length) { const li = acts.map(a => a.d).lastIndexOf("LAZER"); acts = li >= 0 ? acts.slice(0, li).concat(pb, acts.slice(li)) : acts.concat(pb); }
+        }
+        if (wkPh === "FREE" && prevPh === "CATCHUP" && dayIdx === 2 && prevIds.length >= 2) { // 1ª semana da FREE: o Fio B da última semana da CATCHUP (apostila na terça) é selado na sexta (+3d)
+            const pb = [{ d: "REV", color: "#15803D", text: "Selar Fio B (sem. passada): 10 questões + smartcards + os 4 checks (bloco antigo) — o % da selagem agenda as revisões", time: "40min" }];
+            const li = acts.map(a => a.d).lastIndexOf("LAZER"); acts = li >= 0 ? acts.slice(0, li).concat(pb, acts.slice(li)) : acts.concat(pb);
+        }
         const sh = DATED_SHIFTS[iso];
         const shPrev = DATED_SHIFTS[addDaysISO(iso, -1)];
         if (sh || (shPrev && shPrev.kind === "noite"))
@@ -1260,9 +1278,9 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, onSaveSchedule
         if (r === "B")
             return blockB;
         if (r === "DESAT") {
-            const fm = text.match(/Fio (\d+)( \(sem\. passada\))?/);
-            if (fm && wkPh !== "AMB") { // G2/POST/CATCHUP/FREE: fios congelados por semana (config.fioWeek); "(sem. passada)" = semana anterior
-                const id = (fm[2] ? prevIds : wkIds)[Number(fm[1]) - 1];
+            const fm = text.match(/Fio (\d+|[AB])( \(sem\. passada\))?/);
+            if (fm && wkPh !== "AMB") { // G2/POST/CATCHUP/FREE: fios congelados por semana (config.fioWeek); "(sem. passada)" = semana anterior; A/B = 1º/2º
+                const id = (fm[2] ? prevIds : wkIds)[/\d/.test(fm[1]) ? Number(fm[1]) - 1 : (fm[1] === "A" ? 0 : 1)];
                 return id == null ? null : modOfId(id);
             }
             if (fm)
@@ -1345,7 +1363,8 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, onSaveSchedule
         let sug = null, sugOver = null;
         for (let z = paceCfg - 1; z >= 1; z--) { const o = over(z); if (sug == null || o < sugOver) { sug = z; sugOver = o; } if (o <= WEEK_FIT_MAX_OVER) break; }
         const shifts = [0, 1, 2, 3, 4, 5, 6].filter(i => DATED_SHIFTS[dateFor(i)]).length;
-        return { pace: paceCfg, over: cur, shifts, sug, sugOver };
+        const sim = simFor(dateFor(2)); // semana de simulado: se nem o ritmo 1 cabe, a saída explícita é pausar os fios (🧠/😴; 💬: é a semana, não ela)
+        return { pace: paceCfg, over: cur, shifts, sug, sugOver, sim, noFit: over(1) > WEEK_FIT_MAX_OVER };
     })();
     const day = schedFor(dateFor(activeIdx))[activeIdx];
     const dayDate = dateFor(activeIdx);
@@ -1396,7 +1415,10 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, onSaveSchedule
                 ", n\u00E3o Pomodoro: trabalhe at\u00E9 sentir a queda real de foco, registre e pause proporcional ao bloco. Reentrada: antes de parar, deixe a pr\u00F3xima linha escrita (\"retomar em: ___\").")),
         weekFit && React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", background: "#2a1a0a", border: "1px solid #b45309", borderRadius: 10, padding: "8px 12px" } },
             React.createElement("span", { style: { color: "#fbbf24", fontSize: 11, fontWeight: 800, lineHeight: 1.4 } }, "⚠️ Ritmo " + weekFit.pace + " não cabe nesta semana (" + weekFit.over + (weekFit.over === 1 ? " dia" : " dias") + " acima de " + STUDY_WARN_H + "h · " + weekFit.shifts + (weekFit.shifts === 1 ? " plantão" : " plantões") + ")." + (weekFit.sug != null ? " Sugestão: ritmo " + weekFit.sug + (weekFit.sugOver > WEEK_FIT_MAX_OVER ? " (ainda " + weekFit.sugOver + " dias acima de " + STUDY_WARN_H + "h — mova blocos)" : "") + "." : " Mesmo no ritmo 1: mova blocos.")),
-            weekFit.sug != null && React.createElement("button", { onClick: () => __PACE_SAVE && __PACE_SAVE(weekFit.sug), style: { background: "#0f172a", border: "1px solid #b45309", borderRadius: 8, color: "#fbbf24", fontSize: 11, fontWeight: 700, padding: "5px 10px", cursor: "pointer" } }, "Aplicar ritmo " + weekFit.sug)),
+            weekFit.sug != null && React.createElement("button", { onClick: () => __PACE_SAVE && __PACE_SAVE(weekFit.sug), style: { background: "#0f172a", border: "1px solid #b45309", borderRadius: 8, color: "#fbbf24", fontSize: 11, fontWeight: 700, padding: "5px 10px", cursor: "pointer" } }, "Aplicar ritmo " + weekFit.sug),
+            weekFit.sim && weekFit.noFit && React.createElement("div", { style: { flexBasis: "100%", display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" } },
+                React.createElement("span", { style: { color: "#fbbf24", fontSize: 11, fontWeight: 700, lineHeight: 1.4 } }, "⚠️ Semana de simulado: mesmo no ritmo 1 a carga excede. A prova + correção (8h) ocupam um dia-motor inteiro — considere pausar os fios nesta semana."),
+                weekFit.pace > 1 && weekFit.sug !== 1 && React.createElement("button", { onClick: () => __PACE_SAVE && __PACE_SAVE(1), style: { background: "#0f172a", border: "1px solid #b45309", borderRadius: 8, color: "#fbbf24", fontSize: 11, fontWeight: 700, padding: "5px 10px", cursor: "pointer" } }, "Aplicar ritmo 1"))),
         showLight && React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", background: isBreather ? "#2a200a" : "#0f2e1a", border: "1px solid " + (isBreather ? "#b45309" : "#14532d"), borderRadius: 10, padding: "8px 12px" } },
             React.createElement("span", { style: { color: isBreather ? "#fbbf24" : "#86efac", fontSize: 11, fontWeight: 800, whiteSpace: "nowrap" } }, isBreather ? "🌬️ Respiro:" : "🌿 Sem remédio:"),
             React.createElement("select", { value: lightOv == null ? "auto" : String(lightOv), onChange: e => setLightOverride(e.target.value), title: "Dia sem Venvanse desta semana — Auto = menor carga entre os dias livres (sábado por padrão; nunca pós-noturno) · validar com a psiquiatra", style: { background: "#0f172a", border: "1px solid " + (isBreather ? "#b45309" : "#14532d"), borderRadius: 8, color: isBreather ? "#fbbf24" : "#86efac", fontSize: 11, fontWeight: 700, padding: "5px 8px", cursor: "pointer" } },
