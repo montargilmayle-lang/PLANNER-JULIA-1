@@ -384,8 +384,8 @@ const WEEK_SCHEDULE_CATCHUP = [
             { d: "ANKI", color: "#0369A1", text: "Anki + Meditação 15min", time: "35min" },
             { d: "D7", color: "#0F766E", text: "D7 · SIMULADO NA ÍNTEGRA (quinzenal): manhã, cronometrado", time: "5h" },
             { d: "D7", color: "#0F766E", text: "D7 · CORREÇÃO DO SIMULADO: erro → entender → caderno → tema fraco", time: "3h" },
-            { d: "DESAT", color: "#B91C1C", text: "Fio A · toque 3: apostila dos erros do bloco antigo + Feynman — fecha o fio (dia de simulado: se não der, mova p/ domingo)", time: "1.5h" },
-            { d: "REV", color: "#15803D", text: "Sem simulado · Selar o Fio B da semana passada: 10 questões + smartcards + os 4 checks — o % agenda as revisões D+7/D+30", time: "40min" },
+            { d: "DESAT", color: "#B91C1C", text: "Fio A · toque 3: apostila dirigida pelos erros do bloco antigo + Feynman — fecha o fio (dia de simulado: se não der, mova p/ domingo)", time: "1.5h" },
+            { d: "REV", color: "#15803D", text: "Sem simulado · Selar o Fio B da semana passada: 10 questões + smartcards + os 4 checks — o % da selagem agenda as revisões D+7/D+30", time: "40min" },
             { d: "REV", color: "#15803D", text: "Sem simulado: questões dos temas fracos do caderno de erros", time: "1.5h" },
             { d: "GYM", color: "#1D4ED8", text: "Academia — horário livre (dia de simulado: pós-correção)", time: "1h" },
             { d: "LAZER", color: "#6B7280", text: "Lazer à noite ❤️", time: "livre" },
@@ -400,7 +400,7 @@ const WEEK_SCHEDULE_CATCHUP = [
         activities: [
             { d: "ANKI", color: "#0369A1", text: "Anki + Meditação 15min", time: "35min" },
             { d: "DESAT", color: "#B91C1C", text: "Fio B · toque 1: aula online do bloco antigo (1.5x) + resumo — aula antes das questões, sempre", time: "1.7h" },
-            { d: "REV", color: "#15803D", text: "Semana de simulado · Selar o Fio B da semana passada (deslizado da sexta): 10 questões + smartcards + os 4 checks — o % agenda as revisões D+7/D+30", time: "40min" },
+            { d: "REV", color: "#15803D", text: "Semana de simulado · Selar o Fio B da semana passada (deslizado da sexta): 10 questões + smartcards + os 4 checks — o % da selagem agenda as revisões D+7/D+30", time: "40min" },
             { d: "REV", color: "#15803D", text: "Revisão D+30 adaptativa + caderno de erros", time: "1h" },
             { d: "GYM", color: "#1D4ED8", text: "Academia — horário livre", time: "1h" },
             { d: "LAZER", color: "#6B7280", text: "Noite leve — dormir bem para a segunda", time: "livre" },
@@ -416,8 +416,8 @@ const WEEK_SCHEDULE_CATCHUP = [
     { day: "TER", full: "Terça", phase1_venv: "Selar o Fio A da semana passada · Fio B fecha pela apostila · noite livre (âncora de descanso)", emoji: "📚",
         activities: [
             { d: "ANKI", color: "#0369A1", text: "Anki + Meditação 15min", time: "35min" },
-            { d: "REV", color: "#15803D", text: "Selar o Fio A da semana passada: 10 questões + smartcards + os 4 checks — o % agenda as revisões D+7/D+30", time: "40min" },
-            { d: "DESAT", color: "#B91C1C", text: "Fio B · toque 3: apostila dos erros do bloco antigo + Feynman — fecha o fio", time: "1.5h" },
+            { d: "REV", color: "#15803D", text: "Selar o Fio A da semana passada: 10 questões + smartcards + os 4 checks — o % da selagem agenda as revisões D+7/D+30", time: "40min" },
+            { d: "DESAT", color: "#B91C1C", text: "Fio B · toque 3: apostila dirigida pelos erros do bloco antigo + Feynman — fecha o fio", time: "1.5h" },
             { d: "REV", color: "#15803D", text: "Questões dos temas fracos + Smartcards", time: "1h" },
             { d: "GYM", color: "#1D4ED8", text: "Academia — horário livre", time: "1h" },
             { d: "LAZER", color: "#6B7280", text: "Noite livre ❤️", time: "livre" },
@@ -468,7 +468,7 @@ const WEEK_SCHEDULE_G2 = [
     { day: "DOM", full: "Domingo", phase1_venv: "Dia ATIVO (com remédio, descansada de ontem): apostila do B + fios", emoji: "🔥",
         activities: [
             { d: "ANKI", color: "#0369A1", text: "Anki + Meditação 15min", time: "35min" },
-            { d: "D2", color: "#C2410C", text: "Semana de simulado · deslocado da sexta: aula online Bloco B + D2-B (30q + caderno) — registre o %", time: "4h" },
+            { d: "D2", color: "#C2410C", text: "Semana de simulado · deslocado da sexta: aula online Bloco B (1.5x) + resumo + D2-B (30q + caderno + Anki dos erros) — registre o %", time: "4h" },
             { d: "D4", color: "#7E22CE", text: "Sem simulado · D3/D4 · Apostila do Bloco B pelos erros de sexta + completar resumos + Feynman", time: "2h" },
             { d: "D4", color: "#7E22CE", text: "Semana de simulado · D4: Apostila do Bloco A pelos erros de quinta + Feynman", time: "1.5h" },
             { d: "GYM", color: "#1D4ED8", text: "Academia — horário livre", time: "1h" },
@@ -477,15 +477,17 @@ const WEEK_SCHEDULE_G2 = [
     { day: "SEG", full: "Segunda", phase1_venv: "Dia 5 · banco A+B (2ª recuperação espaçada) + fios do desatraso", emoji: "🔥",
         activities: [
             { d: "ANKI", color: "#0369A1", text: "Anki + Meditação 15min — antes de tudo", time: "35min" },
-            { d: "D5", color: "#B45309", text: "D5 · Manhã (pico): questões por conteúdo Bloco A + Smartcards — registre o %", time: "2h" },
-            { d: "D6", color: "#B45309", text: "D6 · Tarde: questões por conteúdo Bloco B + Smartcards + aulas bônus", time: "2h" },
+            { d: "D5", color: "#B45309", text: "D5 · Manhã (pico): questões por conteúdo Bloco A + Smartcards", time: "2h" },
+            { d: "D6", color: "#B45309", text: "Sem simulado · D6 · Tarde: questões por conteúdo Bloco B + Smartcards + aulas bônus", time: "2h" },
             { d: "D4", color: "#7E22CE", text: "Semana de simulado · D4: Apostila do Bloco B pelos erros de domingo + Feynman", time: "1.5h" },
             { d: "REV", color: "#15803D", text: "Revisão adaptativa da semana anterior (o app avisa pelo seu %)", time: "45min" },
             { d: "GYM", color: "#1D4ED8", text: "Academia — horário livre", time: "1h" },
         ] },
-    { day: "TER", full: "Terça", phase1_venv: "Selar os fios da semana passada + fios do desatraso · noite: faculdade 19h30", emoji: "📚",
+    { day: "TER", full: "Terça", phase1_venv: "Selar A e B da semana passada + fios do desatraso (banco B aqui em semana de simulado) · noite: faculdade 19h30", emoji: "📚",
         activities: [
             { d: "ANKI", color: "#0369A1", text: "Anki + Meditação 15min", time: "35min" },
+            { d: "D6", color: "#B45309", text: "Semana de simulado · D6 · Tarde: questões por conteúdo Bloco B + Smartcards + aulas bônus", time: "2h" },
+            { d: "REV", color: "#15803D", text: "Selar A e B da semana passada: 10 questões por bloco + smartcards + os 4 checks — registre o %", time: "30min" },
             { d: "GYM", color: "#1D4ED8", text: "Academia — horário livre", time: "1h" },
             { d: "AULA", color: "#9F1239", text: "Aula teórica da faculdade — 19h30–21h", time: "1.5h" },
         ] },
@@ -529,7 +531,7 @@ const WEEK_SCHEDULE_POST = [
     { day: "DOM", full: "Domingo", phase1_venv: "Dia ATIVO (com remédio, descansada de ontem): apostila do B + fios", emoji: "🔥",
         activities: [
             { d: "ANKI", color: "#0369A1", text: "Anki + Meditação 15min", time: "35min" },
-            { d: "D2", color: "#C2410C", text: "Semana de simulado · deslocado da sexta: aula online Bloco B + D2-B (30q + caderno) — registre o %", time: "4h" },
+            { d: "D2", color: "#C2410C", text: "Semana de simulado · deslocado da sexta: aula online Bloco B (1.5x) + resumo + D2-B (30q + caderno + Anki dos erros) — registre o %", time: "4h" },
             { d: "D4", color: "#7E22CE", text: "Sem simulado · D3/D4 · Apostila do Bloco B pelos erros de sexta + completar resumos + Feynman", time: "2h" },
             { d: "D4", color: "#7E22CE", text: "Semana de simulado · D4: Apostila do Bloco A pelos erros de quinta + Feynman", time: "1.5h" },
             { d: "GYM", color: "#1D4ED8", text: "Academia — horário livre", time: "1h" },
@@ -538,15 +540,17 @@ const WEEK_SCHEDULE_POST = [
     { day: "SEG", full: "Segunda", phase1_venv: "Dia 5 · banco A+B (2ª recuperação espaçada) + fios do desatraso", emoji: "🔥",
         activities: [
             { d: "ANKI", color: "#0369A1", text: "Anki + Meditação 15min — antes de tudo", time: "35min" },
-            { d: "D5", color: "#B45309", text: "D5 · Manhã (pico): questões por conteúdo Bloco A + Smartcards — registre o %", time: "2h" },
-            { d: "D6", color: "#B45309", text: "D6 · Tarde: questões por conteúdo Bloco B + Smartcards + aulas bônus", time: "2h" },
+            { d: "D5", color: "#B45309", text: "D5 · Manhã (pico): questões por conteúdo Bloco A + Smartcards", time: "2h" },
+            { d: "D6", color: "#B45309", text: "Sem simulado · D6 · Tarde: questões por conteúdo Bloco B + Smartcards + aulas bônus", time: "2h" },
             { d: "D4", color: "#7E22CE", text: "Semana de simulado · D4: Apostila do Bloco B pelos erros de domingo + Feynman", time: "1.5h" },
             { d: "REV", color: "#15803D", text: "Revisão adaptativa da semana anterior (o app avisa pelo seu %)", time: "45min" },
             { d: "GYM", color: "#1D4ED8", text: "Academia — horário livre", time: "1h" },
         ] },
-    { day: "TER", full: "Terça", phase1_venv: "Dia livre (provisório — aguardando a nova grade) · selar os fios da semana passada + fios do desatraso", emoji: "📚",
+    { day: "TER", full: "Terça", phase1_venv: "Dia livre (provisório — aguardando a nova grade) · selar A e B da semana passada + fios do desatraso (banco B aqui em semana de simulado)", emoji: "📚",
         activities: [
             { d: "ANKI", color: "#0369A1", text: "Anki + Meditação 15min", time: "35min" },
+            { d: "D6", color: "#B45309", text: "Semana de simulado · D6 · Tarde: questões por conteúdo Bloco B + Smartcards + aulas bônus", time: "2h" },
+            { d: "REV", color: "#15803D", text: "Selar A e B da semana passada: 10 questões por bloco + smartcards + os 4 checks — registre o %", time: "30min" },
             { d: "GYM", color: "#1D4ED8", text: "Academia — horário livre", time: "1h" },
             { d: "LAZER", color: "#6B7280", text: "Noite livre ❤️", time: "livre" },
         ] },
@@ -606,8 +610,8 @@ const WEEK_SCHEDULE_FREE = [
             { d: "ANKI", color: "#0369A1", text: "Anki + Meditação 15min", time: "35min" },
             { d: "DESAT", color: "#B91C1C", text: "Fio 1 · toque 1: AULA online (bloco antigo, 1.5x) + resumo — aula antes das questões, sempre", time: "1.7h" },
             { d: "DESAT", color: "#B91C1C", text: "Fio 6 (sem. passada) · toque 2: 30 questões (bloco antigo) + caderno + Anki dos erros — registre o %", time: "2h" },
-            { d: "DESAT", color: "#B91C1C", text: "Fio 5 (sem. passada) · toque 3: apostila dos erros (bloco antigo) + Feynman — fecha o fio", time: "1.5h" },
-            { d: "REV", color: "#15803D", text: "Selar Fio 2 (sem. passada): 10 questões + smartcards + os 4 checks (bloco antigo) — o % agenda as revisões", time: "40min" },
+            { d: "DESAT", color: "#B91C1C", text: "Fio 5 (sem. passada) · toque 3: apostila dirigida pelos erros (bloco antigo) + Feynman — fecha o fio", time: "1.5h" },
+            { d: "REV", color: "#15803D", text: "Selar Fio 2 (sem. passada): 10 questões + smartcards + os 4 checks (bloco antigo) — o % da selagem agenda as revisões", time: "40min" },
             { d: "REV", color: "#15803D", text: "Revisão adaptativa (o app avisa pelo seu %)", time: "1h" },
             { d: "GYM", color: "#1D4ED8", text: "Academia — horário livre", time: "1h" },
             { d: "LAZER", color: "#6B7280", text: "Lazer à noite ❤️", time: "livre" },
@@ -617,8 +621,8 @@ const WEEK_SCHEDULE_FREE = [
             { d: "ANKI", color: "#0369A1", text: "Anki + Meditação 15min", time: "35min" },
             { d: "DESAT", color: "#B91C1C", text: "Fio 2 · toque 1: AULA online (bloco antigo, 1.5x) + resumo — aula antes das questões, sempre", time: "1.7h" },
             { d: "DESAT", color: "#B91C1C", text: "Fio 1 · toque 2: 30 questões (bloco antigo) + caderno + Anki dos erros — registre o %", time: "2h" },
-            { d: "DESAT", color: "#B91C1C", text: "Fio 6 (sem. passada) · toque 3: apostila dos erros (bloco antigo) + Feynman — fecha o fio", time: "1.5h" },
-            { d: "REV", color: "#15803D", text: "Selar Fio 3 (sem. passada): 10 questões + smartcards + os 4 checks (bloco antigo) — o % agenda as revisões", time: "40min" },
+            { d: "DESAT", color: "#B91C1C", text: "Fio 6 (sem. passada) · toque 3: apostila dirigida pelos erros (bloco antigo) + Feynman — fecha o fio", time: "1.5h" },
+            { d: "REV", color: "#15803D", text: "Selar Fio 3 (sem. passada): 10 questões + smartcards + os 4 checks (bloco antigo) — o % da selagem agenda as revisões", time: "40min" },
             { d: "REV", color: "#15803D", text: "Questões dos temas fracos + Smartcards", time: "1h" },
             { d: "GYM", color: "#1D4ED8", text: "Academia — horário livre", time: "1h" },
             { d: "LAZER", color: "#6B7280", text: "Lazer à noite ❤️", time: "livre" },
@@ -630,8 +634,8 @@ const WEEK_SCHEDULE_FREE = [
             { d: "D7", color: "#0F766E", text: "D7 · CORREÇÃO DO SIMULADO: erro → entender → caderno → tema fraco", time: "3h" },
             { d: "DESAT", color: "#B91C1C", text: "Fio 3 · toque 1: AULA online (bloco antigo, 1.5x) + resumo — aula antes das questões, sempre", time: "1.7h" },
             { d: "DESAT", color: "#B91C1C", text: "Fio 2 · toque 2: 30 questões (bloco antigo) + caderno + Anki dos erros — registre o %", time: "2h" },
-            { d: "DESAT", color: "#B91C1C", text: "Fio 1 · toque 3: apostila dos erros (bloco antigo) + Feynman — fecha o fio", time: "1.5h" },
-            { d: "REV", color: "#15803D", text: "Selar Fio 4 (sem. passada): 10 questões + smartcards + os 4 checks (bloco antigo) — o % agenda as revisões", time: "40min" },
+            { d: "DESAT", color: "#B91C1C", text: "Fio 1 · toque 3: apostila dirigida pelos erros (bloco antigo) + Feynman — fecha o fio", time: "1.5h" },
+            { d: "REV", color: "#15803D", text: "Selar Fio 4 (sem. passada): 10 questões + smartcards + os 4 checks (bloco antigo) — o % da selagem agenda as revisões", time: "40min" },
             { d: "REV", color: "#15803D", text: "Sem simulado: caderno de erros dos simulados anteriores", time: "1h" },
             { d: "GYM", color: "#1D4ED8", text: "Academia — horário livre (dia de simulado: pós-correção)", time: "1h" },
             { d: "LAZER", color: "#6B7280", text: "Lazer à noite ❤️", time: "livre" },
@@ -647,8 +651,8 @@ const WEEK_SCHEDULE_FREE = [
             { d: "ANKI", color: "#0369A1", text: "Anki + Meditação 15min", time: "35min" },
             { d: "DESAT", color: "#B91C1C", text: "Fio 4 · toque 1: AULA online (bloco antigo, 1.5x) + resumo — aula antes das questões, sempre", time: "1.7h" },
             { d: "DESAT", color: "#B91C1C", text: "Fio 3 · toque 2: 30 questões (bloco antigo) + caderno + Anki dos erros — registre o %", time: "2h" },
-            { d: "DESAT", color: "#B91C1C", text: "Fio 2 · toque 3: apostila dos erros (bloco antigo) + Feynman — fecha o fio", time: "1.5h" },
-            { d: "REV", color: "#15803D", text: "Selar Fio 5 (sem. passada): 10 questões + smartcards + os 4 checks (bloco antigo) — o % agenda as revisões", time: "40min" },
+            { d: "DESAT", color: "#B91C1C", text: "Fio 2 · toque 3: apostila dirigida pelos erros (bloco antigo) + Feynman — fecha o fio", time: "1.5h" },
+            { d: "REV", color: "#15803D", text: "Selar Fio 5 (sem. passada): 10 questões + smartcards + os 4 checks (bloco antigo) — o % da selagem agenda as revisões", time: "40min" },
             { d: "GYM", color: "#1D4ED8", text: "Academia — horário livre", time: "1h" },
             { d: "LAZER", color: "#6B7280", text: "Noite leve — dormir bem para a segunda", time: "livre" },
         ] },
@@ -657,8 +661,8 @@ const WEEK_SCHEDULE_FREE = [
             { d: "ANKI", color: "#0369A1", text: "Anki + Meditação 15min", time: "35min" },
             { d: "DESAT", color: "#B91C1C", text: "Fio 5 · toque 1: AULA online (bloco antigo, 1.5x) + resumo — aula antes das questões, sempre", time: "1.7h" },
             { d: "DESAT", color: "#B91C1C", text: "Fio 4 · toque 2: 30 questões (bloco antigo) + caderno + Anki dos erros — registre o %", time: "2h" },
-            { d: "DESAT", color: "#B91C1C", text: "Fio 3 · toque 3: apostila dos erros (bloco antigo) + Feynman — fecha o fio", time: "1.5h" },
-            { d: "REV", color: "#15803D", text: "Selar Fio 6 (sem. passada): 10 questões + smartcards + os 4 checks (bloco antigo) — o % agenda as revisões", time: "40min" },
+            { d: "DESAT", color: "#B91C1C", text: "Fio 3 · toque 3: apostila dirigida pelos erros (bloco antigo) + Feynman — fecha o fio", time: "1.5h" },
+            { d: "REV", color: "#15803D", text: "Selar Fio 6 (sem. passada): 10 questões + smartcards + os 4 checks (bloco antigo) — o % da selagem agenda as revisões", time: "40min" },
             { d: "REV", color: "#15803D", text: "Revisão adaptativa + Anki dos erros", time: "1h" },
             { d: "GYM", color: "#1D4ED8", text: "Academia — horário livre", time: "1h" },
             { d: "LAZER", color: "#6B7280", text: "Lazer à noite ❤️", time: "livre" },
@@ -668,8 +672,8 @@ const WEEK_SCHEDULE_FREE = [
             { d: "ANKI", color: "#0369A1", text: "Anki + Meditação 15min", time: "35min" },
             { d: "DESAT", color: "#B91C1C", text: "Fio 6 · toque 1: AULA online (bloco antigo, 1.5x) + resumo — aula antes das questões, sempre", time: "1.7h" },
             { d: "DESAT", color: "#B91C1C", text: "Fio 5 · toque 2: 30 questões (bloco antigo) + caderno + Anki dos erros — registre o %", time: "2h" },
-            { d: "DESAT", color: "#B91C1C", text: "Fio 4 · toque 3: apostila dos erros (bloco antigo) + Feynman — fecha o fio", time: "1.5h" },
-            { d: "REV", color: "#15803D", text: "Selar Fio 1: 10 questões + smartcards + os 4 checks (bloco antigo) — o % agenda as revisões", time: "40min" },
+            { d: "DESAT", color: "#B91C1C", text: "Fio 4 · toque 3: apostila dirigida pelos erros (bloco antigo) + Feynman — fecha o fio", time: "1.5h" },
+            { d: "REV", color: "#15803D", text: "Selar Fio 1: 10 questões + smartcards + os 4 checks (bloco antigo) — o % da selagem agenda as revisões", time: "40min" },
             { d: "REV", color: "#15803D", text: "Questões dos temas fracos + Smartcards", time: "1h" },
             { d: "GYM", color: "#1D4ED8", text: "Academia — horário livre", time: "1h" },
             { d: "LAZER", color: "#6B7280", text: "Lazer à noite ❤️", time: "livre" },
@@ -685,7 +689,7 @@ const TAG_COLORS = {
 };
 const TAG_OPTIONS = ["D1", "D2", "D3", "D4", "D5", "D6", "D7", "REV", "ANKI", "GYM", "AMB", "AULA", "DESAT", "PLAN", "RECOMP", "LAZER", "EXTRA"];
 const PROGRESS_FIELDS = ["aula", "questoesD2", "apostila", "smartcard"];
-const PROGRESS_LABELS = { aula: "Aula ✓", questoesD2: "D2 (30q por bloco) ✓", apostila: "Apostila ✓", smartcard: "Smartcard ✓" };
+const PROGRESS_LABELS = { aula: "Aula (toque 1) ✓", questoesD2: "D2 · 30q (toque 2) ✓", apostila: "Apostila pelos erros (toque 3) ✓", smartcard: "Selagem ✓" }; // T6 (🧩): vocabulário do dia; chave "smartcard" preservada (dados antigos continuam válidos)
 const WEEKDAY_ABBR = WEEK_SCHEDULE.map(d => d.day); // QUA,QUI,SEX,SAB,DOM,SEG,TER
 const DAY_LBL = ["QUA", "QUI", "SEX", "SÁB", "DOM", "SEG", "TER"]; // rótulos de exibição
 // ── DATE HELPERS ─────────────────────────────────────────────────────────────
@@ -707,6 +711,47 @@ function todayDayIdx() { return (new Date().getDay() - 3 + 7) % 7; } // 0=QUA..6
 // ── PROJEÇÃO DE ZERAMENTO + HORIZONTE DINÂMICO ────────────────────────────
 // Ritmo honesto por fase (módulos/semana, com fio de 3 toques) — ajustável:
 const PROJ_PACE = { amb: 1, g2: 2, catchup: 2, free: 6 }; // free: o pipeline abre 6 fios/semana (1 por dia livre)
+// ── T1/T2/T5 (🧩 + ⚙️): UM só caminho de gravação do progresso, usado pelo card (Módulos), pela linha (Desatraso) e pelo bloco do dia (Cronograma) ──
+function toggleProgressField(progress, id, field) {
+    const cur = (progress || {})[id] || {};
+    const updated = { ...cur, [field]: !cur[field] };
+    const done = PROGRESS_FIELDS.every(f => updated[f]);
+    if (done && !updated.completedAt) updated.completedAt = todayISO();
+    if (!done && updated.completedAt) { delete updated.completedAt; delete updated.reviewD7Done; delete updated.reviewD30Done; delete updated.reviewR3Done; delete updated.r1DoneAt; delete updated.r2DoneAt; delete updated.accR1; delete updated.accR2; }
+    return { ...(progress || {}), [id]: updated };
+}
+function setProgressPct(progress, id, field, v) {
+    const upd = { ...((progress || {})[id] || {}) };
+    if (v === "" || v == null) delete upd[field]; else upd[field] = Math.max(0, Math.min(100, Number(v)));
+    return { ...(progress || {}), [id]: upd };
+}
+const PCT_FIELD = { questoesD2: "accD2", smartcard: "accSelagem" }; // % que cada etapa registra (T3: a selagem calibra o D+7)
+const PCT_LABEL = { accD2: "% de acerto no D2:", accSelagem: "% da selagem (10q + smartcards):" };
+const PCT_NOTE = { accD2: "reserva do D+7 quando não há % de selagem", accSelagem: "calibra o D+7: ≥80% estica · 60–79% mantém · <60% encurta" };
+function PctInput({ pr, field, onSet }) {
+    return React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" } },
+        React.createElement("span", { style: { color: "#94a3b8", fontSize: 10 } }, PCT_LABEL[field]),
+        React.createElement("input", { type: "number", min: 0, max: 100, inputMode: "numeric", placeholder: "%", value: pr[field] == null ? "" : pr[field], onChange: (e) => onSet(e.target.value),
+            style: { width: 64, background: "#0f172a", border: "1px solid #334155", borderRadius: 6, color: "#f1f5f9", padding: "4px 8px", fontSize: 12 } }),
+        React.createElement("span", { style: { color: "#475569", fontSize: 9 } }, PCT_NOTE[field]));
+}
+function PctBlock({ pr, id, progress, onUpdate }) { // % do D2 (após marcar D2) e da selagem (após marcar Selagem) — T5: também na aba Desatraso
+    if (!pr.questoesD2 && !pr.smartcard) return null;
+    return React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6, marginTop: 8 } },
+        pr.questoesD2 ? React.createElement(PctInput, { pr: pr, field: "accD2", onSet: (v) => onUpdate(setProgressPct(progress, id, "accD2", v)) }) : null,
+        pr.smartcard ? React.createElement(PctInput, { pr: pr, field: "accSelagem", onSet: (v) => onUpdate(setProgressPct(progress, id, "accSelagem", v)) }) : null);
+}
+// Linha de tarefas marcáveis de um bloco do dia (T1): cada tarefa = módulo + campo; % quando a etapa está marcada.
+function TaskRow({ tasks, progress, onUpdate, showCode }) {
+    return React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 4, marginTop: 6 } }, tasks.map((t, k) => {
+        const pr = (progress || {})[t.mod.id] || {};
+        const on = !!pr[t.field];
+        return React.createElement("div", { key: k, style: { display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" } },
+            React.createElement("button", { onClick: () => onUpdate && onUpdate(toggleProgressField(progress || {}, t.mod.id, t.field)), title: "Marca no módulo " + t.mod.code, style: { background: on ? "#166534" : "#1e293b", border: "1px solid " + (on ? "#22c55e" : "#334155"), borderRadius: 6, color: on ? "#22c55e" : "#94a3b8", padding: "4px 8px", fontSize: 10, fontWeight: 700, cursor: "pointer" } },
+                (on ? "✓ " : "") + PROGRESS_LABELS[t.field] + (showCode ? " · " + (t.tag ? t.tag + " · " : "") + t.mod.code : "")),
+            on && PCT_FIELD[t.field] && React.createElement(PctInput, { pr: pr, field: PCT_FIELD[t.field], onSet: (v) => onUpdate && onUpdate(setProgressPct(progress || {}, t.mod.id, PCT_FIELD[t.field], v)) }));
+    }));
+}
 function moduleCompleteP(progress, id) { const p = (progress && progress[id]) || {}; return PROGRESS_FIELDS.every(f => p[f]); }
 function rawWeekOf(iso) { return Math.floor(diffDays(DEFAULT_START, iso) / 7) + 1; }
 function projectedZeroISO(progress) {
@@ -733,10 +778,13 @@ function actHours(a) {
 }
 function dayLoadHours(list) { return (list || []).reduce((s, a) => s + actHours(a), 0); }
 const STUDY_WARN_H = 8; // acima disso o rendimento cai — o app avisa, você move
+const WEEK_FIT_MAX_OVER = 1; // P5b: a semana "não cabe" no ritmo quando MAIS de 1 dia passa de STUDY_WARN_H (1 dia isolado já tem o selo 📚)
 const STUDY_WARN_POSTNIGHT_H = 5; // dia pós-noturno: janela desperta ~13h–22h — o 📚 dispara em 5h (sinal para mover o excedente, não freio)
 function studyHours(list) { return (list || []).filter(a => ["GYM", "AMB", "LAZER", "SONO"].indexOf(a.d) === -1).reduce((s, a) => s + actHours(a), 0); }
 // ── MOTOR DE FIOS DINÂMICO (ritmo configurável, ordem aula→questões→apostila) ──
 let __SIM_SAVE = null;
+let __PACE_SAVE = null; // P5b: botão "Aplicar ritmo Z" do aviso de viabilidade grava config.catchupPace
+let __SIMRES_SAVE = null; // T7: % do simulado por sexta (config.simResults) — acompanhamento, não calibra o motor
 let __LIGHT_SAVE = null; // grava config.lightDayOverrides[isoDaQuarta] = dayIdx (ausente = automático)
 const FIO_PAT = [
     [[1, "aula"], [2, "quest"], [4, "apost"]],
@@ -744,16 +792,24 @@ const FIO_PAT = [
     [[2, "aula"], [4, "quest"], [5, "apost"]],
     [[6, "aula"]],
 ];
-function fioBlock(n, st) {
-    if (st === "aula") return { d: "DESAT", color: "#B91C1C", text: "Fio " + n + " · toque 1: AULA online (bloco antigo, 1.5x) + resumo — aula antes das questões, sempre" + (n === 4 ? " · toques 2–3 seguem na próxima semana (o app retoma pelo seu check da aula)" : ""), time: "1.7h" };
-    if (st === "quest") return { d: "DESAT", color: "#B91C1C", text: "Fio " + n + " · toque 2: 25–30 questões (bloco antigo) + caderno + Anki dos erros — registre o %", time: "2h" };
-    return { d: "DESAT", color: "#B91C1C", text: "Fio " + n + " · toque 3: apostila dos erros (bloco antigo) + Feynman — fecha o fio", time: "1.5h" };
+// P5a (📚 preserva os 4 fios · 🧩 continuidade): Fio 4 em CASCATA CRUZADA — toques 2–3 na QUA/QUI da semana seguinte, como "Fio 4 (sem. passada)".
+// P2 (📚 selagem ~3d após a apostila, um fio por bloco): Fio 1 (apostila DOM) → QUA · Fio 3 (SEG) → QUI · Fio 2 (TER) → SEX · Fio 4 (QUI seguinte) → DOM.
+const FIO4_NEXT = [[0, "quest"], [1, "apost"]];
+const FIO_SEAL_NEXT = { 0: 1, 1: 3, 2: 2, 4: 4 };
+function fioSealBlock(n) { return { d: "REV", color: "#15803D", text: "Selar Fio " + n + " (sem. passada): 10 questões + smartcards + os 4 checks (bloco antigo) — o % da selagem agenda as revisões", time: "40min" }; }
+function fioBlock(n, st, prev) {
+    const lbl = "Fio " + n + (prev ? " (sem. passada)" : "");
+    if (st === "aula") return { d: "DESAT", color: "#B91C1C", text: lbl + " · toque 1: AULA online (bloco antigo, 1.5x) + resumo — aula antes das questões, sempre" + (n === 4 ? " · toques 2–3 na quarta e quinta seguintes" : ""), time: "1.7h" };
+    if (st === "quest") return { d: "DESAT", color: "#B91C1C", text: lbl + " · toque 2: 25–30 questões (bloco antigo) + caderno + Anki dos erros — registre o %", time: "2h" };
+    return { d: "DESAT", color: "#B91C1C", text: lbl + " · toque 3: apostila dirigida pelos erros (bloco antigo) + Feynman — fecha o fio", time: "1.5h" };
 }
-function fioBlocksFor(dayIdx, pace) {
+function fioBlocksFor(dayIdx, pace, prevN) {
     const n = Math.max(1, Math.min(4, Number(pace) || 2));
+    const pn = Math.max(0, Math.min(4, Number(prevN) || 0)); // quantos fios a semana passada abriu (0 = 1ª semana da G2: nada a fechar)
     const out = [];
-    if (dayIdx === 6)
-        out.push({ d: "REV", color: "#15803D", text: "Selar os fios FECHADOS na semana passada: 10 questões + smartcards + os 4 checks por módulo — o % agenda as revisões D+7/D+30", time: "40min" });
+    if (pn >= 4) FIO4_NEXT.forEach(p => { if (p[0] === dayIdx) out.push(fioBlock(4, p[1], true)); }); // fecha o Fio 4 de ontem antes de abrir os de hoje
+    const sealN = FIO_SEAL_NEXT[dayIdx];
+    if (sealN && pn >= sealN) out.push(fioSealBlock(sealN));
     FIO_PAT.slice(0, n).forEach((pat, i) => pat.forEach(p => { if (p[0] === dayIdx) out.push(fioBlock(i + 1, p[1])); }));
     return out;
 }
@@ -768,11 +824,47 @@ function effectiveTargets(queue, n) {
 }
 // ── RETA FINAL: os 6 fios da semana ficam CONGELADOS (config.fioWeek[isoDaQuarta] = [ids]) para o pipeline não deslizar
 // quando um módulo é concluído no meio da semana (⚙️: o app não mente; 🧩: previsibilidade). Sem snapshot → cálculo vivo.
-function weekFioIds(config, progress, wk, startISO) {
+// ── Fase da semana (pelos dias que ela contém) e nº de fios que a fase abre ──
+function weekPhase(startISO, wk) {
+    const wed = weekDayISO(startISO, wk, 0), ter = weekDayISO(startISO, wk, 6);
+    return wed >= FREE_START ? "FREE" : wed >= CATCHUP_START ? "CATCHUP" : ter >= G2_START ? "G2" : "AMB"; // "G2" cobre G2 e POST (mesmo desenho de fios)
+}
+function fiosWanted(phase, pace) { return phase === "FREE" ? 6 : phase === "CATCHUP" ? 2 : Math.max(1, Math.min(4, Number(pace) || 2)); }
+// P1 (📚 continuidade + ⚙️ a tela não pode mentir): candidatos a fio NOVO — módulo FECHADO (aula + questões + apostila marcadas) sai dos slots
+// (só a selagem o chama); módulo EM ANDAMENTO (aula marcada, questões pendentes) entra PRIMEIRO; depois, recência. `carry` = ids que a semana
+// passada ainda conduz (Fio 4 em cascata cruzada na G2/POST; todos os fios na FREE): não viram fio novo.
+function fioCandidates(queue, progress, carry) {
+    const ex = new Set(carry || []);
+    const st = (m) => (progress || {})[m.id] || {};
+    const open = queue.filter(m => !ex.has(m.id) && !(st(m).aula && st(m).questoesD2 && st(m).apostila));
+    return open.filter(m => st(m).aula).concat(open.filter(m => !st(m).aula));
+}
+// Fios da semana `wk`, CONGELADOS em config.fioWeek[isoDaQuarta] (snapshot gravado pelo App na 1ª renderização da semana corrente).
+// Semana passada sem snapshot → ordem legada (recência), que é o que a tela mostrou na época. Snapshot curto (o ritmo subiu) → completa ao vivo.
+// Troca de ritmo (seletores e botão "Aplicar ritmo Z"): na G2/POST, se o ritmo CAI, o snapshot da semana corrente encolhe (fios ainda não abertos saem do plano);
+// se sobe, o App completa o snapshot ao vivo. Um só caminho para os três lugares (⚙️).
+function applyPace(config, k) {
+    const next = { ...config, catchupPace: k };
+    const cw = computeWeek(config.startDate, todayISO());
+    if (weekPhase(config.startDate, cw) === "G2") {
+        const wed = weekDayISO(config.startDate, cw, 0); const log = config.fioWeek || {};
+        if (Array.isArray(log[wed]) && log[wed].length > k) next.fioWeek = { ...log, [wed]: log[wed].slice(0, k) };
+    }
+    return next;
+}
+function weekFioIds(config, progress, wk, startISO, n) {
+    const ph = weekPhase(startISO, wk);
     const wed = weekDayISO(startISO, wk, 0);
     const snap = ((config && config.fioWeek) || {})[wed];
-    if (Array.isArray(snap) && snap.length) return snap.slice();
-    return effectiveTargets(catchupQueue(progress || {}, wk), 6).map(m => m.id);
+    const want = n || (Array.isArray(snap) && snap.length ? snap.length : fiosWanted(ph, __PACE)); // sem n: o que a semana planejou (snapshot); sem snapshot, o ritmo atual
+    const base = Array.isArray(snap) ? snap.slice(0, want) : [];
+    if (base.length >= want) return base;
+    const queue = catchupQueue(progress || {}, wk);
+    if (wk < computeWeek(startISO, todayISO())) return base.length ? base : effectiveTargets(queue, want).map(m => m.id);
+    const prevIds = weekPhase(startISO, wk - 1) === ph ? weekFioIds(config, progress, wk - 1, startISO) : [];
+    const carry = ph === "FREE" ? prevIds : (ph === "G2" && prevIds.length >= 4 ? [prevIds[3]] : []);
+    const cand = fioCandidates(queue, progress, base.concat(carry));
+    return base.concat(effectiveTargets(cand, want - base.length).map(m => m.id)).slice(0, want);
 }
 let __PACE = 2;
 function setPaceCfg(p) { __PACE = Math.max(1, Math.min(4, Number(p) || 2)); }
@@ -862,7 +954,8 @@ function catchupDepth(mod, effWeek) {
 // ── REVISÕES ADAPTATIVAS PELO % DE ACERTO (successive relearning) ────────────
 // ≥80% acerto → intervalo estica · 60–79% → mantém · <60% → encurta + reexposição.
 // Sem % informado → padrão por tempo (D+7 / D+30). Reforço extra se D+30 <60%.
-function r1Interval(p) { const a = p && p.accD2; if (a == null) return 7; return a >= 80 ? 10 : (a >= 60 ? 7 : 4); }
+// T3 (📚): o % da SELAGEM calibra o D+7 — re-recuperação pós-critério (Rawson & Dunlosky); o % do D2 é a reserva; sem %, 7 dias.
+function r1Interval(p) { const a = p && (p.accSelagem != null ? p.accSelagem : p.accD2); if (a == null) return 7; return a >= 80 ? 10 : (a >= 60 ? 7 : 4); }
 function r2Interval(p) { const a = p && p.accR1; if (a == null) return 30; return a >= 80 ? 30 : (a >= 60 ? 21 : 12); }
 function r1DueOf(p) { return addDaysISO(p.completedAt, r1Interval(p)); }
 function r2DueOf(p) { return p.r1DoneAt ? addDaysISO(p.r1DoneAt, r2Interval(p)) : addDaysISO(p.completedAt, 30); }
@@ -1009,7 +1102,7 @@ function EventNote({ value, onCommit }) {
                 border: `1px solid ${txt ? "#92400e" : "#334155"}`, borderRadius: 8, color: "#f1f5f9",
                 padding: "10px 12px", fontSize: 12, resize: "vertical", fontFamily: "inherit", lineHeight: 1.5 } })));
 }
-function Schedule({ config, effWeek, scheduleOv, events, reviews, onSaveSchedule, onSaveEvents }) {
+function Schedule({ config, effWeek, scheduleOv, events, reviews, onSaveSchedule, onSaveEvents, onUpdateProgress }) {
     const [activeIdx, setActiveIdx] = useState(todayDayIdx());
     const [editMode, setEditMode] = useState(false);
     const [adding, setAdding] = useState(false);
@@ -1021,7 +1114,15 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, onSaveSchedule
     const blockB = mods[1] || null;
     // Trilha B (desatraso): alvos da semana, intercalando especialidades.
     const queue = catchupQueue(reviews.progress, effWeek);
-    const targets = effectiveTargets(queue, 6);
+    const wkPh = weekPhase(startISO, week);
+    const paceCfg = Math.max(1, Math.min(4, Number(config && config.catchupPace) || 2));
+    const wkIds = wkPh === "AMB" ? [] : weekFioIds(config, reviews.progress, week, startISO, fiosWanted(wkPh, paceCfg)); // fios desta semana (congelados)
+    const prevSnapLen = (((config && config.fioWeek) || {})[weekDayISO(startISO, week - 1, 0)] || []).length;
+    const prevIdsFor = (pc) => (wkPh !== "AMB" && weekPhase(startISO, week - 1) === wkPh) ? weekFioIds(config, reviews.progress, week - 1, startISO, prevSnapLen || fiosWanted(wkPh, pc)) : [];
+    const prevIds = prevIdsFor(paceCfg); // fios da semana passada (selagens, cascata cruzada): snapshot dela; sem snapshot, o ritmo atual
+    const modOfId = (id) => queue.find(m => m.id === id) || MODULES.find(m => m.id === id) || null;
+    const targets = wkPh === "AMB" ? effectiveTargets(queue, 6) : wkIds.map(modOfId).filter(Boolean);
+    const prevMods = modulesForWeek(week - 1); // A e B da semana passada (P6: "Selar A e B")
     const catchupForDay = (dayIdx) => {
         const iso = weekDayISO(startISO, week, dayIdx);
         if (iso >= FREE_START) {
@@ -1062,11 +1163,11 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, onSaveSchedule
     };
     // Sexta de simulado? override manual → sexta de plantão = não → paridade quinzenal (âncora 14/08)
     const simFor = (fri) => { const ovr = ((config && config.simOverrides) || {})[fri]; return ovr !== undefined ? ovr : (DATED_SHIFTS[fri] ? false : (((diffDays(SIMULADO_ANCHOR, fri) % 14) + 14) % 14 === 0)); };
-    const genActivities = (dayIdx) => {
+    const genActivities = (dayIdx, paceOv) => {
         const iso = weekDayISO(startISO, week, dayIdx);
         let acts = schedFor(iso)[dayIdx].activities;
         if (iso >= AMB_START) {
-            if (dayIdx === 2 || dayIdx === 3 || dayIdx === 4 || dayIdx === 5) {
+            if (dayIdx >= 2) { // SEX…TER (P3: a terça recebe o D6-B em semana de simulado)
                 const fri = weekDayISO(startISO, week, 2);
                 const isSim = simFor(fri);
                 acts = acts.filter(a => {
@@ -1078,7 +1179,7 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, onSaveSchedule
             }
         }
         if (iso >= G2_START && iso < CATCHUP_START) {
-            const fb = fioBlocksFor(dayIdx, (config && config.catchupPace) || 2);
+            const fb = fioBlocksFor(dayIdx, paceOv || paceCfg, (paceOv ? prevIdsFor(paceOv) : prevIds).length);
             if (fb.length) {
                 let li = acts.map(a => a.d).lastIndexOf("LAZER");
                 if (li < 0 && acts.length && acts[acts.length - 1].d === "AULA") li = acts.length - 1; // sem LAZER (TER da G2): fios antes da aula da faculdade à noite
@@ -1161,16 +1262,44 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, onSaveSchedule
             return blockB;
         if (r === "DESAT") {
             const fm = text.match(/Fio (\d+)( \(sem\. passada\))?/);
-            if (fm && dateFor(activeIdx) >= FREE_START) { // reta final: fios congelados por semana (config.fioWeek)
-                const id = weekFioIds(config, reviews.progress, fm[2] ? week - 1 : week, startISO)[Number(fm[1]) - 1];
-                return id == null ? null : (MODULES.find(m => m.id === id) || null);
+            if (fm && wkPh !== "AMB") { // G2/POST/CATCHUP/FREE: fios congelados por semana (config.fioWeek); "(sem. passada)" = semana anterior
+                const id = (fm[2] ? prevIds : wkIds)[Number(fm[1]) - 1];
+                return id == null ? null : modOfId(id);
             }
             if (fm)
                 return targets[Number(fm[1]) - 1] || null;
             return /2º bloco antigo/.test(text) ? (targets[1] || targets[0] || null) : catchupForDay(activeIdx);
         }
+        const fa = text.match(/Selar o Fio ([AB]) da semana passada/); // CATCHUP: selagem do fio da semana passada mostra o módulo selado
+        if (fa) { const id = prevIds[fa[1] === "A" ? 0 : 1]; return id == null ? null : modOfId(id); }
         return null;
     };
+    // T1 (🧩 + ⚙️): tarefas marcáveis de um bloco → [{ mod, field }]. Etapas de execução sem registro (D1, D+1, D5/D6, REV, D7) devolvem [] (✓ manual do dia).
+    const blockTasks = (text, mod) => {
+        const t = text;
+        if (/^Resumo rápido/.test(t)) return [];
+        if (/Selar A e B da semana passada/.test(t)) return prevMods.slice(0, 2).map((m, i) => ({ mod: m, field: "smartcard", tag: ["A", "B"][i] }));
+        if (/^(Semana de simulado · )?Selar (o )?Fio/.test(t)) return mod ? [{ mod, field: "smartcard" }] : [];
+        if (blockRef(t) === "DESAT") {
+            if (!mod) return [];
+            if (/toque 1/.test(t)) return [{ mod, field: "aula" }];
+            if (/toque 2/.test(t)) return [{ mod, field: "questoesD2" }];
+            if (/toque 3/.test(t)) return [{ mod, field: "apostila" }];
+            return [];
+        }
+        const both = [blockA, blockB].filter(Boolean);
+        if (/Aula presencial|AULA PRESENCIAL de ontem/i.test(t)) return both.map((m, i) => ({ mod: m, field: "aula", tag: ["A", "B"][i] }));
+        if (/Apostila direcionada pelos erros \(A e B\)/.test(t)) return both.map((m, i) => ({ mod: m, field: "apostila", tag: ["A", "B"][i] }));
+        if (/D2 completo|D2 compacto/.test(t)) return both.map((m, i) => ({ mod: m, field: "questoesD2", tag: ["A", "B"][i] }));
+        const ref = blockRef(t); const m = ref === "A" ? blockA : ref === "B" ? blockB : null;
+        if (!m) return [];
+        const out = [];
+        if (/aula online/i.test(t)) out.push({ mod: m, field: "aula" });
+        if (/D2-[AB]|30 questões Bloco [AB]|30q Bloco [AB]|20q Bloco [AB]/.test(t)) out.push({ mod: m, field: "questoesD2" });
+        if (/Apostila (do )?Bloco [AB]/i.test(t)) out.push({ mod: m, field: "apostila" });
+        return out;
+    };
+    const isBlockDone = (a) => { const tk = blockTasks(a.text, resolveBlock(a.text)); const pg = reviews.progress || {}; return tk.length ? tk.every(t => !!((pg[t.mod.id] || {})[t.field])) : !!a.done; }; // T2: bloco com módulo reflete o card
     // ── DIA SEM VENVANSE: domingo é SEMPRE dia de estudo; o dia sem remédio varia pela demanda da semana ──
     // Candidatos: os 7 dias da semana visível, menos a quarta enquanto houver presencial (até 24/11), os dias com
     // plantão datado, os dias PÓS-NOTURNO (🧠: pausa + privação de sono + compromisso à noite é o que a pausa deve evitar)
@@ -1206,11 +1335,24 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, onSaveSchedule
         __LIGHT_SAVE && __LIGHT_SAVE(o);
     };
     const fmtHrs = (x) => (Math.round(x * 10) / 10).toFixed(1).replace(".", ",") + "h";
+    // ── P5b · VIABILIDADE DA SEMANA (🧠/😴 pedem o aviso · 📚 preserva os 4 fios · 🧩 informação antes do fracasso, não depois) ──
+    // Conta os dias com estudo acima de STUDY_WARN_H no ritmo atual (só G2/POST, onde o ritmo muda a semana); se passar de WEEK_FIT_MAX_OVER,
+    // avisa e sugere o maior ritmo que cabe (ou o que menos estoura). A escolha continua dela: o botão só aplica a sugestão.
+    const weekFit = (() => {
+        if (wkPh !== "G2") return null;
+        const over = (p) => { let k = 0; for (let i = 0; i < 7; i++) { const l = scheduleOv[dateFor(i)] || genActivities(i, p); if (studyHours(l) > STUDY_WARN_H + 1e-9) k++; } return k; };
+        const cur = over(paceCfg);
+        if (cur <= WEEK_FIT_MAX_OVER) return null;
+        let sug = null, sugOver = null;
+        for (let z = paceCfg - 1; z >= 1; z--) { const o = over(z); if (sug == null || o < sugOver) { sug = z; sugOver = o; } if (o <= WEEK_FIT_MAX_OVER) break; }
+        const shifts = [0, 1, 2, 3, 4, 5, 6].filter(i => DATED_SHIFTS[dateFor(i)]).length;
+        return { pace: paceCfg, over: cur, shifts, sug, sugOver };
+    })();
     const day = schedFor(dateFor(activeIdx))[activeIdx];
     const dayDate = dateFor(activeIdx);
     const list = listFor(activeIdx);
     const dayReviews = computeReviews(reviews.progress, dayDate);
-    const doneCount = list.filter(a => a.done).length;
+    const doneCount = list.filter(isBlockDone).length;
     return (React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 16 } },
         React.createElement("div", { style: { background: "#1e293b", borderRadius: 12, padding: 16 } },
             React.createElement("div", { style: { color: "#94a3b8", fontSize: 11, marginBottom: 10 } }, "ESTRUTURA DOS DIAS D"),
@@ -1228,7 +1370,7 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, onSaveSchedule
                 { d: "D1", label: "Quarta", desc: "Dia 0: 10q pré-aula (priming) + presencial A e B", color: "#2980B9" },
                 { d: "D3→D2", label: "Qui / Sex", desc: "Aula online do bloco → 30q no MESMO dia (A qui · B sex) — registre o %", color: "#C2410C" },
                 { d: "D4", label: "Sex+Dom", desc: "Apostila pelos erros (A sex, de quinta · B dom, de sexta) + Feynman", color: "#7E22CE" },
-                { d: "D5/D6", label: "Seg", desc: "Banco A+B · SÁB = template leve · DOM ativo · dia sem Venvanse = selo 🌿 (menor carga) · fios: ritmo 1–4 na aba Desatraso", color: "#B45309" },
+                { d: "D5/D6", label: "Seg (+Ter)", desc: "Banco A+B (em semana de simulado o D6-B vai para a terça) · TER: selar A e B + fios da semana passada, um bloco por fio · SÁB = template leve · DOM ativo · selo 🌿 = dia sem Venvanse · fios: ritmo 1–4 (o ⚠️ da semana avisa quando não cabe)", color: "#B45309" },
             ] : dayDate >= AMB_START && dayDate <= AMB_END ? [
                 { d: "D1", label: "Quarta", desc: "10q pré-aula (priming) + presencial A e B", color: "#2980B9" },
                 { d: "D3", label: "Qui+Sex", desc: "Aulas online: áudio no plantão (A) + vídeo sexta (B) — aula ANTES das questões", color: "#7E22CE" },
@@ -1253,6 +1395,9 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, onSaveSchedule
                 "\u23F1\uFE0F ",
                 React.createElement("strong", { style: { color: "#94a3b8" } }, "Flowtime"),
                 ", n\u00E3o Pomodoro: trabalhe at\u00E9 sentir a queda real de foco, registre e pause proporcional ao bloco. Reentrada: antes de parar, deixe a pr\u00F3xima linha escrita (\"retomar em: ___\").")),
+        weekFit && React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", background: "#2a1a0a", border: "1px solid #b45309", borderRadius: 10, padding: "8px 12px" } },
+            React.createElement("span", { style: { color: "#fbbf24", fontSize: 11, fontWeight: 800, lineHeight: 1.4 } }, "⚠️ Ritmo " + weekFit.pace + " não cabe nesta semana (" + weekFit.over + (weekFit.over === 1 ? " dia" : " dias") + " acima de " + STUDY_WARN_H + "h · " + weekFit.shifts + (weekFit.shifts === 1 ? " plantão" : " plantões") + ")." + (weekFit.sug != null ? " Sugestão: ritmo " + weekFit.sug + (weekFit.sugOver > WEEK_FIT_MAX_OVER ? " (ainda " + weekFit.sugOver + " dias acima de " + STUDY_WARN_H + "h — mova blocos)" : "") + "." : " Mesmo no ritmo 1: mova blocos.")),
+            weekFit.sug != null && React.createElement("button", { onClick: () => __PACE_SAVE && __PACE_SAVE(weekFit.sug), style: { background: "#0f172a", border: "1px solid #b45309", borderRadius: 8, color: "#fbbf24", fontSize: 11, fontWeight: 700, padding: "5px 10px", cursor: "pointer" } }, "Aplicar ritmo " + weekFit.sug)),
         showLight && React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", background: isBreather ? "#2a200a" : "#0f2e1a", border: "1px solid " + (isBreather ? "#b45309" : "#14532d"), borderRadius: 10, padding: "8px 12px" } },
             React.createElement("span", { style: { color: isBreather ? "#fbbf24" : "#86efac", fontSize: 11, fontWeight: 800, whiteSpace: "nowrap" } }, isBreather ? "🌬️ Respiro:" : "🌿 Sem remédio:"),
             React.createElement("select", { value: lightOv == null ? "auto" : String(lightOv), onChange: e => setLightOverride(e.target.value), title: "Dia sem Venvanse desta semana — Auto = menor carga entre os dias livres (sábado por padrão; nunca pós-noturno) · validar com a psiquiatra", style: { background: "#0f172a", border: "1px solid " + (isBreather ? "#b45309" : "#14532d"), borderRadius: 8, color: isBreather ? "#fbbf24" : "#86efac", fontSize: 11, fontWeight: 700, padding: "5px 8px", cursor: "pointer" } },
@@ -1312,8 +1457,9 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, onSaveSchedule
                         " \u00B7 ",
                         m.title)))))) : (React.createElement("div", { style: { color: "#94a3b8", fontSize: 12 } }, "Semana de recupera\u00E7\u00E3o \u2014 sem m\u00F3dulos novos. Use os blocos para desatraso e revis\u00E3o."))),
             React.createElement(EventNote, { value: events[dayDate], onCommit: (val) => onSaveEvents({ ...events, [dayDate]: val }) }),
-            (activeIdx === 2 && dayDate >= AMB_START && !DATED_SHIFTS[dayDate]) && (() => {
-                const par = ((diffDays(SIMULADO_ANCHOR, dayDate) % 14) + 14) % 14 === 0;
+            (activeIdx === 2 && dayDate >= AMB_START) && (() => {
+                const shiftFri = !!DATED_SHIFTS[dayDate]; // P8 (⚙️): sexta de plantão = sem simulado pela regra, mas o toque religa — o override manual sempre vence
+                const par = shiftFri ? false : ((diffDays(SIMULADO_ANCHOR, dayDate) % 14) + 14) % 14 === 0;
                 const ov = ((config && config.simOverrides) || {})[dayDate];
                 const isSim = ov !== undefined ? ov : par;
                 return React.createElement("button", { onClick: () => {
@@ -1321,7 +1467,8 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, onSaveSchedule
                         if (ov === undefined) o[dayDate] = !par; else delete o[dayDate];
                         __SIM_SAVE && __SIM_SAVE(o);
                     }, style: { width: "100%", marginBottom: 12, background: isSim ? "#0f2e2a" : "#0f172a", border: "1px solid " + (isSim ? "#0f766e" : "#334155"), borderRadius: 8, color: isSim ? "#2dd4bf" : "#94a3b8", padding: "9px", fontSize: 11, fontWeight: 700, cursor: "pointer" } },
-                    isSim ? "🎯 Simulado marcado nesta sexta — toque se NÃO for fazer (o dia vira estudo ativo)" : "📚 Sexta de estudo ativo — toque se FOR fazer simulado hoje");
+                    isSim ? (shiftFri ? "🎯 Simulado marcado nesta sexta DE PLANTÃO (sua escolha) — toque para voltar à regra (sem simulado)" : "🎯 Simulado marcado nesta sexta — toque se NÃO for fazer (o dia vira estudo ativo)")
+                        : (shiftFri ? "📚 Sexta de plantão: sem simulado pela regra — toque se FOR fazer simulado hoje (sua escolha vale mais que a regra)" : "📚 Sexta de estudo ativo — toque se FOR fazer simulado hoje"));
             })(),
             React.createElement("div", { style: { display: "flex", gap: 8, marginBottom: 12 } },
                 React.createElement("button", { onClick: () => { setEditMode(m => !m); setAdding(false); }, style: {
@@ -1338,30 +1485,45 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, onSaveSchedule
                 const isDesat = blockRef(act.text) === "DESAT";
                 const act2 = mod && isDesat ? catchupAction(reviews.progress, mod.id) : null;
                 const depth = mod && isDesat ? catchupDepth(mod, effWeek) : null;
+                // T1/T2 (🧩 1 toque · ⚙️ um só registro): bloco com módulo → o ✓ É o campo do módulo (ida e volta com o card);
+                // bloco sem módulo (Anki, PLAN, D1, D+1, D5/D6, REV, D7, academia) → ✓ manual do dia, como antes.
+                const tasks = blockTasks(act.text, mod);
+                const pg = reviews.progress || {};
+                const tDone = (t) => !!((pg[t.mod.id] || {})[t.field]);
+                const isDone = tasks.length ? tasks.every(tDone) : !!act.done;
+                const onMainToggle = () => {
+                    if (!tasks.length) { toggleDone(activeIdx, i); return; }
+                    const allDone = tasks.every(tDone);
+                    let next = pg;
+                    tasks.forEach(t => { if (tDone(t) === allDone) next = toggleProgressField(next, t.mod.id, t.field); });
+                    onUpdateProgress && onUpdateProgress(next);
+                };
+                const isSimFix = activeIdx === 2 && /CORREÇÃO DO SIMULADO/.test(act.text); // T7: % do simulado (acompanhamento entre provas)
+                const simRes = ((config && config.simResults) || {})[dayDate];
                 return (React.createElement("div", { key: act.id, style: { background: "#0f172a", borderRadius: 8,
-                        borderLeft: `3px solid ${act.color}`, padding: "10px 12px",
-                        opacity: act.done ? 0.55 : 1, transition: "opacity .2s" } },
+                        borderLeft: "3px solid " + act.color, padding: "10px 12px",
+                        opacity: isDone ? 0.55 : 1, transition: "opacity .2s" } },
                     React.createElement("div", { style: { display: "flex", gap: 10, alignItems: "flex-start" } },
-                        React.createElement("button", { onClick: () => toggleDone(activeIdx, i), title: "Concluir", style: { marginTop: 1, flexShrink: 0, width: 20, height: 20, borderRadius: 5,
-                                cursor: "pointer", background: act.done ? "#166534" : "transparent",
-                                border: `1px solid ${act.done ? "#22c55e" : "#475569"}`,
-                                color: "#22c55e", fontSize: 12, lineHeight: 1, padding: 0 } }, act.done ? "✓" : ""),
+                        React.createElement("button", { onClick: onMainToggle, title: tasks.length ? "Marcar a etapa no módulo" : "Concluir", style: { marginTop: 1, flexShrink: 0, width: 20, height: 20, borderRadius: 5,
+                                cursor: "pointer", background: isDone ? "#166534" : "transparent",
+                                border: "1px solid " + (isDone ? "#22c55e" : "#475569"),
+                                color: "#22c55e", fontSize: 12, lineHeight: 1, padding: 0 } }, isDone ? "✓" : ""),
                         React.createElement("span", { style: { background: act.color, color: "#fff", fontSize: 9, fontWeight: 800,
                                 padding: "2px 6px", borderRadius: 4, whiteSpace: "nowrap", marginTop: 1, flexShrink: 0 } }, act.d),
                         React.createElement("div", { style: { flex: 1, minWidth: 0 } },
                             React.createElement("span", { style: { color: "#cbd5e1", fontSize: 12, lineHeight: 1.5,
-                                    textDecoration: act.done ? "line-through" : "none" } }, act.text),
+                                    textDecoration: isDone ? "line-through" : "none" } }, act.text),
                             mod && !isDesat && (React.createElement("div", { style: { color: "#7c8aa0", fontSize: 11, marginTop: 3 } },
-                                "\u21B3 ",
+                                "↳ ",
                                 React.createElement("strong", { style: { color: "#94a3b8" } }, mod.code),
-                                " \u00B7 ",
+                                " · ",
                                 mod.title)),
                             mod && isDesat && (React.createElement("div", { style: { marginTop: 6 } },
                                 React.createElement("div", { style: { background: "#13212e", border: "1px solid #1f3a4d",
                                         borderRadius: 6, padding: "7px 9px" } },
                                     React.createElement("div", { style: { display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", marginBottom: 2 } },
-                                        React.createElement("span", { style: { color: "#5eb3a8", fontSize: 10, fontWeight: 700 } }, "\uD83D\uDCCC MAT\u00C9RIA"),
-                                        React.createElement(Badge, { label: `Sem.${mod.week}`, color: "#7f1d1d" }),
+                                        React.createElement("span", { style: { color: "#5eb3a8", fontSize: 10, fontWeight: 700 } }, "📌 MATÉRIA"),
+                                        React.createElement(Badge, { label: "Sem." + mod.week, color: "#7f1d1d" }),
                                         React.createElement(Badge, { label: mod.code, color: TAG_COLORS[mod.code] || "#475569" }),
                                         depth && React.createElement("span", { style: { background: depth.color, color: "#fff", fontSize: 8,
                                                 fontWeight: 800, padding: "1px 5px", borderRadius: 3 } }, depth.tier)),
@@ -1372,7 +1534,14 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, onSaveSchedule
                                         React.createElement("strong", null, act2.lead),
                                         " ",
                                         React.createElement("span", { style: { color: "#64748b" } }, act2.rest)))))),
-                            mod === null && isDesat && (React.createElement("div", { style: { color: "#22c55e", fontSize: 11, marginTop: 3 } }, "\uD83C\uDF89 Sem desatraso pendente \u2014 use o slot para refor\u00E7o da semana atual."))),
+                            mod === null && isDesat && (React.createElement("div", { style: { color: "#22c55e", fontSize: 11, marginTop: 3 } }, "🎉 Sem desatraso pendente — use o slot para reforço da semana atual.")),
+                            tasks.length > 0 && React.createElement(TaskRow, { tasks: tasks, progress: pg, onUpdate: onUpdateProgress, showCode: tasks.length > 1 }),
+                            isSimFix && React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginTop: 6, flexWrap: "wrap" } },
+                                React.createElement("span", { style: { color: "#94a3b8", fontSize: 10 } }, "📈 % do simulado:"),
+                                React.createElement("input", { type: "number", min: 0, max: 100, inputMode: "numeric", placeholder: "%", value: simRes == null ? "" : simRes,
+                                    onChange: (e) => { const v = e.target.value; const o = { ...((config && config.simResults) || {}) }; if (v === "") delete o[dayDate]; else o[dayDate] = Math.max(0, Math.min(100, Number(v))); __SIMRES_SAVE && __SIMRES_SAVE(o); },
+                                    style: { width: 64, background: "#1e293b", border: "1px solid #334155", borderRadius: 6, color: "#f1f5f9", padding: "4px 8px", fontSize: 12 } }),
+                                React.createElement("span", { style: { color: "#475569", fontSize: 9 } }, "acompanhamento entre provas — não calibra o motor"))),
                         act.time && act.time !== "livre" && (React.createElement("span", { style: { color: "#475569", fontSize: 10, whiteSpace: "nowrap", marginTop: 2 } }, act.time))),
                     editMode && (React.createElement("div", { style: { display: "flex", gap: 6, marginTop: 10, flexWrap: "wrap", alignItems: "center" } },
                         React.createElement("button", { onClick: () => reorder(activeIdx, i, -1), disabled: i === 0, style: ctrlBtn(i === 0) }, "\u2191"),
@@ -1456,24 +1625,7 @@ function ModuleTracker({ progress, onUpdate, effWeek, reviews }) {
         const p = prog(id);
         return Math.round(PROGRESS_FIELDS.filter(f => p[f]).length / PROGRESS_FIELDS.length * 100);
     };
-    const toggle = (id, field) => {
-        const cur = prog(id);
-        const updated = { ...cur, [field]: !cur[field] };
-        const done = PROGRESS_FIELDS.every(f => updated[f]);
-        if (done && !updated.completedAt)
-            updated.completedAt = todayISO();
-        if (!done && updated.completedAt) {
-            delete updated.completedAt;
-            delete updated.reviewD7Done;
-            delete updated.reviewD30Done;
-            delete updated.reviewR3Done;
-            delete updated.r1DoneAt;
-            delete updated.r2DoneAt;
-            delete updated.accR1;
-            delete updated.accR2;
-        }
-        onUpdate({ ...progress, [id]: updated });
-    };
+    const toggle = (id, field) => onUpdate(toggleProgressField(progress, id, field)); // T1: função única
     const overallPct = () => {
         const total = MODULES.length * PROGRESS_FIELDS.length;
         const done = MODULES.reduce((acc, m) => acc + PROGRESS_FIELDS.filter(f => prog(m.id)[f]).length, 0);
@@ -1572,13 +1724,7 @@ function ModuleTracker({ progress, onUpdate, effWeek, reviews }) {
                         } },
                         pr[f] ? "✓ " : "",
                         PROGRESS_LABELS[f])))),
-                    pr.questoesD2 ? React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginTop: 8, flexWrap: "wrap" } },
-                        React.createElement("span", { style: { color: "#94a3b8", fontSize: 10 } }, "% de acerto no D2:"),
-                        React.createElement("input", { type: "number", min: 0, max: 100, inputMode: "numeric", placeholder: "%",
-                            value: pr.accD2 == null ? "" : pr.accD2,
-                            onChange: (e) => { const v = e.target.value; const upd = { ...pr }; if (v === "") { delete upd.accD2; } else { upd.accD2 = Math.max(0, Math.min(100, Number(v))); } onUpdate({ ...progress, [m.id]: upd }); },
-                            style: { width: 64, background: "#0f172a", border: "1px solid #334155", borderRadius: 6, color: "#f1f5f9", padding: "4px 8px", fontSize: 12 } }),
-                        React.createElement("span", { style: { color: "#475569", fontSize: 9 } }, "\u226580% estica a revis\u00E3o \u00B7 <60% encurta")) : null));
+                    React.createElement(PctBlock, { pr: pr, id: m.id, progress: progress, onUpdate: onUpdate })));
             }),
             filtered.length === 0 && (React.createElement("div", { style: { color: "#475569", textAlign: "center", padding: 40 } }, "Nenhum m\u00F3dulo encontrado.")))));
 }
@@ -1615,11 +1761,13 @@ function BackupCard() {
 }
 function PlanejadorSemana({ progress, onUpdate, effWeek, config, onSaveConfig }) {
     const [speed15, setSpeed15] = useState(true);
-    const pace = (config && config.catchupPace) || 2;
-    const queue = catchupQueue(progress, effWeek);
     const tISO = todayISO();
-    const nFio = tISO >= FREE_START ? 6 : Math.max(1, Math.min(4, pace)); // reta final: 6 fios/semana (pipeline), congelados
-    const targets = (tISO >= FREE_START ? weekFioIds(config, progress, effWeek, config.startDate).map(id => queue.find(m => m.id === id)) : effectiveTargets(queue, nFio)).filter(Boolean).slice(0, nFio);
+    const paceLocked = tISO >= CATCHUP_START && tISO < FREE_START; // P7 (⚙️): a CATCHUP agenda 2 fios (A e B)
+    const pace = paceLocked ? 2 : ((config && config.catchupPace) || 2);
+    const queue = catchupQueue(progress, effWeek);
+    const phNow = weekPhase(config.startDate, effWeek);
+    const nFio = fiosWanted(phNow, pace);
+    const targets = (phNow === "AMB" ? effectiveTargets(queue, nFio) : weekFioIds(config, progress, effWeek, config.startDate, nFio).map(id => queue.find(m => m.id === id) || MODULES.find(m => m.id === id))).filter(Boolean).slice(0, nFio);
     const proj = projectedZeroISO(progress);
     const projW = rawWeekOf(proj);
     const zerado = proj <= todayISO();
@@ -1661,8 +1809,8 @@ function PlanejadorSemana({ progress, onUpdate, effWeek, config, onSaveConfig })
             "Assistirei em 1.5x (ajusta o tempo de foco)"),
         React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 10, flexWrap: "wrap" } },
             React.createElement("span", { style: { color: "#94a3b8", fontSize: 11 } }, "Ritmo do desatraso:"),
-            [1, 2, 3, 4].map(k => React.createElement("button", { key: k, onClick: () => onSaveConfig && onSaveConfig({ ...config, catchupPace: k }), style: { background: pace === k ? "#7c2d12" : "#0f172a", border: "1px solid " + (pace === k ? "#f59e0b" : "#334155"), borderRadius: 8, color: pace === k ? "#f59e0b" : "#64748b", fontSize: 12, fontWeight: 800, padding: "6px 12px", cursor: "pointer" } }, k)),
-            React.createElement("span", { style: { color: "#475569", fontSize: 9 } }, "fios/semana · o app encaixa aula→questões→apostila→selagem sozinho · 4 = semana pesada (o ⚠️ vigia)")),
+            [1, 2, 3, 4].map(k => React.createElement("button", { key: k, onClick: () => { if (paceLocked) return; onSaveConfig && onSaveConfig(applyPace(config, k)); }, style: { background: pace === k ? "#7c2d12" : "#0f172a", border: "1px solid " + (pace === k ? "#f59e0b" : "#334155"), borderRadius: 8, color: pace === k ? "#f59e0b" : "#64748b", fontSize: 12, fontWeight: 800, padding: "6px 12px", cursor: "pointer" } }, k)),
+            React.createElement("span", { style: { color: "#475569", fontSize: 9 } }, paceLocked ? "esta fase agenda 2 fios (A e B)" : "fios/semana · o app encaixa aula→questões→apostila→selagem sozinho · 4 = semana pesada (o ⚠️ da semana avisa quando não cabe)")),
         React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 10 } }, rows.length ? rows.map(({ m, pr, sug }) => (React.createElement("div", { key: m.id, style: { background: "#0f172a", borderRadius: 8, padding: 10 } },
             React.createElement("div", { style: { display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", marginBottom: 6 } },
                 React.createElement(Badge, { label: "Sem." + m.week, color: "#7f1d1d" }),
@@ -1684,29 +1832,13 @@ function PlanejadorSemana({ progress, onUpdate, effWeek, config, onSaveConfig })
 function CatchUp({ progress, onUpdate, effWeek, config, onSaveConfig }) {
     const prog = (id) => (progress === null || progress === void 0 ? void 0 : progress[id]) || {};
     const pct = (id) => Math.round(PROGRESS_FIELDS.filter(f => prog(id)[f]).length / PROGRESS_FIELDS.length * 100);
-    const toggle = (id, field) => {
-        const cur = prog(id);
-        const updated = { ...cur, [field]: !cur[field] };
-        const done = PROGRESS_FIELDS.every(f => updated[f]);
-        if (done && !updated.completedAt)
-            updated.completedAt = todayISO();
-        if (!done && updated.completedAt) {
-            delete updated.completedAt;
-            delete updated.reviewD7Done;
-            delete updated.reviewD30Done;
-            delete updated.reviewR3Done;
-            delete updated.r1DoneAt;
-            delete updated.r2DoneAt;
-            delete updated.accR1;
-            delete updated.accR2;
-        }
-        onUpdate({ ...progress, [id]: updated });
-    };
-    const pace = config.catchupPace || 2;
+    const toggle = (id, field) => onUpdate(toggleProgressField(progress, id, field)); // T1: função única
+    const paceLocked = todayISO() >= CATCHUP_START && todayISO() < FREE_START; // P7 (⚙️): a CATCHUP agenda 2 fios (A e B)
+    const pace = paceLocked ? 2 : (config.catchupPace || 2);
     const queue = catchupQueue(progress, effWeek);
-    const targets = todayISO() >= FREE_START
-        ? weekFioIds(config, progress, effWeek, config.startDate).map(id => queue.find(m => m.id === id)).filter(Boolean) // reta final: 6 fios congelados da semana
-        : effectiveTargets(queue, pace);
+    const phNow = weekPhase(config.startDate, effWeek);
+    const targets = phNow === "AMB" ? effectiveTargets(queue, pace)
+        : weekFioIds(config, progress, effWeek, config.startDate, fiosWanted(phNow, pace)).map(id => queue.find(m => m.id === id) || MODULES.find(m => m.id === id)).filter(Boolean); // fios congelados da semana (snapshot)
     const pins = Array.isArray(config.catchupPins) ? config.catchupPins : [];
     const togglePin = (id) => {
         const next = pins.indexOf(id) >= 0 ? pins.filter(x => x !== id) : pins.concat([id]);
@@ -1777,7 +1909,8 @@ function CatchUp({ progress, onUpdate, effWeek, config, onSaveConfig }) {
                     cursor: "pointer", fontWeight: 600
                 } },
                 prog(m.id)[f] ? "✓ " : "",
-                PROGRESS_LABELS[f]))))));
+                PROGRESS_LABELS[f])))),
+            React.createElement(PctBlock, { pr: prog(m.id), id: m.id, progress: progress, onUpdate: onUpdate })));
     };
     return (React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 16 } },
         React.createElement("div", { style: { background: "#1e293b", borderRadius: 12, padding: 18 } },
@@ -1809,13 +1942,13 @@ function CatchUp({ progress, onUpdate, effWeek, config, onSaveConfig }) {
                     React.createElement("div", { style: { color: "#94a3b8", fontSize: 24, fontWeight: 700 } }, weeksLeft),
                     React.createElement("div", { style: { color: "#64748b", fontSize: 10 } }, "at\u00E9 o fim (Sem." + dynTW() + ")"))),
             React.createElement("div", { style: { color: "#94a3b8", fontSize: 11, marginBottom: 6 } },
-                "Ritmo de desatraso: ",
+                paceLocked ? "Ritmo de desatraso (travado — esta fase agenda 2 fios (A e B)): " : "Ritmo de desatraso: ",
                 React.createElement("strong", { style: { color: "#f1f5f9" } },
                     pace,
                     " m\u00F3dulo",
                     pace > 1 ? "s" : "",
                     "/semana")),
-            React.createElement("div", { style: { display: "flex", gap: 6, marginBottom: 12 } }, [1, 2, 3, 4].map(n => (React.createElement("button", { key: n, onClick: () => onSaveConfig({ ...config, catchupPace: n }), style: {
+            React.createElement("div", { style: { display: "flex", gap: 6, marginBottom: 12 } }, [1, 2, 3, 4].map(n => (React.createElement("button", { key: n, onClick: () => { if (paceLocked) return; onSaveConfig(applyPace(config, n)); }, style: {
                     flex: 1, background: pace === n ? "#f5c518" : "#0f172a",
                     border: `1px solid ${pace === n ? "#f5c518" : "#334155"}`, borderRadius: 8,
                     color: pace === n ? "#0f172a" : "#94a3b8", padding: "8px", fontSize: 12,
@@ -2038,21 +2171,28 @@ function App() {
     }, [config]);
     const isManual = (config === null || config === void 0 ? void 0 : config.manualWeek) != null;
     const reviews = useMemo(() => computeReviews(progress), [progress]);
-    setPaceCfg(config && config.catchupPace); // ritmo primeiro: a projeção (e o horizonte) dependem dele
+    setPaceCfg((todayISO() >= CATCHUP_START && todayISO() < FREE_START) ? 2 : (config && config.catchupPace)); // ritmo primeiro: a projeção (e o horizonte) dependem dele · P7: CATCHUP = 2
     setDynTW(progress); // horizonte dinâmico: acompanha a projeção de zeramento
     setCatchupPins(config && config.catchupPins);
     __SIM_SAVE = (ov) => saveConfig({ ...config, simOverrides: ov });
     __LIGHT_SAVE = (ov) => saveConfig({ ...config, lightDayOverrides: ov });
-    // Reta final: congela os 6 fios da semana CORRENTE (pela data real) na 1ª renderização — o pipeline referencia
-    // fios de ontem/anteontem/semana passada, que não podem deslizar quando um módulo é concluído (⚙️ + 🧩).
+    __PACE_SAVE = (p) => saveConfig(applyPace(config, p));
+    __SIMRES_SAVE = (o) => saveConfig({ ...config, simResults: o });
+    // Congela os fios da semana CORRENTE (pela data real) em config.fioWeek[isoDaQuarta] na 1ª renderização — G2/POST, CATCHUP e FREE (P1/P2: ⚙️ + 🧩):
+    // selagens e cascata cruzada referenciam a semana passada, que não pode deslizar quando um módulo é concluído. Se o ritmo subir no meio da
+    // semana, completa o snapshot (nunca reordena o que já foi gravado).
     useEffect(() => {
         if (!loaded || !config) return;
         const cw = computeWeek(config.startDate, todayISO());
+        const ph = weekPhase(config.startDate, cw);
+        if (ph === "AMB") return;
         const wed = weekDayISO(config.startDate, cw, 0);
-        if (wed < FREE_START) return;
+        const want = fiosWanted(ph, Number(config.catchupPace) || 2);
         const log = config.fioWeek || {};
-        if (Array.isArray(log[wed]) && log[wed].length) return;
-        const ids = effectiveTargets(catchupQueue(progress || {}, cw), 6).map(m => m.id);
+        const cur = Array.isArray(log[wed]) ? log[wed] : [];
+        if (cur.length >= want) return;
+        const ids = weekFioIds(config, progress, cw, config.startDate, want);
+        if (ids.length <= cur.length) return;
         saveConfig({ ...config, fioWeek: { ...log, [wed]: ids } });
     }, [loaded, config, progress]);
     const markReviewDone = useCallback((id, kind, pct) => {
@@ -2196,7 +2336,7 @@ function App() {
                             width: `${Math.round(effWeek / dynTW() * 100)}%` } })))),
         React.createElement("div", { style: { padding: "16px 16px 100px" } },
             (tab === "schedule" || tab === "modules" || tab === "catchup") && (React.createElement(ReviewAlerts, { alerts: reviews, onDone: markReviewDone })),
-            tab === "schedule" && (React.createElement(Schedule, { config: config, effWeek: effWeek, scheduleOv: scheduleOv, events: events, reviews: { progress }, onSaveSchedule: saveSchedule, onSaveEvents: saveEvents })),
+            tab === "schedule" && (React.createElement(Schedule, { config: config, effWeek: effWeek, scheduleOv: scheduleOv, events: events, reviews: { progress }, onSaveSchedule: saveSchedule, onSaveEvents: saveEvents, onUpdateProgress: saveProgress })),
             tab === "modules" && (React.createElement(ModuleTracker, { progress: progress, onUpdate: saveProgress, effWeek: effWeek, reviews: reviews })),
             tab === "catchup" && (React.createElement(React.Fragment, null, React.createElement(PlanejadorSemana, { progress: progress, onUpdate: saveProgress, effWeek: effWeek, config: config, onSaveConfig: saveConfig }), React.createElement(CatchUp, { progress: progress, onUpdate: saveProgress, effWeek: effWeek, config: config, onSaveConfig: saveConfig }))),
             tab === "dopamine" && React.createElement(DopamineMenu, { data: dopeData, onSave: saveDope }),

@@ -74,12 +74,12 @@ Cada bloco tem sua escadinha completa, colada na própria aula:
 - **Dia 2 · Sexta:** **aula online do Bloco B → D2-B (30q)** + **apostila do A dirigida pelos erros de ONTEM** + Feynman + Fio 1 · questões (ritmo ≥3: + Fio 3 · aula). (Quinzenalmente: SIMULADO, §11 — a aula B + D2-B e a apostila do A deslizam para o domingo.)
 - **Dia 3 · Sábado:** **DIA LEVE por construção**: Anki 30min + PLAN (intenções + recompensa + pomodoros + backup) · sem fios · **tarde e noite protegidas** (ou estágio — nunca os dois). O dia **sem Venvanse** é o selo 🌿 da semana (menor carga entre os dias livres; sábado por padrão) — a validar com a psiquiatra.
 - **Dia 4 · Domingo:** **dia ATIVO** (domingo é sempre dia de estudo): apostila do B pelos erros de sexta + Fio 1 · apostila + Fio 2 · aula (ritmo ≥3: + Fio 3 · questões) + academia. Em semana de simulado: aula B + D2-B deslocados + apostila do A (erros de quinta).
-- **Dia 5 · Segunda:** **banco A+B + smartcards** (2ª recuperação espaçada) + Fio 2 · questões (ritmo ≥3: + Fio 3 · apostila) + revisão adaptativa. Em semana de simulado: + apostila do B (erros de domingo).
-- **Terça:** **selar os fios FECHADOS na semana passada** (10q + smartcards + 4 checks) → Fio 2 · apostila (ritmo 4: + Fio 4 · aula, que continua na semana seguinte pelo seu check) · temas fracos · (aula da faculdade 19h30–21h até 11/10).
+- **Dia 5 · Segunda:** **banco A+B + smartcards** (2ª recuperação espaçada — etapa de execução, sem registro de %) + Fio 2 · questões (ritmo ≥3: + Fio 3 · apostila) + revisão adaptativa. Em semana de simulado: + apostila do B (erros de domingo), e o **banco B vai para a terça** (apostila antes do banco, nunca no mesmo dia).
+- **Terça:** **selar A e B da semana passada** (10q por bloco + smartcards + 4 checks, 30min — +4 dias da apostila do A, +2 da do B) → Fio 2 · apostila (ritmo 4: + Fio 4 · aula, que continua na QUA/QUI seguintes como "Fio 4 (sem. passada)") · banco B em semana de simulado · (aula da faculdade 19h30–21h até 11/10). A selagem de cada FIO tem bloco próprio ~3 dias depois da apostila daquele fio, na semana seguinte: Fio 1 na quarta, Fio 3 na quinta, Fio 2 na sexta, Fio 4 no domingo.
 
-*Ritmo dos fios (1–4 na aba Desatraso) = `FIO_PAT`: Fio 1 qui→sex→dom · Fio 2 dom→seg→ter · Fio 3 sex→dom→seg · Fio 4 ter (continua na semana seguinte). Dois fios no mesmo dia são sempre módulos distintos.*
+*Ritmo dos fios (1–4 na aba Desatraso) = `FIO_PAT`: Fio 1 qui→sex→dom · Fio 2 dom→seg→ter · Fio 3 sex→dom→seg · Fio 4 ter→qua→qui (cruza a semana). Dois fios no mesmo dia são sempre módulos distintos. Fio fechado (3 checks) não volta como fio novo; fio começado (aula marcada) entra primeiro na semana seguinte. Se a semana não comportar o ritmo, o cabeçalho avisa ("⚠️ Ritmo N não cabe … Sugestão: ritmo Z") — você decide.*
 
-Registre o **%** em toda bateria — é ele que calibra as revisões.
+Registre o **%** no D2 e na **selagem** — o da selagem é o que calibra o D+7 (o do D2 é a reserva). O banco (D5/D6) é execução, sem registro. Tudo se marca **no próprio bloco do dia** (1 toque; o card do módulo acompanha).
 
 ---
 
@@ -93,13 +93,13 @@ Registre o **%** em toda bateria — é ele que calibra as revisões.
 | 2ª <60% | — | — | Reforço +14d |
 | sem % | D+7 | D+30 | padrão |
 
-**Sugestão da equipe (§14): <40% = trate a aula como não vista — reassista antes de novas questões.** O app avisa as datas sozinho; a selagem (§7) é o que coloca cada módulo de desatraso nesse trilho.
+**Sugestão da equipe (§14): <40% = trate a aula como não vista — reassista antes de novas questões.** O app avisa as datas sozinho; a selagem (§7) é o que coloca cada módulo nesse trilho, e é o **% da selagem** (re-recuperação pós-critério, Rawson & Dunlosky) que calibra a 1ª revisão — o % do D2 fica como reserva.
 
 ---
 
 ## 7 · Desatraso — fio de 3 toques + SELAGEM (aprender e lembrar, não zerar)
 
-Por módulo: **toque 1 = AULA** (sempre primeiro; se você marcou a aula como vista há ≤8 semanas, direto às questões; há mais tempo, reexposição rápida — só o SEU check no app conta) → **toque 2 = questões** (+2 dias, com sono no meio; registre o %) → **toque 3 = apostila dos erros** → **SELAGEM** (+3 dias): 10 questões + smartcards + os 4 checks — o % da selagem entrega o módulo ao motor de revisões D+7/D+30. Sem selagem, o módulo está riscado; com ela, está *medido e agendado para ser lembrado*.
+Por módulo: **toque 1 = AULA** (sempre primeiro; se você marcou a aula como vista há ≤8 semanas, direto às questões; há mais tempo, reexposição rápida — só o SEU check no app conta) → **toque 2 = questões** (+2 dias, com sono no meio; registre o %) → **toque 3 = apostila dirigida pelos erros** → **SELAGEM** (+3 dias, bloco próprio que nomeia o fio): 10 questões + smartcards + os 4 checks — o % da selagem entrega o módulo ao motor de revisões D+7/D+30. Sem selagem, o módulo está riscado; com ela, está *medido e agendado para ser lembrado*.
 
 Ferramentas: **📌 fixar/trocar** qualquer módulo da fila (a sugestão automática por recência continua o padrão); **planejador de pomodoros** (minutos da aula → nº de pomodoros 60/10/35 + divisão sugerida — dimensionamento apenas; na execução, siga o Flowtime se estiver rendendo); **projeção de zeramento viva** (ritmos honestos: ~2/sem agora, 2/sem na recuperação, 6/sem na reta final em pipeline; meta 31/12, pode ultrapassar — o horizonte do app acompanha).
 
@@ -125,7 +125,7 @@ Cards SÓ dos erros (D2, selagens <60%, simulados). Novos 15–20/dia (teto 25);
 
 ## 11 · Simulados
 
-Quinzenais, **sextas, âncora 14/08** — o app mostra sozinho qual sexta é de prova (o ciclo de 09/10 foi pulado por decisão sua; retoma 23/10). Prova 5h em condições reais + correção 3h no mesmo dia: erro → por quê → raciocínio certo escrito → caderno/Anki → tema fraco marcado. **Opção da equipe se 8h pesar:** correção dividida — 2h na sexta + 1h no sábado de manhã, com olhos frescos. Temas fracos entram no banco da semana seguinte.
+Quinzenais, **sextas, âncora 14/08** — o app mostra sozinho qual sexta é de prova (o ciclo de 09/10 foi pulado por decisão sua; retoma 23/10). Sexta de plantão = sem prova pela regra, mas o botão existe também nela: seu toque vale mais que a regra. Anote o **% do simulado** no bloco de correção — é acompanhamento entre provas para a equipe, não calibra o motor. Prova 5h em condições reais + correção 3h no mesmo dia: erro → por quê → raciocínio certo escrito → caderno/Anki → tema fraco marcado. **Opção da equipe se 8h pesar:** correção dividida — 2h na sexta + 1h no sábado de manhã, com olhos frescos. Temas fracos entram no banco da semana seguinte.
 
 ---
 

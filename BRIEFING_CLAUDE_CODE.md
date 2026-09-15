@@ -64,15 +64,15 @@ Esta é a distribuição **correta e validada pela equipe**. Não alterar sem re
 
 | Dia | O que acontece | Por quê (evidência) |
 |---|---|---|
-| **QUA (Dia 0)** | 10q pré-aula (priming) + **aula presencial A e B** (17h–22h) + D+1 relâmpago | Pretesting (Kornell 2009); gatilho da semana |
-| **QUI (Dia 1)** | **Aula online Bloco A (1.5x) → D2-A (30q) no mesmo dia** + **Fio 1 · aula** | Testing effect a 1 dia da presencial (Roediger 2006) |
-| **SEX (Dia 2)** | **Aula online Bloco B → D2-B (30q)** + **Apostila do A pelos erros de ontem** + Fio 1 · questões (ritmo ≥3: + Fio 3 · aula) | Erro→releitura em 24h; prática distribuída (Cepeda 2006) |
+| **QUA (Dia 0)** | 10q pré-aula (priming) + **aula presencial A e B** (17h–22h) + D+1 relâmpago · **Selar Fio 1 (sem. passada)** (apostila foi no DOM, +3d) · ritmo 4: **Fio 4 (sem. passada) · questões** | Pretesting (Kornell 2009); gatilho da semana |
+| **QUI (Dia 1)** | **Aula online Bloco A (1.5x) → D2-A (30q) no mesmo dia** + **Fio 1 · aula** · **Selar Fio 3 (sem. passada)** (+3d) · ritmo 4: **Fio 4 (sem. passada) · apostila** | Testing effect a 1 dia da presencial (Roediger 2006) |
+| **SEX (Dia 2)** | **Aula online Bloco B → D2-B (30q)** + **Apostila do A pelos erros de ontem** + Fio 1 · questões (ritmo ≥3: + Fio 3 · aula) · **Selar Fio 2 (sem. passada)** (+3d) | Erro→releitura em 24h; prática distribuída (Cepeda 2006) |
 | **SÁB (Dia 3)** | **DIA LEVE (template)**: Anki 30min + PLAN — sem fios. O dia **sem Venvanse** é o selo 🌿 calculado pela menor carga entre os dias livres (sábado por padrão; override por semana) | Reset dopaminérgico no dia de menor demanda; domingo é sempre dia de estudo |
-| **DOM (Dia 4)** | **Dia ATIVO** (domingo é sempre dia de estudo): Apostila do B + Fio 1 · apostila + Fio 2 · aula (ritmo ≥3: + Fio 3 · questões) + gym | Descansado pelo sábado; alimenta a segunda |
-| **SEG (Dia 5)** | Banco A+B + smartcards (D5/D6) + Fio 2 · questões (ritmo ≥3: + Fio 3 · apostila) | 2ª recuperação espaçada |
-| **TER (Dia 6)** | Selar os fios FECHADOS na semana passada + Fio 2 · apostila (ritmo 4: + Fio 4 · aula, que continua na semana seguinte) + faculdade 19h30–21h (até 11/10) | Selagem = re-recuperação pós-critério (Rawson 2011) |
+| **DOM (Dia 4)** | **Dia ATIVO** (domingo é sempre dia de estudo): Apostila do B + Fio 1 · apostila + Fio 2 · aula (ritmo ≥3: + Fio 3 · questões) + gym · ritmo 4: **Selar Fio 4 (sem. passada)** (+3d) | Descansado pelo sábado; alimenta a segunda |
+| **SEG (Dia 5)** | Banco A+B + smartcards (D5/D6 — etapa de execução, sem "registre o %") + Fio 2 · questões (ritmo ≥3: + Fio 3 · apostila) · em semana de simulado: + apostila do B e o **D6-B vai para a terça** (P3) | 2ª recuperação espaçada |
+| **TER (Dia 6)** | **Selar A e B da semana passada** (30min; +4d da apostila do A, +2d da do B) + Fio 2 · apostila (ritmo 4: + Fio 4 · aula → questões QUA e apostila QUI seguintes) + D6-B em semana de simulado + faculdade 19h30–21h (até 11/10) | Selagem = re-recuperação pós-critério (Rawson 2011) |
 
-*Tabela reescrita em 13/09 a partir do `FIO_PAT` vigente (§5). Em semana de simulado: SEX = prova + correção; DOM = aula B + D2-B + apostila do A; SEG = + apostila do B.*
+*Tabela reescrita em 13/09 a partir do `FIO_PAT` vigente (§5). Em semana de simulado: SEX = prova + correção; DOM = aula B (1.5x) + resumo + D2-B + apostila do A; SEG = + apostila do B; TER = D6-B (banco B).*
 
 **RESOLVIDO (12/09):** o card de Estrutura dizia "Sex+Sáb (A sex · B sáb)" — corrigido para "Sex+Dom"; o card ACADEMIA passou a ler a lista real de cada dia (sábado leve sem treino, domingo com treino, pós-noturno sem treino, plantão diurno "opcional").
 
@@ -85,8 +85,11 @@ const FIO_PAT = [
     [[1, "aula"], [2, "quest"], [4, "apost"]],   // Fio 1: aula=QUI, q=SEX, a=DOM
     [[4, "aula"], [5, "quest"], [6, "apost"]],   // Fio 2: aula=DOM, q=SEG, a=TER
     [[2, "aula"], [4, "quest"], [5, "apost"]],   // Fio 3: aula=SEX, q=DOM, a=SEG
-    [[6, "aula"]],                                // Fio 4: aula=TER; toques 2–3 na semana seguinte (o app retoma pelo check da aula)
+    [[6, "aula"]],                                // Fio 4: aula=TER; toques 2–3 na QUA/QUI SEGUINTES (cascata cruzada, P5a)
 ];
+const FIO4_NEXT = [[0, "quest"], [1, "apost"]];    // blocos "Fio 4 (sem. passada) · toque 2/3" na semana seguinte (se a semana passada abriu 4 fios)
+const FIO_SEAL_NEXT = { 0: 1, 1: 3, 2: 2, 4: 4 };  // P2: selagem por fio, bloco próprio, +3d da apostila — QUA sela Fio 1 · QUI Fio 3 · SEX Fio 2 · DOM Fio 4
+// fioBlocksFor(dayIdx, pace, prevN): prevN = nº de fios que a semana passada abriu (snapshot); 0 na 1ª semana da G2
 // Rebalanceado para o ritmo 4: evita empilhar aulas na sexta/segunda. Com ritmo 4 a sexta chega a ~9,5h de estudo
 // e o selo 📚 (>8h) avisa — é o mecanismo que identifica quando o ritmo não cabe.
 // dayIdx: 0=QUA, 1=QUI, 2=SEX, 3=SÁB, 4=DOM, 5=SEG, 6=TER
@@ -98,8 +101,10 @@ const FIO_PAT = [
 - Apostila: **1.5h** (corrigido de 1.2h)
 - Total por fio: ~5.2h + selagem = **≈5.9h/módulo** (dentro do padrão 5–6h da equipe)
 
-**Selagem (terça-feira):** `fioBlocksFor(dayIdx=6)` injeta o bloco de selagem antes dos fios:
-> "Selar os fios FECHADOS na semana passada: 10 questões + smartcards + os 4 checks por módulo — o % agenda as revisões D+7/D+30"
+**Selagem por fio (P2, PR #5):** `fioSealBlock(n)` injeta, na semana seguinte, um bloco próprio por fio (~3 dias após a apostila daquele fio):
+> "Selar Fio N (sem. passada): 10 questões + smartcards + os 4 checks (bloco antigo) — o % da selagem agenda as revisões"
+
+**Selagem de A e B (P6):** bloco fixo na TER dos templates G2/POST — "Selar A e B da semana passada: 10 questões por bloco + smartcards + os 4 checks — registre o %" (30min); D5/D6 é a etapa 4 (banco), não selagem.
 
 **Regra ABSOLUTA:** Aula sempre antes de questões ou apostila. O sistema nunca deve gerar questões de um módulo sem que a aula tenha sido marcada como vista (check `p.aula`). No desatraso: entrada adaptativa — sem aula vista → toque 1 (aula); aula vista há ≤8 sem → direto às questões; aula vista há mais tempo → reexposição rápida (~40min) → questões.
 
@@ -128,7 +133,7 @@ const FIO_PAT = [
 - Dia pós-noturno (chega às 07h) — regra da paciente (14/09): dia de ESTUDO com o sono como bloco inegociável antes. Bloco 😴 "Chegando (~07h): dormir até ~13h — bloco inegociável. Depois, dia de estudo normal: comece pelo mais pesado" (6h) no topo + blocos do template para valer; **sem academia** (veto 🏃 + 😴 mantido); o selo 📚 dispara em **5h** de estudo (`STUDY_WARN_POSTNIGHT_H`, janela desperta ~13h–22h) — sinal para mover o excedente, não freio. A linguagem de "manutenção" foi revogada
 - Arco 05→06→07/10 (noturno PM04 → recuperação + aula 19h30 → plantão diurno na quarta da presencial): o trecho mais duro da grade — 05/10 recebe os blocos da segunda + 🌙 no fim; 06/10 recebe 😴 + blocos da terça com a aula preservada e sem academia; 07/10 é a colisão (⚠️ dispara; ela decide). Grade atualizada em 14/09: o noturno de 28/09 saiu; 28/09 virou pós-noturno simples e 29/09 terça normal
 - Colisão com AULA presencial (07/10): o bloco da aula vira aviso "vista AMANHÃ, online"; a gravada substitui **as aulas 1.5x da semana (plural)**: 08/10 recebe a presencial gravada (A+B) no lugar da 1.5x do A; 09/10 troca a 1.5x do B por "Resumo rápido do Bloco B (visto na gravação de ontem) → vá direto ao D2-B" (20min) — sem dupla exposição sem teste entre elas
-- **Sexta de plantão = sem simulado por padrão** (`DATED_SHIFTS[fri] ? false : paridade`), salvo override manual
+- **Sexta de plantão = sem simulado por padrão** (`DATED_SHIFTS[fri] ? false : paridade`), salvo override manual — o botão de override existe TAMBÉM nas sextas de plantão (P8, ⚙️: toda regra automática é reversível pela paciente); texto "📚 Sexta de plantão: sem simulado pela regra — toque se FOR fazer simulado hoje"
 - NUNCA voltar ao modelo antigo em que o plantão substituía o dia inteiro
 
 ---
@@ -138,7 +143,8 @@ const FIO_PAT = [
 - Âncora: **14/08/2026** (primeira sexta COM simulado — informado pela paciente)
 - Ciclo de **09/10 pulado** (fim de semana com 3 plantões) — retoma 23/10
 - Paridade: `((diffDays(SIMULADO_ANCHOR, fri) % 14) + 14) % 14 === 0`
-- **Override por sexta:** `config.simOverrides[isoSexta]` = true/false (2º toque apaga → volta à paridade)
+- **Override por sexta:** `config.simOverrides[isoSexta]` = true/false (2º toque apaga → volta à paridade/regra)
+- **Resultado (T7):** `config.simResults[isoSexta]` = % do simulado, digitado no bloco de correção ("📈 % do simulado") — acompanhamento entre provas para a equipe, NÃO calibra o motor
 - **Botão na sexta:** "🎯 Simulado marcado — toque se NÃO for fazer" / "📚 toque se FOR fazer"
 - Semana de simulado (paridade cobre dayIdx 2,3,4,5): DOM recebe aula B + D2-B deslocados + **apostila do A (erros de quinta)**; SEG recebe **apostila do B (erros de domingo)**. Sem simulado: DOM tem apostila do B (erros de sexta). Prefixos "Semana de simulado ·" / "Sem simulado ·" controlam o filtro.
 
@@ -153,8 +159,8 @@ const FIO_PAT = [
 ## 8 · Motor de revisões adaptativo por %
 
 ```javascript
-function r1Interval(p) {
-    const a = p && p.accD2;
+function r1Interval(p) { // T3 (📚): o % da SELAGEM calibra o D+7 (re-recuperação pós-critério); o % do D2 é a reserva
+    const a = p && (p.accSelagem != null ? p.accSelagem : p.accD2);
     if (a == null) return 7;
     return a >= 80 ? 10 : (a >= 60 ? 7 : 4);
 }
@@ -166,7 +172,9 @@ function r2Interval(p) {
 // Reforço em +14d se accR2 < 60
 ```
 
-- Campo `accD2` aparece no card do módulo quando D2 está marcado
+- Campo `accD2` ("% de acerto no D2") aparece quando D2 está marcado; campo `accSelagem` ("% da selagem (10q + smartcards)") quando a Selagem está marcada — no card (Módulos), na linha (Desatraso, T5) e no bloco do dia (Cronograma, T1)
+- Campos de progresso: `PROGRESS_FIELDS = ["aula", "questoesD2", "apostila", "smartcard"]` com rótulos T6 "Aula (toque 1) ✓", "D2 · 30q (toque 2) ✓", "Apostila pelos erros (toque 3) ✓", "Selagem ✓" — a chave `smartcard` foi PRESERVADA (dados antigos continuam válidos); presencial e online marcam o mesmo `aula` (decisão 15/09)
+- Gravação única: `toggleProgressField(progress, id, field)` e `setProgressPct(progress, id, field, v)` — usados pelo card, pela linha e pelo bloco do dia (T1, ⚙️)
 - Ao tocar "Revisei" num alerta, campo de % abre para capturar `accR1` ou `accR2`
 - Reset de módulo limpa: `reviewD7Done, reviewD30Done, reviewR3Done, r1DoneAt, r2DoneAt, accR1, accR2`
 
@@ -178,10 +186,14 @@ function r2Interval(p) {
 - **effectiveTargets(queue, n):** pins primeiro + automáticos completam até n
 - **Pins (📌):** `config.catchupPins` = array de IDs fixados; toggle no botão de cada linha da fila
 - **catchupForDay(dayIdx):** retorna o alvo do fio para aquele dia conforme a fase
+- **weekPhase(startISO, wk)** → "AMB" | "G2" (G2 e POST) | "CATCHUP" | "FREE"; **fiosWanted(fase, ritmo)** → 4 (ritmo) | 2 | 6
+- **fioCandidates(queue, progress, carry)** (P1, 📚 + ⚙️): módulo FECHADO (aula + questões + apostila) sai dos slots de fio (só a selagem o chama); módulo EM ANDAMENTO (aula marcada, questões pendentes) entra PRIMEIRO; depois recência. `carry` = ids que a semana passada ainda conduz (Fio 4 em cascata cruzada na G2/POST; todos os fios na FREE)
+- **weekFioIds(config, progress, wk, startISO, n)** (todas as fases ≥ G2): fios da semana congelados em `config.fioWeek[isoDaQuarta]` (snapshot gravado pelo App na 1ª renderização da semana corrente; ritmo sobe → completa; nunca reordena). Semana passada sem snapshot → ordem legada (recência)
 - **resolveBlock(text):** injeta o módulo real no bloco genérico:
-  - `/Fio (\d+)/` → `targets[n-1]`
-  - `/2º bloco antigo/` → `targets[1]`
-  - senão → `catchupForDay(activeIdx)`
+  - `/Fio (\d+)( \(sem\. passada\))?/` → `wkIds[n-1]` ou `prevIds[n-1]` (snapshot desta / da semana passada)
+  - `/Selar o Fio ([AB]) da semana passada/` (CATCHUP) → `prevIds[0|1]`
+  - `/2º bloco antigo/` → `targets[1]`; senão → `catchupForDay(activeIdx)`
+- **blockTasks(text, mod)** (T1): tarefas marcáveis do bloco → `[{ mod, field }]` (toque 1 → aula; toque 2 → questoesD2; toque 3 → apostila; "Selar …" → smartcard; presencial → aula de A e B; D2/D4 de A/B → campo do módulo A/B). D1, D+1, D5/D6, REV, D7 → `[]` (✓ manual do dia)
 
 ---
 
@@ -194,6 +206,7 @@ const PROJ_PACE = { amb: 1, g2: __PACE, catchup: 2, free: 6 }; // free: o pipeli
 // Meta: 31/12/2026, pode ultrapassar
 // Fonte ÚNICA: projectedZeroISO(progress) alimenta o planejador E o card "RITMO E PREVISÃO" (mesmo texto de data);
 // o rodapé mostra "ritmo atual: __PACE/sem". Não existe mais o cálculo remaining/pace uniforme.
+// P7 (⚙️): na CATCHUP (25/11–15/12) o ritmo é TRAVADO em 2 — setPaceCfg(2), seletores inertes com a nota "esta fase agenda 2 fios (A e B)".
 ```
 
 ---
@@ -204,6 +217,7 @@ const PROJ_PACE = { amb: 1, g2: __PACE, catchup: 2, free: 6 }; // free: o pipeli
 const DAY_CAP_H = 14.5; // 24h − 8h sono − 1h30 refeições
 ```
 - `lightDayFor()` (Schedule): dia SEM Venvanse da semana visível = menor `studyHours(listFor(dayIdx))` entre os candidatos (7 dias menos a quarta com presencial `iso <= "2026-11-24"`, dias com `DATED_SHIFTS`, dias PÓS-NOTURNO (`DATED_SHIFTS[addDaysISO(iso,-1)].kind === "noite"` — veto 🧠: pausa + privação de sono + compromisso noturno) e a sexta quando `isSim`); empate → sábado; menor carga > `STUDY_WARN_H` → o menos pesado vira DIA DE RESPIRO (`breather: true`; selo 🌬️ âmbar "Dia de respiro — o mais leve da semana. COM Venvanse…", sem texto de pausa); `null` só quando não há candidato. O selo 🌿 só aparece quando há dia realmente leve; a escolha manual é sempre "sem remédio" (dela), com selo de validação. O domingo NÃO é excluído dos candidatos: pode ser o dia sem remédio ou dia ativo, a critério da equipe em cada semana (14/09). Override: `config.lightDayOverrides[isoDaQuarta] = dayIdx` (ponte `__LIGHT_SAVE`). UI: seletor `🌿 Sem remédio: [Auto · SÁB] ▾` acima das abas dos dias + selo no cabeçalho do dia escolhido. O selo não altera blocos; semanas totalmente anteriores a 10/09 não mostram o seletor.
+- **P5b · viabilidade da semana** (`weekFit`, Schedule; só G2/POST): conta os dias da semana visível com `studyHours > STUDY_WARN_H` no ritmo atual; se passar de `WEEK_FIT_MAX_OVER = 1`, mostra "⚠️ Ritmo N não cabe nesta semana (X dias acima de 8h · Y plantões). Sugestão: ritmo Z." com o botão "Aplicar ritmo Z" (`__PACE_SAVE`). Z = maior ritmo menor que N que cabe (ou o que menos estoura). A escolha continua dela
 - `STUDY_WARN_POSTNIGHT_H = 5`: no dia pós-noturno o selo 📚 dispara em 5h de estudo (em vez de 8h)
 - Reta final: `weekFioIds(config, progress, wk, startISO)` devolve os 6 fios da semana — snapshot `config.fioWeek[isoDaQuarta]` gravado pelo App (useEffect) na 1ª renderização da semana corrente, senão cálculo vivo. `resolveBlock` resolve "Fio N" e "Fio N (sem. passada)" por esse snapshot; a 1ª semana do pipeline omite os blocos "(sem. passada)"
 - `moveAct` verifica o total do dia destino antes de mover
@@ -240,11 +254,20 @@ const DAY_CAP_H = 14.5; // 24h − 8h sono − 1h30 refeições
 | FREE_START = quarta 16/12; PROJ_PACE.free = 6 (PR #4) | ✅ |
 | Véspera de noturno = dia normal começando mais tarde (😴 ~09h); pós-noturno = sono até ~13h inegociável + estudo real; 📚 em 5h no pós-noturno; academia ausente no pós-noturno (4a–4d, PR #4) | ✅ |
 | Regra de trabalho da equipe registrada em §17 (PR #4) | ✅ |
+| P1: fio fechado sai dos slots; em andamento entra primeiro; fios congelados por semana em todas as fases ≥ G2 (PR #5) | ✅ |
+| P3: D6-B na terça em semana de simulado · P4: DOM de simulado com "(1.5x) + resumo" e "Anki dos erros" (PR #5) | ✅ |
+| P5: Fio 4 em cascata cruzada (QUA/QUI seguintes) + aviso "⚠️ Ritmo N não cabe" com botão (PR #5) | ✅ |
+| P7: ritmo travado em 2 na CATCHUP · P8: botão do simulado também nas sextas de plantão (PR #5) | ✅ |
+| T1/T2: marcar a etapa direto do bloco do dia; bloco reflete o card (ida e volta); função única de gravação (PR #5) | ✅ |
+| T3: % da selagem (`accSelagem`) calibra o D+7, reserva `accD2`; chave `smartcard` preservada (PR #5) | ✅ |
+| T5/T6: % também na aba Desatraso; rótulos "Aula (toque 1) ✓ · D2 · 30q (toque 2) ✓ · Apostila pelos erros (toque 3) ✓ · Selagem ✓" (PR #5) | ✅ |
+| T7: `config.simResults[isoSexta]` = % do simulado, no bloco de correção — acompanhamento, não calibra (PR #5) | ✅ |
+| T4 recusado: banco D5/D6 sem registro; "registre o %" removido desses blocos na G2/POST (PR #5) | ✅ |
 | Colisão 08→09/10 confirmada pela paciente (14/09) | ✅ |
 | Seletor de ritmo 1–4 na aba Desatraso | ✅ |
 | Projeção pace-aware (__PACE) | ✅ |
 | Tempos: aula 1.7h, questões 2h, apostila 1.5h | ✅ |
-| Selagem dos fios na terça | ✅ |
+| Selagem por fio em bloco próprio, +3d da apostila (G2/POST: QUA/QUI/SEX/DOM da semana seguinte; CATCHUP/FREE já eram) + "Selar A e B" na terça (PR #5) | ✅ |
 | 11 plantões datados com horários 06h–19h / 18h–07h | ✅ |
 | Colisão 07/10 + política presencial→amanhã | ✅ |
 | Motor revisões adaptativo (r1DueOf, r2DueOf) | ✅ |
@@ -290,8 +313,14 @@ Sem ambulatório e sem aula da faculdade (decisões da paciente). Fio A = qua (a
 
 ### C · RESOLVIDO — plantões preservam blocos e fios (buildShiftDay não-destrutivo). Testado em 09/10, 10/10, 11/10, 20/09, 21/09, 07/10 e, na grade de 14/09, 28/09 (pós-noturno simples), 29/09 (terça normal), 05/10 (🌙 PM04) e 06/10 (😴 + aula 19h30).
 
-### D · Ritmo 4 no planejador
-Com `catchupPace=4`, o Fio 4 só recebe aula (SEG) e questões (TER) nesta semana — a apostila vem na próxima semana. O bloco já avisa: "apostila deste fio abre na próxima semana". Isso é correto e aceito.
+### D · Ritmo 4 — RESOLVIDO no PR #5 (P5)
+Com `catchupPace=4`, o Fio 4 recebe a aula na TER e continua na semana seguinte como "Fio 4 (sem. passada)": questões na QUA, apostila na QUI, selagem no DOM (+3d). O P1 impede que ele seja re-sorteado como fio novo e o aviso ⚠️ da semana diz quando o ritmo não cabe (sugere Z e oferece o botão). O seletor continua com 1–4: a paciente escolhe, o app informa.
+
+### H · Auditoria de cobertura (15/09) — PR #5
+Achados corrigidos: selagem dos fios era um bloco compartilhado 7–9 dias após a apostila (→ P2); Fio 4 sumia na semana seguinte (→ P1/P5a); Bloco B tinha apostila e banco no mesmo dia em semana de simulado (→ P3); textos do DOM de simulado sem "1.5x + resumo"/"Anki dos erros" (→ P4); A/B sem selagem própria (→ P6); ritmo 4 não cabe sem aviso (→ P5b); CATCHUP prometia 4 fios e agendava 2 (→ P7); sexta de plantão sem botão de simulado (→ P8). AMB (encerrada) só registrada. Sinalizações mantidas: no ritmo 2 a SEX do POST fica em ~8,4h (📚) por causa da selagem do Fio 2; a quinzena 26/09–09/10 fica sem simulado (decisão 🩺); a semana seguinte só "sabe" dos fios pelos checks — sem checks, o fio se repete e a selagem aparece pelo snapshot.
+
+### I · Auditoria de rastreabilidade (15/09) — PR #5
+O cronograma não marcava nada no progresso (o ✓ do bloco era só visual). Corrigido: T1 (tarefa marcável no bloco: 1 toque), T2 (bloco reflete o card), T3 (`accSelagem` calibra o D+7), T5 (% na Desatraso), T6 (rótulos), T7 (% do simulado). Recusado: T4 (registro do banco sem uso no motor — 🧩 veta trabalho cognitivo sem retorno). Campo único `aula` para presencial e online (decisão 15/09).
 
 ### E · Pendências que dependem da paciente (não código)
 1. Nova grade de plantões pós-11/10 (provisório POST ativo enquanto não chega)
@@ -360,6 +389,17 @@ await page.waitForTimeout(1200); // aguardar React renderizar
 17. **Colisão 08→09/10 confirmada** (14/09): gravada A+B na quinta; resumo rápido de 20min do Bloco B na sexta antes do D2-B
 18. **Reta final em PIPELINE** (📚, 14/09): 1 fio novo por dia livre; aula hoje → questões amanhã → apostila depois de amanhã → selagem ~3 dias depois em bloco próprio; 6 fios/semana congelados por `config.fioWeek`; FREE_START = quarta 16/12 (a terça 15/12 fecha o Fio B da CATCHUP)
 19. **Dias de plantão — regra da paciente (14/09):** véspera de noturno = dia normal começando mais tarde (😴 ~09h, blocos completos, academia); pós-noturno = sono até ~13h como bloco inegociável (6h) + dia de estudo normal, 📚 em 5h, sem academia. Revoga a "manutenção"
+20. **P1 (15/09, 📚 + ⚙️):** fio FECHADO (aula + questões + apostila) sai dos slots de fio; módulo com aula marcada e questões pendentes entra PRIMEIRO na semana seguinte; fios congelados por semana (`config.fioWeek`) em todas as fases ≥ G2
+21. **P2 (📚):** selagem por fio, bloco próprio, ~3 dias após a apostila daquele fio — G2/POST na semana seguinte: Fio 1 → QUA · Fio 3 → QUI · Fio 2 → SEX · Fio 4 → DOM; substitui o bloco compartilhado da terça
+22. **P3 (📚):** em semana de simulado o D6-B vai da segunda para a terça (D2-B dom → apostila seg → banco ter)
+23. **P4 (📚):** DOM de simulado diz "aula online Bloco B (1.5x) + resumo + D2-B (30q + caderno + Anki dos erros)"
+24. **P5 (🧠/😴 + 📚 + 🧩):** ritmo 4 disponível, Fio 4 em cascata cruzada (questões QUA e apostila QUI seguintes) e aviso "⚠️ Ritmo N não cabe nesta semana (X dias acima de 8h · Y plantões). Sugestão: ritmo Z." com botão — nunca limitar o seletor a 3
+25. **P6 (🩺 + 📚):** A/B ganham selagem própria na terça ("Selar A e B da semana passada", 30min); D5/D6 é a etapa 4 (banco), não selagem
+26. **P7 (⚙️):** CATCHUP trava o ritmo em 2 com a nota "esta fase agenda 2 fios (A e B)"
+27. **P8 (🩺 + ⚙️):** quinzena 26/09–09/10 sem simulado; o botão de override existe também nas sextas de plantão
+28. **T1/T2 (🧩 + ⚙️):** marcar a etapa direto do bloco do dia (1 toque); bloco com módulo reflete o card (ida e volta); blocos sem módulo mantêm o ✓ manual; função única de gravação
+29. **T3 (📚):** D+7 calibrado pelo % da SELAGEM (`accSelagem ?? accD2 ?? 7 dias`); 4º check renomeado "Selagem ✓" com a chave `smartcard` preservada; **T4 recusado** (sem `accBanco`; "registre o %" removido do D5/D6); **campo único `aula`** para presencial e online
+30. **T5/T6/T7:** % também na aba Desatraso; rótulos "Aula (toque 1) ✓ · D2 · 30q (toque 2) ✓ · Apostila pelos erros (toque 3) ✓ · Selagem ✓"; `config.simResults` = % do simulado (acompanhamento, não calibração)
 
 ---
 
