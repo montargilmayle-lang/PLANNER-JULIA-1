@@ -208,3 +208,36 @@ Bateria final: `audit.js` S0–S19 e `coverage45.js` (números no PR). `index.ht
 2. **Semana 30**: exceção documentada (como está) ou injetar o D2-A histórico.
 3. **Ritmo por semana** (`paceOverrides`): implementar ou manter o botão global.
 4. Da revisão geral, o que aplicar (tudo é opcional e nada foi tocado): **1.2/4.1** 📌 na semana corrente; **2.1** "Revisei" dentro do bloco de revisão; **4.3–4.5** textos "sábado por padrão"/protocolo §2/§12/decisão 3; **3** série de % dos simulados; **1.5**, **1.6**, **4.2**, **4.11**, **6** (pins, `DEFAULT_START`, código morto) como limpeza.
+
+
+---
+
+## Parte 3 · Aviso de espaçamento ao mover tarefa (PR #14, 24/09) — relatório antes do merge
+
+**Membro que pede · evidência:** 📚 (a distribuição é decidida pela estratégia de aprendizagem — decisão 38; faixas da decisão 40) e ⚙️ (o app não pode deixar um movimento à mão quebrar o que a cascata garante sem dizer nada). 🧩 pede o aviso sem bloqueio e a proposta pronta; 💬 pede que a decisão fique com ela ("Mover assim mesmo" sempre disponível).
+
+**O que faz:** ao mover um bloco ligado a módulo, `analyzeMove` recalcula os intervalos da **cadeia daquele bloco** (`familyOf`: o próprio fio — rótulo + semana do slot — ou a cascata A/B/C — letra + semana; um módulo pode ter as duas, ex. Bloco A da semana passada e Fio 1 desta) na posição nova, nos dias −7…+20, e compara com a faixa vigente: nunca duas etapas no mesmo dia · questões→apostila 1–2d · apostila→banco e apostila→selagem 2–5d · aula→questões 1–2d (A/B/C: 0–2, aula online → D2 no mesmo dia). As faixas aceitas são exatamente as já registradas em §16 40 (Fio 1 a→q 2d, sim B selagem +2d, C banco +5d passam sem aviso). O diálogo é o mesmo em que a carga é informada, sem bloquear, com o antes e o depois de cada intervalo afetado, na ordem de prioridade. **Mover assim mesmo** grava só o movimento; **Ver como reorganizar o fio** mostra a proposta (só etapas não feitas e não vividas; pós-noturno nunca; dia leve por último com aviso; ⚠️ à vista) e só **Aplicar** grava — fios da G2/POST pelo plano (`fioPlan`/`fioExtra`), A/B/C e fios da CATCHUP/FREE só dentro da própria semana (o texto "Bloco A"/"Fio A" é relativo à semana em que aparece), materializando os dias como um movimento à mão; **Cancelar** não move nada. Bloco sem módulo (Anki, PLAN, academia, lazer, plantão): como antes, só a carga.
+
+**Intervalos antes e depois em cada cenário (lidos do render, `tests/audit.js` S20):**
+
+| Cenário (sem.41, 14/10, ritmo 2, fios [77, 78]) | Antes | Depois do movimento | Aviso | Proposta / resultado |
+|---|---|---|---|---|
+| a · Fio 1 (Sem.40 Síndromes Febris) · questões SÁB 17 → SEG 19 | aula QUI 15 →2d→ questões SÁB 17 →1d→ apostila DOM 18 →3d→ selagem QUA' 21 | aula QUI →**4d**→ questões SEG →**−1d**→ apostila DOM | "⚠️ Isso deixa a apostila 1 dia ANTES das questões (a ordem é questões → apostila) e as questões a 4 dias da aula (ideal: 1 a 2 dias)." · aula → questões: 2d → 4d · questões → apostila: 1d → −1d | **aula SÁB 17 (6,5h) →2d→ questões SEG 19 (seu movimento) →2d→ apostila ⚠️ QUA' 21 (9,3h) →3d→ selagem SÁB' 24 (5,0h)** — TER 🌿 preterida, ⚠️ à vista. "Aplicar" grava SÁB/SEG editados + `fioPlan[14/10][1] = { aula 3, apost 7, seal 10 }`; a QUA' mostra "Fio 1 (sem. passada) · toque 3" e o SÁB' "Selar Fio 1 (sem. passada)" ⇒ Sem.40 |
+| b · Bloco A (NEU1) · apostila SEX 16 → SEG 19 (dia do banco) | aula+D2 QUI 15 →1d→ apostila SEX 16 →3d→ banco SEG 19 →5d→ selagem QUA' 21 | questões →**4d**→ apostila SEG = **mesmo dia do banco** | "⚠️ Isso deixa a apostila no mesmo dia do banco e a apostila a 4 dias das questões (ideal: ~1 dia)." · apostila → banco: 3d → mesmo dia · questões → apostila: 1d → 4d | "Não consigo reacomodar sem quebrar outra regra — mover assim mesmo mantém a apostila no mesmo dia do banco." (o banco de A/B/C só se move dentro da semana; +2…5d cairia na semana seguinte). Só "Mover assim mesmo" / "Cancelar" |
+| c · Fio 1 · questões SÁB 17 → SEX 16 | aula QUI →2d→ questões SÁB →1d→ apostila DOM | aula →**1d**→ questões SEX →**2d**→ apostila DOM (na faixa) | nenhum — move direto | SEX/SÁB editados |
+| d · "Mover assim mesmo" no cenário a | — | aula QUI →4d→ questões SEG · apostila DOM | — | só SÁB e SEG editados, sem `fioPlan`; aula e apostila ficam |
+| e · "Cancelar" no cenário b | — | — | — | nada gravado (sem dia editado, sem plano) |
+| f · Anki QUI → SEX (sem módulo) | — | — | nenhum (só carga, como antes) | QUI/SEX editados |
+| g · sem.38 (24/09): aula online A QUI → SÁB 26 (plantão) | aula+D2 QUI 24 →2d→ apostila SÁB 26 (simulado) →2d→ banco SEG 28 | aula SÁB = **mesmo dia da apostila**; questões **2 dias ANTES** da aula | "⚠️ SÁB ficaria com ~22,5h de atividades — acima do tempo hábil (~14,5h)…" + "⚠️ Isso deixa a aula no mesmo dia da apostila e as questões 2 dias ANTES da aula (a ordem é aula → questões)." | D2-A de hoje é vivido (fixo) → "Não consigo reacomodar…" |
+
+**Passagem pelos oito:** 🧠/😴 nada muda no dia sem remédio nem no pós-noturno (a proposta nunca o recebe); 🧩 aviso + proposta pronta, sem bloqueio; 📚 faixas da decisão 40; 🩺 o movimento dela vence sempre ("Mover assim mesmo"); 🏃/💬 blocos sem módulo intocados; ⚙️ nada apagado, "Cancelar" não grava, plano só com "Aplicar". **Nenhum veto.**
+
+**Sinalizações (não decididas):** (1) a proposta só reacomoda dentro da própria semana para A/B/C e fios da CATCHUP/FREE — o texto desses blocos é relativo à semana; levar um banco de A/B/C para a semana seguinte exigiria um bloco "Bloco X da semana passada" gerado sob demanda (possível, PR próprio); (2) o cálculo usa o dia de cada etapa lido das listas reais (inclusive dias editados à mão): se ela editou o dia e apagou uma etapa, o intervalo com essa etapa simplesmente não é avaliado; (3) hoje conta como dia vivido — a etapa de hoje nunca é reacomodada.
+
+**Decisões da paciente sobre as sinalizações (24/09, aval do PR #14):** (1) reorganização só dentro da própria semana para A/B/C e fios CATCHUP/FREE — aceita, registrada como pendência técnica sem prioridade (briefing §14 E); (2) hoje conta como dia vivido — aceito; (3) **etapa apagada de um dia editado — corrigida no mesmo PR:** entra como ausente (aviso no diálogo) e a proposta a recoloca.
+
+| Cenário h (sem.41, 14/10) | Antes | Depois do movimento | Aviso | Proposta / resultado |
+|---|---|---|---|---|
+| Apostila do Fio 1 apagada do DOM 18 (dia editado à mão); questões SÁB 17 → SEX 16 | aula QUI 15 →2d→ questões SÁB 17 · apostila **ausente** · selagem QUA' 21 | aula →1d→ questões SEX 16 · apostila ausente | "⚠️ a apostila deste módulo não está em nenhum dia desta semana (apagada de um dia editado — a cascata a esperava DOM 18/10)" — sem isso o app diria "tudo na faixa" com a etapa inexistente | apostila **recolocada** em SÁB 17 (+1d das questões) e selagem SEG 19 (+2d da apostila); "Aplicar" grava `fioPlan[14/10][1] = { apost 3, seal 5 }` |
+
+**Bateria:** `tests/audit.js` S0–S20 e `tests/coverage45.js` (números no PR). `index.html` idêntico.

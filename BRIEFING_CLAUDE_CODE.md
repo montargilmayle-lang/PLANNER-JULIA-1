@@ -232,6 +232,10 @@ const DAY_CAP_H = 14.5; // 24h − 8h sono − 1h30 refeições
 
 ---
 
+### Aviso de espaçamento ao mover (PR #14)
+
+`moveAct` → bloco com módulo? `analyzeMove(act, fromIdx, idx, toIdx)`: `stagesOf` (etapas que o bloco representa), `familyOf` (cadeia), `stageMapFor` antes/depois (dias −7…20), `spacingIssues` (faixas `RANGES`: aq 1–2 / A-B-C 0–2 · qp 1–2 · pb 2–5 · ps 2–5; prioridade: mesmo dia 0 · qp 1 · pb/ps 2 · aq 3), `reorganize` (etapas movíveis = não feitas e d > `pastAbs`; `pick` com as 4 passadas da redistribuição; A/B/C e fios CATCHUP/FREE presos à própria semana — `isTemplFioG2`), `applyMovePlan`. Diálogo `[data-pw="move-ask"]` dentro do card do dia. Sem violação e sem carga acima do tempo hábil → move direto; bloco sem módulo → `window.confirm` de carga, como antes.
+
 ## 12 · Backup e sincronização
 
 - Card **💾 Backup e sincronização** na aba **Sono**
@@ -297,6 +301,7 @@ const DAY_CAP_H = 14.5; // 24h − 8h sono − 1h30 refeições
 | Planejador: subtítulo "Dimensionamento apenas — na execução, siga o Flowtime" (C6); ritmo 1 mostra 1 fio (S6) | ✅ |
 | Rótulo "D2 (30q por bloco)" (S4) · dica véspera de plantão 06h na aba Sono (S5) · "bloco antigo" nos fios CATCHUP/FREE (S1) | ✅ |
 | Cards Estrutura ("Sex+Dom") e ACADEMIA (lista real do dia); venv SEG/TER sem "Fio A/B"; fios da TER antes da faculdade | ✅ |
+| **Aviso de espaçamento ao mover (PR #14, 24/09):** `analyzeMove` → `stageMapFor(mod, lists, familyOf)` (−7…20) → `spacingIssues` (faixas da decisão 40, prioridade) → diálogo `moveAsk` (carga + intervalos antes/depois; Mover assim mesmo · Ver como reorganizar o fio · Cancelar) → `reorganize` (só etapas não feitas/não vividas; passadas da redistribuição) → `applyMovePlan` (fioPlan/fioExtra ou dias materializados). Bloco sem módulo: só carga | ✅ |
 | **Semanas com 3+ blocos (PR #13, 24/09):** `weekGroupsFor(config, week)` (grupos A, B, C… — `config.weekGroups[semana]`, padrão 1 módulo por grupo, "Bônus" por último), cascata própria para C+ (`cascadeFor` em `genForCtx`: SÁB aula+D2 · DOM apostila · QUA' selagem · SEX' banco), grupo de N módulos (tempo × N, marcação em todos, etiqueta = letra), `blockRef`/`resolveBlock`/`blockTasks` por letra A–H, blocos adicionados/editados pela paciente (`config.customModules`, `config.moduleEdits`, `ALL_MODS()` em fila/projeção/revisões/Módulos), editor "✎ Blocos e grupos" no cabeçalho da semana, aviso de cobertura "⚠️ [código] está na lista da semana mas não tem tarefas — agrupe-o ou defina os dias.", aviso de capacidade nomeando os N blocos, teste permanente `coverage45.js` (45 semanas) | ✅ |
 
 ---
@@ -350,6 +355,7 @@ O cronograma não marcava nada no progresso (o ✓ do bloco era só visual). Cor
 
 ### E · Pendências que dependem da paciente (não código)
 
+- **Reorganização entre semanas para A/B/C e fios CATCHUP/FREE** (aval do PR #14, 24/09, sem prioridade): hoje esses blocos só se reacomodam dentro da própria semana porque o texto ("Bloco A", "Fio A") é relativo à semana em que aparece; levar um banco/apostila de A/B/C para a semana seguinte exigiria gerar sob demanda um bloco "Bloco X da semana passada" (como já existe para selagem e banco). A paciente pode mover à mão para a semana seguinte.
 - **Ritmo de fios por semana** (`config.paceOverrides[isoDaQuarta]`) — aprovado como feature em 24/09, para um PR próprio: hoje o botão "Aplicar ritmo Z" muda o ritmo global (`catchupPace`); a versão por semana toca `fiosWanted`/`weekFioIds`/snapshot/`projectedZeroISO`/Planejador/CatchUp/App.
 1. Nova grade de plantões pós-11/10 (provisório POST ativo enquanto não chega)
 2. Marcar no app o que já estudou (cada check encurta a projeção)
@@ -395,7 +401,7 @@ await page.waitForTimeout(1200); // aguardar React renderizar
 **Bateria completa (obrigatória antes de qualquer ✅):**
 ```bash
 cd tests/   # cópia da bateria no repositório (PR #13) — no scratchpad da sessão fica a versão de trabalho
-PLANNER_FILE=/caminho/planner_residencia_2026_offline.html PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers node audit.js        # cenários S0–S19 (405 checks em 24/09)
+PLANNER_FILE=/caminho/planner_residencia_2026_offline.html PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers node audit.js        # cenários S0–S20 (425 checks em 24/09)
 PLANNER_FILE=... PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers node coverage45.js   # teste permanente: 45 semanas com módulos, todo módulo listado tem aula+questões+apostila (90 checks, sem exceções)
 cmp planner_residencia_2026_offline.html index.html
 ```
@@ -457,6 +463,7 @@ cmp planner_residencia_2026_offline.html index.html
 50. **Bloco-nota (📌 …) nunca é etapa (24/09):** `resolveBlock`/`blockTasks` ignoram textos que começam com 📌 (seed histórico de 25/06); `catchupAction` e `rawWeekOf` usam a data-base do config (`__START_ISO`, `setStartCfg`); `catchupForDay` só serve aos templates históricos (antigo/AMB) — ramos G2/CATCHUP/FREE removidos.
 51. **`aulaPresencialAt` (24/09):** ao marcar "Aula presencial ✓" o app grava a data; o card mostra "presencial assistida em dd/mm" (informação, fora dos 4 checks — decisão 33 mantida).
 52. **Série do % dos simulados (24/09):** `simSeriesText(config.simResults)` no bloco de correção da sexta ("📈 Evolução: 62% (14/08) · …") e no topo da aba Módulos — acompanhamento clínico, não calibra o motor.
+54. **Aviso de espaçamento ao mover tarefa (paciente, 24/09 — PR #14):** ao mover um bloco ligado a módulo (etapa de A/B/C ou toque/selagem de fio), o app recalcula os intervalos DAQUELA cadeia (`familyOf`: o próprio fio — rótulo + semana do slot — ou a cascata A/B/C — letra + semana; um módulo pode ter as duas) na posição nova e compara com a faixa vigente (decisão 40): nunca duas etapas no mesmo dia · questões→apostila 1–2d · apostila→banco e apostila→selagem 2–5d · aula→questões 1–2d (A/B/C: 0–2, aula online → D2 no mesmo dia). Avisa **sem bloquear**, no mesmo diálogo em que a carga é informada (`moveAsk`, padrão visual da redistribuição avisada), com o antes e o depois de cada intervalo afetado, na ordem de prioridade (mesmo dia → q→p → p→banco/selagem → a→q). Três opções: **Mover assim mesmo** (só o movimento), **Ver como reorganizar o fio** (`reorganize`: reacomoda só as etapas não feitas e não vividas da cadeia, mesmas exclusões da redistribuição — pós-noturno nunca, dia leve por último com aviso, ⚠️ à vista; "Aplicar" grava movimento + plano: fios G2/POST em `fioPlan`/`fioExtra`, A/B/C e fios CATCHUP/FREE só dentro da própria semana, materializando os dias) e **Cancelar**. Sem solução na faixa: "Não consigo reacomodar sem quebrar outra regra — mover assim mesmo mantém …". Bloco sem módulo: como antes (só carga). **Etapa apagada de um dia editado (aval do PR #14, 24/09):** a cascata a esperava (`genListAt`, listas geradas sem edições), ela não está feita e não aparece em dia nenhum → entra como AUSENTE: aviso "⚠️ a apostila deste módulo não está em nenhum dia desta semana (apagada de um dia editado — a cascata a esperava DOM 18/10)" e a proposta a **recoloca** ("apostila SÁB 17/10 (recolocada — estava apagada)"); nunca "na faixa" por ficção. Aceito: hoje conta como dia vivido (a etapa de hoje nunca é reacomodada). `listAt` cobre −7…27 (semana passada entra no cálculo); `resolveBlockIn`/`blockTasksIn` resolvem blocos de outra semana com os fios/grupos daquela semana (`frameAt(k)`).
 53. **Semana 30 (fronteira 29/07→04/08, paciente 24/09):** a segunda 03/08 recebe o D2-A do template antigo ("30 questões Bloco A … fronteira 03/08") — nenhuma semana histórica carrega aviso permanente; `coverage45.js` sem exceções.
 40. **Prioridade entre intervalos (paciente, 24/09):** quando dois intervalos conflitam, a ordem é (a) nunca duas etapas do mesmo módulo no mesmo dia; (b) questões → apostila em ~1 dia; (c) apostila → banco e apostila → selagem em ~3 dias; (d) aula → questões entre 1 e 2 dias. O que ceder, cede na ordem inversa. Aceitos: Fio 1 com aula → questões em 2 dias; CATCHUP Fio A com questões → apostila em 2 dias; selagem do Bloco B a 2 dias da apostila em semana de simulado (QUA fixa, antes do banco da QUI).
 
