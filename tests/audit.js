@@ -1026,6 +1026,20 @@ async function scenario(browser, name, dateISO, seeds, fn) {
         check('Cancelar: nada gravado', !(await getLS(page, SCH)));
     });
 
+    const removeViaUI = async (page, blockRe) => { await page.evaluate(() => { if (![...document.querySelectorAll('button')].some(b => b.innerText.trim() === '✓ Pronto')) { const e = [...document.querySelectorAll('button')].find(b => b.innerText.trim() === '✎ Reorganizar dia'); if (e) e.click(); } }); await page.waitForTimeout(200); const r = await page.evaluate((bs) => { const bre = new RegExp(bs); const blocks = [...document.querySelectorAll('div')].filter(el => el.style && /^3px solid/.test(el.style.borderLeft)); const el = blocks.find(b => { const body = b.children[0] && b.children[0].children[2]; const s = body && body.querySelector('span'); return s && bre.test(s.textContent.trim()); }); if (!el) return 'bloco não encontrado: ' + bs; const b = [...el.querySelectorAll('button')].find(b => /remover/.test(b.innerText)); if (!b) return 'botão remover não encontrado'; b.click(); return true; }, blockRe.source); if (r !== true) throw new Error(r); await page.waitForTimeout(300); };
+    await scenario(browser, 'S20g-etapa-apagada-recolocada-1410', '2026-10-14', { [CFG]: cfg20 }, async (page) => {
+        await clickDay(page, 'DOM'); await removeViaUI(page, /^Fio 1 · toque 3/);
+        check('DOM 18/10 editado à mão: apostila do Fio 1 apagada (override gravado)', Object.keys((await getLS(page, SCH)) || {}).join(',') === '2026-10-18' && !has(await readDay(page), /^Fio 1 · toque 3/));
+        await clickDay(page, 'SAB'); await moveViaUI(page, /^Fio 1 · toque 2/, 2);
+        let ask = await readAsk(page);
+        check('Questões SÁB → SEX (intervalo em si na faixa) MAS a apostila apagada entra como ausente: "⚠️ a apostila deste módulo não está em nenhum dia desta semana (apagada de um dia editado — a cascata a esperava DOM 18/10)" — nunca "tudo na faixa" por ficção', has20(ask, /^⚠️ a apostila deste módulo não está em nenhum dia desta semana \(apagada de um dia editado — a cascata a esperava DOM 18\/10\)$/) && !has20(ask, /^⚠️ Isso deixa/) && JSON.stringify(ask.btns) === JSON.stringify(['Mover assim mesmo', 'Ver como reorganizar o fio', 'Cancelar']), JSON.stringify(ask && ask.lines));
+        await clickAsk(page, 'Ver como reorganizar o fio'); ask = await readAsk(page);
+        check('Proposta recoloca a apostila: "aula QUI 15/10 (fica) · questões SEX 16/10 (seu movimento) · apostila SÁB 17/10 (6,3h) (recolocada — estava apagada) · selagem SEG 19/10 (5,3h) (antes: QUA 21/10)"', has20(ask, /^💡 Reorganizar Sem\.40 Síndromes Febris: aula QUI 15\/10 \(fica\) · questões SEX 16\/10 \(seu movimento\) · apostila SÁB 17\/10 \(6,3h\) \(recolocada — estava apagada\) · selagem SEG 19\/10 \(5,3h\) \(antes: QUA 21\/10 \(sem\. seguinte\)\)\.$/) && ask.btns[0] === 'Aplicar', ask.lines[ask.lines.length - 1]);
+        await clickAsk(page, 'Aplicar');
+        const cfg = await getLS(page, CFG); const w = await dumpWeek(page, ['QUI', 'SEX', 'SAB', 'DOM', 'SEG']);
+        check('"Aplicar": fioPlan[14/10][1] = { apost: 3, seal: 5 }; cadeia completa de novo — aula QUI, questões SEX, apostila SÁB (recolocada), selagem SEG; DOM segue sem ela', JSON.stringify(cfg.fioPlan) === '{"2026-10-14":{"1":{"apost":3,"seal":5}}}' && has(w.QUI, /^Fio 1 · toque 1/) && has(w.SEX, /^Fio 1 · toque 2/) && has(w.SAB, /^Fio 1 · toque 3/) && has(w.SEG, /^Selar Fio 1:/) && !has(w.DOM, /^Fio 1 · toque 3/), JSON.stringify(cfg.fioPlan));
+    });
+
     await browser.close();
     const fails = H.results.filter(r => !r.ok);
     console.log(`\n══════════ RESUMO: ${H.results.length} checks · ${H.results.length - fails.length} ✅ · ${fails.length} ❌ ══════════`);

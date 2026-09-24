@@ -1367,7 +1367,7 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, onSaveSchedule
             if (capMsg && !window.confirm(capMsg + " Manter TUDO nesse dia mesmo assim?")) return; // cancela apenas o movimento
             __moveActCore(fromIdx, idx, toIdx); return;
         }
-        if (!an.issues.length && !capMsg) { __moveActCore(fromIdx, idx, toIdx); return; } // espaçamento mantido ou melhorado e carga ok: move sem avisar
+        if (!an.issues.length && !an.missing.length && !capMsg) { __moveActCore(fromIdx, idx, toIdx); return; } // espaçamento mantido ou melhorado, nada ausente e carga ok: move sem avisar
         setMoveAsk({ fromIdx, idx, toIdx, act, capMsg, ...an, view: false });
     };
     const __moveActCore = (fromIdx, idx, toIdx) => {
@@ -1673,6 +1673,7 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, onSaveSchedule
         return map;
     };
     const dayOfStage = (map, st) => map[st] && map[st].length ? Math.min(...map[st].map(x => x.d)) : null;
+    const genListAt = (d) => { if (d < -7 || d > 27) return null; if (d < 0) return genForCtx(ctxAt(-1), d + 7, null, true); if (d <= 6) return genActivities(d, null, true); return genForCtx(ctxAt(Math.floor(d / 7)), d % 7, null, true); }; // lista que a cascata GERA (ignora dias editados): referência para etapa apagada
     const spacingIssues = (map, abc, involved) => { // violações da faixa que envolvem as etapas em `involved` — ordem de prioridade da decisão 40
         const D = {}; CHAIN.forEach(st => { D[st] = dayOfStage(map, st); }); const R = RANGES(abc); const out = []; const inv = (st) => involved.indexOf(st) >= 0;
         for (let i = 0; i < CHAIN.length; i++) for (let j = i + 1; j < CHAIN.length; j++) { const x = CHAIN[i], y = CHAIN[j]; if (D[x] == null || D[y] == null || D[x] !== D[y]) continue; if (abc && x === "aula" && y === "quest") continue; if (!inv(x) && !inv(y)) continue; out.push({ prio: 0, key: x + "=" + y, x, y, same: true, gap: 0, text: inv(y) ? NOM[y] + " no mesmo dia " + OF[x] : NOM[x] + " no mesmo dia " + OF[y] }); }
@@ -1682,23 +1683,25 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, onSaveSchedule
     };
     const gapTxt = (g) => g == null ? "—" : g === 0 ? "mesmo dia" : g + "d";
     const isTemplFioG2 = (a, k) => { const fm = a && a.text.match(/^(?:Semana de simulado · )?(?:Selar )?Fio (\d+|[AB])( \(sem\. passada\)| \(há ([23]) sem\.\))?/); if (!fm || isAbcBlock(a.text)) return false; const ago = fm[2] ? (fm[3] ? Number(fm[3]) : 1) : 0; return weekPhase(startISO, week + k - ago) === "G2"; }; // fio do motor G2/POST (fioPlan/fioExtra); CATCHUP/FREE e A/B/C só se movem dentro da própria semana (texto relativo à semana)
-    const reorganize = (modId, movedStages, dx, map, abc) => { // reacomoda as etapas não feitas/não vividas do módulo em torno da(s) movida(s); null = não cabe na faixa
+    const reorganize = (modId, movedStages, dx, map, abc, missing) => { // reacomoda as etapas não feitas/não vividas do módulo em torno da(s) movida(s); etapas AUSENTES (apagadas de dia editado) são recolocadas; null = não cabe na faixa
         const R = RANGES(abc); const days = {}; const fixed = {}; const movable = [];
-        CHAIN.forEach(st => { const occ = map[st] || []; if (!occ.length) return; const o = occ.slice().sort((p, q) => p.d - q.d)[0]; if (movedStages.indexOf(st) >= 0) { fixed[st] = dx; return; } if (o.done || o.past) fixed[st] = o.d; else movable.push({ st, occ: o }); });
+        CHAIN.forEach(st => { const occ = map[st] || []; if (!occ.length) { const ms = (missing || []).find(x => x.stage === st); if (ms) movable.push({ st, occ: { d: null, a: ms.a, abc: ms.abc, kExp: ms.k, dExp: ms.d } }); return; } const o = occ.slice().sort((p, q) => p.d - q.d)[0]; if (movedStages.indexOf(st) >= 0) { fixed[st] = dx; return; } if (o.done || o.past) fixed[st] = o.d; else movable.push({ st, occ: o }); });
         Object.assign(days, fixed);
         const pick = (lo, hi, hrs, keepWeek, kOld) => { for (let p = 0; p < 4; p++) for (let d = lo; d <= hi; d++) { if (d < 0 || d > 20 || d <= pastAbs || !open(d)) continue; if (Object.values(days).indexOf(d) >= 0) continue; if (keepWeek && Math.floor(d / 7) !== kOld) continue; if (!!lightOf(d) !== (p >= 2)) continue; if (p % 2 === 0 && !fitsAt(d, hrs)) continue; return d; } return null; };
         const plan = [];
-        for (const m of movable) { const st = m.st; let lo, hi;
-            if (st === "aula") { const q = days.quest; if (q == null) { days.aula = m.occ.d; continue; } lo = q - R.aq[1]; hi = q - R.aq[0]; }
-            else if (st === "quest") { const a = days.aula, p = days.apost; if (a == null && p == null) { days.quest = m.occ.d; continue; } lo = a != null ? a + R.aq[0] : p - R.qp[1]; hi = a != null ? a + R.aq[1] : p - R.qp[0]; if (a != null && p != null && fixed.apost != null) { lo = Math.max(lo, p - R.qp[1]); hi = Math.min(hi, p - R.qp[0]); } }
-            else if (st === "apost") { const q = days.quest; if (q == null) { days.apost = m.occ.d; continue; } lo = q + R.qp[0]; hi = q + R.qp[1]; }
-            else { const p = days.apost; if (p == null) { days[st] = m.occ.d; continue; } lo = p + R.pb[0]; hi = p + R.pb[1]; }
-            const keepWeek = !isTemplFioG2(m.occ.a, Math.floor(m.occ.d / 7));
-            const d = pick(lo, hi, STAGE_HRS[st], keepWeek, Math.floor(m.occ.d / 7));
+        for (const m of movable) { const st = m.st; let lo, hi; const cur = m.occ.d != null ? m.occ.d : m.occ.dExp; // etapa ausente: o dia que a cascata daria é a referência
+            if (st === "aula") { const q = days.quest; if (q == null) { days.aula = cur; if (m.occ.d == null && cur != null) plan.push({ st, from: null, to: cur, a: m.occ.a, abc: m.occ.abc }); continue; } lo = q - R.aq[1]; hi = q - R.aq[0]; }
+            else if (st === "quest") { const a = days.aula, p = days.apost; if (a == null && p == null) { days.quest = cur; continue; } lo = a != null ? a + R.aq[0] : p - R.qp[1]; hi = a != null ? a + R.aq[1] : p - R.qp[0]; if (a != null && p != null && fixed.apost != null) { lo = Math.max(lo, p - R.qp[1]); hi = Math.min(hi, p - R.qp[0]); } }
+            else if (st === "apost") { const q = days.quest; if (q == null) { days.apost = cur; continue; } lo = q + R.qp[0]; hi = q + R.qp[1]; }
+            else { const p = days.apost; if (p == null) { days[st] = cur; continue; } lo = p + R.pb[0]; hi = p + R.pb[1]; }
+            const kOld = m.occ.d != null ? Math.floor(m.occ.d / 7) : m.occ.kExp;
+            const keepWeek = !isTemplFioG2(m.occ.a, kOld);
+            const d = pick(lo, hi, STAGE_HRS[st], keepWeek, kOld);
             if (d == null) return null;
             days[st] = d; if (d !== m.occ.d) plan.push({ st, from: m.occ.d, to: d, a: m.occ.a, abc: m.occ.abc });
         }
         const map2 = {}; CHAIN.forEach(st => { if (days[st] != null) map2[st] = [{ d: days[st] }]; });
+        if ((missing || []).some(ms => days[ms.stage] == null)) return null; // etapa ausente sem lugar na faixa
         return spacingIssues(map2, abc, CHAIN).length ? null : { plan, days };
     };
     const analyzeMove = (act, fromIdx, idx, toIdx) => { // null = bloco sem módulo
@@ -1709,14 +1712,18 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, onSaveSchedule
         const listsAfter = (d) => d === fromIdx ? listFor(fromIdx).filter((_, i) => i !== idx) : d === toIdx ? listFor(toIdx).concat([act]) : listAt(d);
         const fam = familyOf(act, 0);
         const res = mods.map(m => { const before = stageMapFor(m.id, listAt, fam), after = stageMapFor(m.id, listsAfter, fam); const D0 = {}; CHAIN.forEach(st => { D0[st] = dayOfStage(before, st); });
-            const issues = spacingIssues(after, abc, movedStages).map(is => ({ ...is, before: (D0[is.x] != null && D0[is.y] != null) ? D0[is.y] - D0[is.x] : null })); return { mod: m, before, after, issues }; });
-        const first = res.find(r => r.issues.length) || res[0];
-        const proposal = first.issues.length ? reorganize(first.mod.id, movedStages, toIdx, first.after, abc) : null;
-        return { mods, abc, movedStages, res, issues: first.issues, proposal, mod: first.mod };
+            const issues = spacingIssues(after, abc, movedStages).map(is => ({ ...is, before: (D0[is.x] != null && D0[is.y] != null) ? D0[is.y] - D0[is.x] : null }));
+            // etapa apagada de um dia editado (paciente, 24/09): a cascata a esperava, ela não está feita e não aparece em dia nenhum → ausente (aviso + recolocação na proposta), nunca "na faixa" por ficção
+            const exp = stageMapFor(m.id, genListAt, fam);
+            const missing = CHAIN.filter(st => exp[st] && exp[st].length && !(after[st] && after[st].length)).map(st => { const o = exp[st].slice().sort((p, q) => p.d - q.d)[0]; return { stage: st, a: o.a, d: o.d, k: Math.floor(o.d / 7), abc: o.abc, done: o.done }; }).filter(x => !x.done);
+            return { mod: m, before, after, issues, missing }; });
+        const first = res.find(r => r.issues.length || r.missing.length) || res[0];
+        const proposal = (first.issues.length || first.missing.length) ? reorganize(first.mod.id, movedStages, toIdx, first.after, abc, first.missing) : null;
+        return { mods, abc, movedStages, res, issues: first.issues, missing: first.missing, proposal, mod: first.mod };
     };
     const askLines = (ask) => ask.issues.map(i => BARE[i.x] + " → " + BARE[i.y] + ": " + gapTxt(i.before) + " → " + gapTxt(i.gap) + (i.same ? " (nunca no mesmo dia)" : " (ideal " + IDEAL[i.key] + ")"));
-    const propText = (ask) => { if (!ask.proposal) return "Não consigo reacomodar sem quebrar outra regra — mover assim mesmo mantém " + ask.issues[0].text + "."; const P = ask.proposal;
-        const parts = CHAIN.filter(st => P.days[st] != null).map(st => { const mv = P.plan.find(p => p.st === st); return BARE[st] + " " + (ask.movedStages.indexOf(st) >= 0 ? dayName(P.days[st]) + " (seu movimento)" : mv ? dayCost(mv.to, STAGE_HRS[st]) + " (antes: " + dayName(mv.from) + ")" : dayName(P.days[st]) + " (fica)"); });
+    const propText = (ask) => { if (!ask.proposal) return "Não consigo reacomodar sem quebrar outra regra — mover assim mesmo mantém " + (ask.issues.length ? ask.issues[0].text : NOM[ask.missing[0].stage] + " ausente") + "."; const P = ask.proposal;
+        const parts = CHAIN.filter(st => P.days[st] != null).map(st => { const mv = P.plan.find(p => p.st === st); return BARE[st] + " " + (ask.movedStages.indexOf(st) >= 0 ? dayName(P.days[st]) + " (seu movimento)" : mv ? dayCost(mv.to, STAGE_HRS[st]) + (mv.from == null ? " (recolocada — estava apagada)" : " (antes: " + dayName(mv.from) + ")") : dayName(P.days[st]) + " (fica)"); });
         const notes = [...new Set(P.plan.map(p => lightNote(p.to)).filter(Boolean))];
         return "Reorganizar " + modName(ask.mod) + ": " + parts.join(" · ") + "." + (notes.length ? " " + notes.join(" · ") : ""); };
     const applyMovePlan = (ask) => { // grava o movimento pedido + a reorganização — fios G2/POST pelo plano (fioPlan/fioExtra), o resto materializando os dias; nada é apagado
@@ -1726,7 +1733,8 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, onSaveSchedule
         const listOf = (d) => ovNext[isoAt(d)] || listAt(d) || [];
         const insertBefore = (l, b) => { const li = l.map(x => x.d).lastIndexOf("LAZER"); const nb = { id: "c-" + Date.now() + "-" + Math.random().toString(36).slice(2, 6), ...b }; return li >= 0 ? l.slice(0, li).concat([nb], l.slice(li)) : l.concat([nb]); };
         (ask.proposal ? ask.proposal.plan : []).forEach(p => {
-            const a = p.a; const kFrom = Math.floor(p.from / 7), kTo = Math.floor(p.to / 7);
+            const a = p.a; const kFrom = p.from == null ? Math.floor(p.to / 7) : Math.floor(p.from / 7), kTo = Math.floor(p.to / 7); // from = null: etapa apagada, só recolocar
+            if (p.from == null && !isTemplFioG2(a, kFrom)) { ovNext[isoAt(p.to)] = insertBefore(listOf(p.to), { d: a.d, color: a.color, text: a.text, time: a.time }); return; }
             if (isTemplFioG2(a, kFrom)) {
                 const fm = a.text.match(/^(?:Semana de simulado · )?(?:Selar )?Fio (\d+|[AB])( \(sem\. passada\)| \(há ([23]) sem\.\))?/);
                 const label = /\d/.test(fm[1]) ? Number(fm[1]) : (fm[1] === "A" ? 1 : 2); const ago = fm[2] ? (fm[3] ? Number(fm[3]) : 1) : 0; const kSlot = kFrom - ago; const wed = wedAt(kSlot); const stg = p.st; const relTo = p.to - 7 * kSlot;
@@ -1734,7 +1742,7 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, onSaveSchedule
                 if (ei >= 0) { exW[ei][stg] = relTo; exAll[wed] = exW; } else { const pw = { ...(planAll[wed] || {}) }; pw[String(label)] = { ...(pw[String(label)] || {}), [stg]: relTo }; planAll[wed] = pw; }
                 cfgChanged = true;
                 const agoTo = kTo - kSlot; let b = stg === "seal" ? fioSealBlock(label) : fioBlock(label, stg, agoTo > 0); if (stg === "seal" && agoTo === 0) b = { ...b, text: b.text.replace(" (sem. passada)", "") }; if (agoTo >= 2) b = { ...b, text: b.text.replace(" (sem. passada)", " (há " + agoTo + " sem.)") };
-                if (ovNext[isoAt(p.from)]) ovNext[isoAt(p.from)] = ovNext[isoAt(p.from)].filter(x => x.text !== a.text); // dia editado à mão: o bloco sai dele (o gerador cuida dos dias não editados)
+                if (p.from != null && ovNext[isoAt(p.from)]) ovNext[isoAt(p.from)] = ovNext[isoAt(p.from)].filter(x => x.text !== a.text); // dia editado à mão: o bloco sai dele (o gerador cuida dos dias não editados)
                 if (ovNext[isoAt(p.to)] && !ovNext[isoAt(p.to)].some(x => x.text === b.text)) ovNext[isoAt(p.to)] = insertBefore(ovNext[isoAt(p.to)], b);
             } else { // A/B/C, CATCHUP/FREE: mesma semana — materializa os dois dias (como um movimento à mão)
                 ovNext[isoAt(p.from)] = listOf(p.from).filter(x => x.text !== a.text);
@@ -1931,11 +1939,12 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, onSaveSchedule
                 moveAsk.capMsg && React.createElement("span", { style: { color: "#fbbf24", fontSize: 11, fontWeight: 700, lineHeight: 1.45 } }, moveAsk.capMsg),
                 moveAsk.issues.length > 0 && React.createElement("span", { style: { color: "#fbbf24", fontSize: 11, fontWeight: 800, lineHeight: 1.45 } }, "⚠️ Isso deixa " + moveAsk.issues.map(i => i.text).join(" e ") + "."),
                 moveAsk.issues.length > 0 && React.createElement("div", { style: { color: "#e0f2fe", fontSize: 10, lineHeight: 1.5 } }, askLines(moveAsk).map((l, i) => React.createElement("div", { key: i }, "· " + l))),
+                (moveAsk.missing || []).map((ms, i) => React.createElement("span", { key: "m" + i, style: { color: "#fbbf24", fontSize: 11, fontWeight: 800, lineHeight: 1.45 } }, "⚠️ " + NOM[ms.stage] + " deste módulo não está em nenhum dia desta semana (apagada de um dia editado — a cascata a esperava " + dayName(ms.d) + ")")),
                 moveAsk.view && React.createElement("span", { style: { color: "#e0f2fe", fontSize: 11, lineHeight: 1.45 } }, "💡 " + propText(moveAsk)),
                 React.createElement("div", { style: { display: "flex", gap: 8, flexWrap: "wrap" } },
                     moveAsk.view && moveAsk.proposal && React.createElement("button", { onClick: () => applyMovePlan(moveAsk), style: { background: "#1e3a8a", border: "1px solid #3b82f6", borderRadius: 8, color: "#bfdbfe", fontSize: 11, fontWeight: 700, padding: "5px 10px", cursor: "pointer" } }, "Aplicar"),
-                    React.createElement("button", { onClick: () => { __moveActCore(moveAsk.fromIdx, moveAsk.idx, moveAsk.toIdx); setMoveAsk(null); }, style: { background: moveAsk.issues.length ? "#0f172a" : "#1e3a8a", border: "1px solid " + (moveAsk.issues.length ? "#334155" : "#3b82f6"), borderRadius: 8, color: moveAsk.issues.length ? "#94a3b8" : "#bfdbfe", fontSize: 11, fontWeight: 700, padding: "5px 10px", cursor: "pointer" } }, "Mover assim mesmo"),
-                    !moveAsk.view && moveAsk.issues.length > 0 && React.createElement("button", { onClick: () => setMoveAsk({ ...moveAsk, view: true }), style: { background: "#1e3a8a", border: "1px solid #3b82f6", borderRadius: 8, color: "#bfdbfe", fontSize: 11, fontWeight: 700, padding: "5px 10px", cursor: "pointer" } }, "Ver como reorganizar o fio"),
+                    React.createElement("button", { onClick: () => { __moveActCore(moveAsk.fromIdx, moveAsk.idx, moveAsk.toIdx); setMoveAsk(null); }, style: { background: (moveAsk.issues.length || (moveAsk.missing || []).length) ? "#0f172a" : "#1e3a8a", border: "1px solid " + ((moveAsk.issues.length || (moveAsk.missing || []).length) ? "#334155" : "#3b82f6"), borderRadius: 8, color: (moveAsk.issues.length || (moveAsk.missing || []).length) ? "#94a3b8" : "#bfdbfe", fontSize: 11, fontWeight: 700, padding: "5px 10px", cursor: "pointer" } }, "Mover assim mesmo"),
+                    !moveAsk.view && (moveAsk.issues.length > 0 || (moveAsk.missing || []).length > 0) && React.createElement("button", { onClick: () => setMoveAsk({ ...moveAsk, view: true }), style: { background: "#1e3a8a", border: "1px solid #3b82f6", borderRadius: 8, color: "#bfdbfe", fontSize: 11, fontWeight: 700, padding: "5px 10px", cursor: "pointer" } }, "Ver como reorganizar o fio"),
                     React.createElement("button", { onClick: () => setMoveAsk(null), style: { background: "#0f172a", border: "1px solid #334155", borderRadius: 8, color: "#94a3b8", fontSize: 11, fontWeight: 700, padding: "5px 10px", cursor: "pointer" } }, "Cancelar"))),
             React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 8 } }, list.map((act, i) => {
                 const mod = resolveBlock(act.text);

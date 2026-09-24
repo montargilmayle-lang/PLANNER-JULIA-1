@@ -234,4 +234,10 @@ Bateria final: `audit.js` S0–S19 e `coverage45.js` (números no PR). `index.ht
 
 **Sinalizações (não decididas):** (1) a proposta só reacomoda dentro da própria semana para A/B/C e fios da CATCHUP/FREE — o texto desses blocos é relativo à semana; levar um banco de A/B/C para a semana seguinte exigiria um bloco "Bloco X da semana passada" gerado sob demanda (possível, PR próprio); (2) o cálculo usa o dia de cada etapa lido das listas reais (inclusive dias editados à mão): se ela editou o dia e apagou uma etapa, o intervalo com essa etapa simplesmente não é avaliado; (3) hoje conta como dia vivido — a etapa de hoje nunca é reacomodada.
 
+**Decisões da paciente sobre as sinalizações (24/09, aval do PR #14):** (1) reorganização só dentro da própria semana para A/B/C e fios CATCHUP/FREE — aceita, registrada como pendência técnica sem prioridade (briefing §14 E); (2) hoje conta como dia vivido — aceito; (3) **etapa apagada de um dia editado — corrigida no mesmo PR:** entra como ausente (aviso no diálogo) e a proposta a recoloca.
+
+| Cenário h (sem.41, 14/10) | Antes | Depois do movimento | Aviso | Proposta / resultado |
+|---|---|---|---|---|
+| Apostila do Fio 1 apagada do DOM 18 (dia editado à mão); questões SÁB 17 → SEX 16 | aula QUI 15 →2d→ questões SÁB 17 · apostila **ausente** · selagem QUA' 21 | aula →1d→ questões SEX 16 · apostila ausente | "⚠️ a apostila deste módulo não está em nenhum dia desta semana (apagada de um dia editado — a cascata a esperava DOM 18/10)" — sem isso o app diria "tudo na faixa" com a etapa inexistente | apostila **recolocada** em SÁB 17 (+1d das questões) e selagem SEG 19 (+2d da apostila); "Aplicar" grava `fioPlan[14/10][1] = { apost 3, seal 5 }` |
+
 **Bateria:** `tests/audit.js` S0–S20 e `tests/coverage45.js` (números no PR). `index.html` idêntico.
