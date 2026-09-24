@@ -186,6 +186,32 @@ const MODULES = [
     { id: 90, week: 46, code: "ORT1", title: "Ortopedia II" },
 ];
 const TOTAL_WEEKS = 51; // 46 do curso + 5 de desatraso puro (até ~fim de dezembro/2026)
+// ── BLOCOS DA SEMANA: universo de módulos e GRUPOS (paciente, 24/09 — bug do Bloco C) ──
+// ⚙️ (a tela não pode mentir) + 🩺 (todo bloco da semana é núcleo): módulos adicionados/editados pela paciente vivem em config
+// (customModules = [{ id ≥ 1000, week, code, title }], moduleEdits = { [id]: { code, title } }) e entram em tudo (cronograma, fila, projeção,
+// revisões, Módulos). Nada é apagado: o módulo dela convive com os embutidos. Setado pelo App a cada render (como o ritmo).
+let __CUSTOM_MODS = [], __MOD_EDITS = {};
+function setModuleCfg(config) { __CUSTOM_MODS = Array.isArray(config && config.customModules) ? config.customModules.filter(m => m && m.id != null && m.week) : []; __MOD_EDITS = (config && config.moduleEdits) || {}; }
+function ALL_MODS() { const ed = __MOD_EDITS; const ap = (m) => ed[m.id] ? { ...m, ...ed[m.id] } : m; return MODULES.map(ap).concat(__CUSTOM_MODS.map(m => ap({ ...m, id: Number(m.id), week: Number(m.week), custom: true }))); }
+const isBonusMod = (m) => /^b[oô]nus\b/i.test(String(m.title || ""));
+const GROUP_LETTERS = "ABCDEFGH";
+const GROUP_COLORS = ["#C2410C", "#B45309", "#7E22CE", "#0F766E", "#0369A1", "#9F1239", "#1D4ED8", "#475569"];
+// Grupos da semana: config.weekGroups[week] = [[ids do grupo A], [ids do grupo B], …]; padrão = cada módulo no seu grupo, na ordem de
+// modulesForWeek (🩺: "Bônus" por último — complementares — mas com cascata própria se ela não os agrupar). Cada grupo recebe a cascata
+// completa; grupo com N módulos soma as questões (30q de cada) e a marcação registra a etapa em TODOS os módulos do grupo.
+// Módulo fora do agrupamento gravado (adicionado depois) ganha grupo próprio — nunca some da cascata.
+function weekGroupsFor(config, week) {
+    const mods = modulesForWeek(week); if (!mods.length) return [];
+    const byId = {}; mods.forEach(m => { byId[m.id] = m; });
+    const raw = ((config && config.weekGroups) || {})[week];
+    const seen = new Set(); const out = [];
+    if (Array.isArray(raw)) raw.forEach(g => { const ms = (Array.isArray(g) ? g : []).map(id => byId[Number(id)]).filter(m => m && !seen.has(m.id)); ms.forEach(m => seen.add(m.id)); if (ms.length) out.push(ms); });
+    mods.forEach(m => { if (!seen.has(m.id)) out.push([m]); });
+    return out;
+}
+function groupRef(mods, letter) { if (!mods || !mods.length) return null; return mods.length === 1 ? { ...mods[0], letter } : { id: mods[0].id, week: mods[0].week, code: mods.map(m => m.code).join(" + "), title: mods.map(m => m.title).join(" + "), mods, letter, group: true }; }
+const groupMods = (g) => g ? (g.mods || [g]) : [];
+const fmtDur = (h) => h * 60 < 60 ? Math.round(h * 60) + "min" : (Math.round(h * 10) / 10) + "h";
 // Quarta-feira da Semana 1 (dia da aula presencial = D1). A semana corre QUA → TER,
 // igual ao app do Medcurso (ex.: Sem.25 = 24/06 a 30/06).
 const DEFAULT_START = "2026-01-07";
@@ -359,7 +385,7 @@ const WEEK_SCHEDULE_AMB = [
 // PROVISÓRIO — nova grade pendente da paciente: sem ambulatório recorrente e sem aula da faculdade
 // (decisões explícitas da paciente). Dias livres com dois fios de 3 toques em dias diferentes:
 //   Fio A = QUA aula → QUI questões → SÁB apostila · Fio B = DOM aula → SEG questões → TER apostila · SÁB = dia útil (decisão 24/09)
-//   Selagem: Fio A na TER; Fio B na SEX sem simulado (com simulado desliza p/ o DOM) · academia livre (6 dos 7 dias) · simulados quinzenais na sexta.
+//   Selagem: Fio A na TER; Fio B na SEX sem simulado (com simulado desliza p/ o SÁB) · academia livre (6 dos 7 dias) · simulados quinzenais na sexta.
 const CATCHUP_START = "2026-11-25";
 // ── FASE DE RECUPERAÇÃO A (25/11 a 14/12) — PROVISÓRIO — nova grade pendente da paciente ──
 const WEEK_SCHEDULE_CATCHUP = [
@@ -720,6 +746,7 @@ const PROJ_PACE = { amb: 1, g2: 2, catchup: 2, free: 6 }; // free: o pipeline ab
 function toggleProgressField(progress, id, field) {
     const cur = (progress || {})[id] || {};
     const updated = { ...cur, [field]: !cur[field] };
+    if (field === "aulaPresencial") { if (updated.aulaPresencial) updated.aulaPresencialAt = todayISO(); else delete updated.aulaPresencialAt; } // 24/09: o card mostra "presencial assistida em dd/mm" (informação, fora dos 4 checks)
     const done = PROGRESS_FIELDS.every(f => updated[f]);
     if (done && !updated.completedAt) updated.completedAt = todayISO();
     if (!done && updated.completedAt) { delete updated.completedAt; delete updated.reviewD7Done; delete updated.reviewD30Done; delete updated.reviewR3Done; delete updated.r1DoneAt; delete updated.r2DoneAt; delete updated.accR1; delete updated.accR2; }
@@ -752,16 +779,19 @@ function TaskRow({ tasks, progress, onUpdate, showCode }) {
         const pr = (progress || {})[t.mod.id] || {};
         const on = !!pr[t.field];
         return React.createElement("div", { key: k, style: { display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" } },
-            React.createElement("button", { onClick: () => onUpdate && onUpdate(toggleProgressField(progress || {}, t.mod.id, t.field)), title: "Marca no módulo " + t.mod.code, style: { background: on ? "#166534" : "#1e293b", border: "1px solid " + (on ? "#22c55e" : "#334155"), borderRadius: 6, color: on ? "#22c55e" : "#94a3b8", padding: "4px 8px", fontSize: 10, fontWeight: 700, cursor: "pointer" } },
+            React.createElement("button", { onClick: () => onUpdate && onUpdate(toggleProgressField(progress || {}, t.mod.id, t.field)), title: "Marca no módulo " + t.mod.code + " · " + t.mod.title, style: { background: on ? "#166534" : "#1e293b", border: "1px solid " + (on ? "#22c55e" : "#334155"), borderRadius: 6, color: on ? "#22c55e" : "#94a3b8", padding: "4px 8px", fontSize: 10, fontWeight: 700, cursor: "pointer" } },
                 (on ? "✓ " : "") + PROGRESS_LABELS[t.field] + ((showCode || t.tag) ? " · " + (t.tag ? t.tag + " · " : "") + t.mod.code : "")), // etiqueta A/B sempre visível quando existe (selagem de A/B em blocos separados, 24/09)
             on && PCT_FIELD[t.field] && React.createElement(PctInput, { pr: pr, field: PCT_FIELD[t.field], onSet: (v) => onUpdate && onUpdate(setProgressPct(progress || {}, t.mod.id, PCT_FIELD[t.field], v)) }));
     }));
 }
+function simSeriesText(simResults) { const e = Object.entries(simResults || {}).filter(([, v]) => v != null && v !== "").sort((a, b) => (a[0] < b[0] ? -1 : 1)); return e.length ? e.map(([d, v]) => v + "% (" + fmtBR(d) + ")").join(" · ") : ""; } // 24/09: evolução dos simulados (acompanhamento clínico; não calibra o motor)
 function moduleCompleteP(progress, id) { const p = (progress && progress[id]) || {}; return PROGRESS_FIELDS.every(f => p[f]); }
-function rawWeekOf(iso) { return Math.floor(diffDays(DEFAULT_START, iso) / 7) + 1; }
+let __START_ISO = DEFAULT_START; // data-base REAL (config.startDate), setada pelo App — nunca a constante (24/09)
+function setStartCfg(iso) { __START_ISO = iso || DEFAULT_START; }
+function rawWeekOf(iso) { return Math.floor(diffDays(__START_ISO, iso) / 7) + 1; }
 function projectedZeroISO(progress) {
     const cw = rawWeekOf(todayISO());
-    let pending = MODULES.filter(m => m.week < cw && !moduleCompleteP(progress, m.id)).length;
+    let pending = ALL_MODS().filter(m => m.week < cw && !moduleCompleteP(progress, m.id)).length;
     let iso = todayISO(); let g = 0;
     while (pending > 0 && g < 200) {
         const cap = iso >= FREE_START ? PROJ_PACE.free : (iso >= CATCHUP_START ? PROJ_PACE.catchup : (iso >= G2_START ? __PACE : PROJ_PACE.amb));
@@ -792,6 +822,7 @@ let __PACE_SAVE = null; // P5b: botão "Aplicar ritmo Z" do aviso de viabilidade
 let __FILL_SAVE = null; // redistribuição avisada: grava fioPlan / fioExtra / fillDismissed só com confirmação da paciente
 let __SIMRES_SAVE = null; // T7: % do simulado por sexta (config.simResults) — acompanhamento, não calibra o motor
 let __LIGHT_SAVE = null; // grava config.lightDayOverrides[isoDaQuarta] = dayIdx (ausente = automático)
+let __CFG_SAVE = null; // grava campos parciais do config (weekGroups, customModules, moduleEdits) — editor de blocos da semana (24/09)
 const FIO_PAT = [ // decisão da paciente (24/09): nenhum dia livre nasce vazio — Fio 1 QUI→SÁB→DOM · Fio 2 DOM→SEG→TER · Fio 3 SÁB→DOM→SEG · Fio 4 TER (+ QUA/QUI seguintes)
     [[1, "aula"], [3, "quest"], [4, "apost"]],
     [[4, "aula"], [5, "quest"], [6, "apost"]],
@@ -922,19 +953,16 @@ function modulePct(progress, id) {
     const p = (progress === null || progress === void 0 ? void 0 : progress[id]) || {};
     return PROGRESS_FIELDS.filter(f => p[f]).length / PROGRESS_FIELDS.length;
 }
-function modulesForWeek(week) { return MODULES.filter(m => m.week === week); }
+function modulesForWeek(week) { const ms = ALL_MODS().filter(m => m.week === week); return ms.filter(m => !isBonusMod(m)).concat(ms.filter(isBonusMod)); } // ordem de cascata: principais primeiro, "Bônus" por último (🩺)
 function blockRef(text) {
     if (/bloco antigo/i.test(text))
         return "DESAT";
-    if (/Bloco A/i.test(text))
-        return "A";
-    if (/Bloco B/i.test(text))
-        return "B";
-    return null;
+    const m = text.match(/\bBloco ([A-H])\b/); // "Bloco A" … "Bloco H" (não "Blocos A e B", não "bloco antigo")
+    return m ? m[1] : null;
 }
 // Fila: recência (semana desc) → alta frequência → id. Só módulos passados < 100%.
 function catchupQueue(progress, effWeek) {
-    return MODULES
+    return ALL_MODS()
         .filter(m => m.week < effWeek && modulePct(progress, m.id) < 1)
         .map(m => ({ ...m, pct: modulePct(progress, m.id), highYield: isHighYield(m.code) }))
         .sort((a, b) => b.week - a.week ||
@@ -944,8 +972,8 @@ function catchupQueue(progress, effWeek) {
 // Próxima ação test-first conforme o que já foi marcado no próprio app (não usa % da tela).
 function catchupAction(progress, id) {
     const p = (progress === null || progress === void 0 ? void 0 : progress[id]) || {};
-    const mod = MODULES.find(mm => mm.id === id);
-    const gap = mod ? Math.max(0, computeWeek(DEFAULT_START, todayISO()) - mod.week) : 99;
+    const mod = ALL_MODS().find(mm => mm.id === id);
+    const gap = mod ? Math.max(0, computeWeek(__START_ISO, todayISO()) - mod.week) : 99; // data-base do config (24/09)
     if (!p.aula)
         return { icon: "▶️", lead: "Toque 1: aula online completa 1.5x", rest: "→ aula ANTES das questões, sempre" };
     if (!p.questoesD2) {
@@ -998,7 +1026,7 @@ function computeReviews(progress, refISO) {
     Object.entries(progress || {}).forEach(([id, p]) => {
         if (!p || !p.completedAt)
             return;
-        const mod = MODULES.find(m => m.id === Number(id));
+        const mod = ALL_MODS().find(m => m.id === Number(id));
         if (!mod)
             return;
         const d7 = r1DueOf(p);
@@ -1078,11 +1106,8 @@ function Badge({ label, color }) {
 }
 // Banner de revisões espaçadas no prazo
 function ReviewAlerts({ alerts, onDone }) {
-    const [askKey, setAskKey] = useState(null);
-    const [pctVal, setPctVal] = useState("");
     if (!alerts || !alerts.length)
         return null;
-    const finish = (a, pct) => { onDone(a.id, a.kind, pct); setAskKey(null); setPctVal(""); };
     return (React.createElement("div", { style: { background: "#2a200a", border: "1px solid #f5c518", borderRadius: 12,
             padding: 14, marginBottom: 16 } },
         React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 6 } },
@@ -1093,7 +1118,15 @@ function ReviewAlerts({ alerts, onDone }) {
                 ")")),
         React.createElement("div", { style: { color: "#94a3b8", fontSize: 9, marginBottom: 10, lineHeight: 1.5 } },
             "Ao concluir, informe o % de acerto: \u2265" + "80% estica a pr\u00F3xima revis\u00E3o \u00B7 60\u201379% mant\u00E9m \u00B7 <60% encurta + reexposi\u00E7\u00E3o (apostila/aula antes de novas quest\u00F5es)."),
-        React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 8 } }, alerts.map(a => {
+        React.createElement(ReviewRows, { alerts: alerts, onDone: onDone })));
+}
+// Linhas "Revisei" + % (decisão da paciente, 24/09): o MESMO fluxo do card amarelo vive também dentro do bloco de revisão do dia e na seção
+// REVISÕES ESPAÇADAS — paridade com as demais etapas (🧩); o % das revisões calibra os intervalos seguintes (📚)
+function ReviewRows({ alerts, onDone }) {
+    const [askKey, setAskKey] = useState(null);
+    const [pctVal, setPctVal] = useState("");
+    const finish = (a, pct) => { onDone(a.id, a.kind, pct); setAskKey(null); setPctVal(""); };
+    return (React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 8 } }, alerts.map(a => {
             const key = a.id + a.kind;
             const asking = askKey === key;
             return (React.createElement("div", { key: key, style: { display: "flex", alignItems: "center", gap: 10,
@@ -1123,7 +1156,7 @@ function ReviewAlerts({ alerts, onDone }) {
                     : React.createElement("button", { onClick: () => { if (a.kind !== "D+7" && a.kind !== "D+30") { finish(a, null); } else { setAskKey(key); setPctVal(""); } },
                         style: { background: "#166534", border: "1px solid #22c55e", borderRadius: 6, color: "#22c55e", fontSize: 11,
                             padding: "5px 10px", cursor: "pointer", whiteSpace: "nowrap" } }, "Revisei")));
-        }))));
+        })));
 }
 // Campo de imprevisto por data — commit no blur
 function EventNote({ value, onCommit }) {
@@ -1135,7 +1168,7 @@ function EventNote({ value, onCommit }) {
                 border: `1px solid ${txt ? "#92400e" : "#334155"}`, borderRadius: 8, color: "#f1f5f9",
                 padding: "10px 12px", fontSize: 12, resize: "vertical", fontFamily: "inherit", lineHeight: 1.5 } })));
 }
-function Schedule({ config, effWeek, scheduleOv, events, reviews, onSaveSchedule, onSaveEvents, onUpdateProgress }) {
+function Schedule({ config, effWeek, scheduleOv, events, reviews, onSaveSchedule, onSaveEvents, onUpdateProgress, onReviewDone }) {
     const [activeIdx, setActiveIdx] = useState(todayDayIdx());
     const [editMode, setEditMode] = useState(false);
     const [adding, setAdding] = useState(false);
@@ -1143,9 +1176,12 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, onSaveSchedule
     const startISO = config.startDate;
     const week = effWeek;
     const mods = modulesForWeek(week);
-    const blockA = mods[0] || null;
-    const blockB = mods[1] || null;
-    const prevMods = modulesForWeek(week - 1), prevBlockA = prevMods[0] || null, prevBlockB = prevMods[1] || null; // selagem de A/B na QUA e banco B pós-simulado apontam para a semana passada
+    const groups = weekGroupsFor(config, week), prevGroups = weekGroupsFor(config, week - 1); // grupos A, B, C… desta semana e da passada (selagens e banco pós-simulado apontam para a passada)
+    const groupAt = (gs, L) => { const i = GROUP_LETTERS.indexOf(L); return i >= 0 && gs[i] ? groupRef(gs[i], L) : null; };
+    const letterOf = (L) => groupAt(groups, L), prevLetterOf = (L) => groupAt(prevGroups, L);
+    const blockA = letterOf("A"), blockB = letterOf("B");
+    const [grpEdit, setGrpEdit] = useState(false);
+    const [newMod, setNewMod] = useState({ code: "", title: "" });
     // Trilha B (desatraso): alvos da semana, intercalando especialidades.
     const queue = catchupQueue(reviews.progress, effWeek);
     const wkPh = weekPhase(startISO, week);
@@ -1159,26 +1195,11 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, onSaveSchedule
     const plan = ((config && config.fioPlan) || {})[wedISO0] || {}, prevPlan = ((config && config.fioPlan) || {})[prevWedISO] || {};
     const extras = ((config && config.fioExtra) || {})[wedISO0] || [], prevExtras = ((config && config.fioExtra) || {})[prevWedISO] || [];
     const prev2Extras = ((config && config.fioExtra) || {})[weekDayISO(startISO, week - 2, 0)] || [], prev3Extras = ((config && config.fioExtra) || {})[weekDayISO(startISO, week - 3, 0)] || [];
-    const modOfId = (id) => queue.find(m => m.id === id) || MODULES.find(m => m.id === id) || null;
+    const modOfId = (id) => queue.find(m => m.id === id) || ALL_MODS().find(m => m.id === id) || null;
     const targets = wkPh === "AMB" ? effectiveTargets(queue, 6) : wkIds.map(modOfId).filter(Boolean);
-    const catchupForDay = (dayIdx) => {
+    const catchupForDay = (dayIdx) => { // fallback só dos templates HISTÓRICOS (antigo e AMB), cujos blocos de desatraso não trazem "Fio N"; de 10/09 em diante todo bloco resolve pelo snapshot (ramos G2/CATCHUP/FREE removidos em 24/09 — código morto)
         const iso = weekDayISO(startISO, week, dayIdx);
-        if (iso >= FREE_START) {
-            const map = { 0: 0, 1: 1, 2: 2, 3: 3, 4: 3, 5: 4, 6: 5 }; // Reta final (6 fios: QUA·QUI·SEX·SÁB·SEG·TER; DOM fecha etapas do Fio 4/3): só para blocos SEM "Fio N" (os do pipeline resolvem pelo snapshot)
-            return (dayIdx in map) ? (targets[map[dayIdx]] || null) : null;
-        }
-        if (iso >= CATCHUP_START) {
-            // Fio A = 1º alvo (Qua→Qui→Sáb); Fio B = 2º alvo (Dom→Seg→Ter)
-            if (dayIdx <= 3) return targets[0] || null;
-            if (dayIdx >= 4) return targets[1] || targets[0] || null;
-            return null;
-        }
-        if (iso >= G2_START) {
-            // Fio A = 1º alvo (Ter→Qui→Sáb); Fio B = 2º alvo (Sáb "2º bloco" → Seg)
-            if (dayIdx === 6 || dayIdx === 1 || dayIdx === 3) return targets[0] || null;
-            if (dayIdx === 5) return targets[1] || targets[0] || null;
-            return null;
-        }
+        if (iso >= G2_START) return null;
         if (iso >= AMB_START && iso <= AMB_END) {
             // Fio da semana = 1º alvo (Ter áudio → Ter noite → Sex → Sáb); Dom áudio = próximo fio (2º alvo)
             if (dayIdx === 6 || dayIdx === 2 || dayIdx === 3) return targets[0] || null;
@@ -1218,6 +1239,25 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, onSaveSchedule
                 }).map(a => /^Sem simulado/.test(a.text) ? { ...a, text: a.text.replace(/^Sem simulado\s*[·:]\s*/, "") } : a);
             }
         }
+        // ── SEMANAS COM 3+ BLOCOS (paciente, 24/09): cada grupo além de A e B recebe cascata própria, com os intervalos da regra de prioridade (decisão 40) ──
+        // C: SÁB aula 1.5x + D2 (mesmo dia) · DOM apostila (+1d) · QUA' selagem (+3d da apostila, junto das de A e B) · SEX' banco (+5d — decisão 24/09: não empilhar dois bancos na QUI' após semana de simulado). D: um dia depois (DOM/SEG/QUI'/SÁB'), e assim por diante.
+        const gW = weekGroupsFor(config, week), gP = weekGroupsFor(config, week - 1);
+        const cascadeFor = (gi, dayAbs) => { // gi ≥ 2 (C, D, …); dayAbs 0..13 (0..6 = esta semana, 7..13 = a seguinte)
+            const L = GROUP_LETTERS[gi]; const d0 = Math.min(5, 3 + (gi - 2)); const out = [];
+            if (dayAbs === d0) out.push({ d: "D3", color: "#7E22CE", text: "D3 · Aula online Bloco " + L + " (1.5x) + resumo — aula ANTES das questões", time: "1.7h" }, { d: "D2", color: "#C2410C", text: "D2-" + L + " · 30 questões Bloco " + L + " + caderno de erros + Anki dos erros — registre o %", time: "2h" });
+            if (dayAbs === d0 + 1) out.push({ d: "D4", color: "#7E22CE", text: "D4: Apostila do Bloco " + L + " dirigida pelos erros de ONTEM + Feynman", time: "1.5h" });
+            if (dayAbs === d0 + 4) out.push(SEAL_AB(L));
+            if (dayAbs === d0 + 6) out.push({ d: "D6", color: "#B45309", text: "D6 · Banco: questões por conteúdo do Bloco " + L + " da semana passada (+5d da apostila) + Smartcards", time: "2h" });
+            return out;
+        };
+        let gb = [];
+        for (let gi = 2; gi < gW.length; gi++) gb = gb.concat(cascadeFor(gi, dayIdx));
+        for (let gi = 2; gi < gP.length; gi++) gb = gb.concat(cascadeFor(gi, dayIdx + 7));
+        if (gb.length) {
+            const seals = gb.filter(a => /^Selar Bloco/.test(a.text)), rest = gb.filter(a => !/^Selar Bloco/.test(a.text));
+            if (seals.length) { const ls = acts.map(a => /^Selar Bloco/.test(a.text)).lastIndexOf(true); acts = ls >= 0 ? acts.slice(0, ls + 1).concat(seals, acts.slice(ls + 1)) : (() => { const ia = acts.findIndex(a => ["GYM", "LAZER", "PLAN", "AULA", "AMB", "SONO"].indexOf(a.d) >= 0); return ia >= 0 ? acts.slice(0, ia).concat(seals, acts.slice(ia)) : acts.concat(seals); })(); }
+            if (rest.length) { const ia = acts.findIndex(a => ["GYM", "LAZER", "PLAN", "AULA", "AMB", "SONO"].indexOf(a.d) >= 0); acts = ia >= 0 ? acts.slice(0, ia).concat(rest, acts.slice(ia)) : acts.concat(rest); }
+        }
         if (iso >= G2_START && iso < CATCHUP_START) {
             const fb = fioBlocksFor(dayIdx, paceOv || paceCfg, (paceOv ? prevIdsFor(paceOv) : prevIds).length, plan, prevPlan, extras, prevExtras, prev2Extras, prev3Extras);
             if (fb.length) {
@@ -1250,10 +1290,24 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, onSaveSchedule
             const pb = [{ d: "REV", color: "#15803D", text: "Selar Fio B (sem. passada): 10 questões + smartcards + os 4 checks (bloco antigo) — o % da selagem agenda as revisões", time: "40min" }];
             const li = acts.map(a => a.d).lastIndexOf("LAZER"); acts = li >= 0 ? acts.slice(0, li).concat(pb, acts.slice(li)) : acts.concat(pb);
         }
+        // Grupo com N módulos (paciente, 24/09): o bloco de A/B/C vale para todos os módulos do grupo — tempo × N e o rótulo diz quais são; grupo inexistente
+        // (ela juntou tudo em menos letras) some do dia. Blocos "da semana passada" olham os grupos da semana passada. Semana sem módulos mantém o template.
+        acts = acts.map(a => {
+            if (blockRef(a.text) === "DESAT") return a;
+            const ls = [...new Set((a.text.match(/\bBloco ([A-H])\b/g) || []).map(x => x.slice(-1)))]; if (ls.length !== 1) return a;
+            const prev = /da semana passada/.test(a.text); const gs = prev ? gP : gW; if (!gs.length) return a;
+            const g = gs[GROUP_LETTERS.indexOf(ls[0])]; if (!g) return null;
+            if (g.length < 2) return a;
+            return { ...a, text: a.text + " · grupo " + ls[0] + ": " + g.length + " módulos (" + g.map(m => m.code).join(" + ") + ")", time: fmtDur(actHours(a) * g.length) };
+        }).filter(Boolean);
         const sh = DATED_SHIFTS[iso];
         const shPrev = DATED_SHIFTS[addDaysISO(iso, -1)];
         if (sh || (shPrev && shPrev.kind === "noite"))
             acts = buildShiftDay(sh, shPrev, acts);
+        if (iso === "2026-08-03") { // fronteira template antigo → AMB (decisão da paciente, 24/09): a segunda do template antigo trazia o D2-A; o AMB só tem o banco — o CAR3 (sem.30) não fica sem questões
+            const ia = acts.findIndex(a => a.d === "ANKI");
+            acts = acts.slice(0, ia + 1).concat([{ d: "D2", color: "#C2410C", text: "30 questões Bloco A + caderno de erros + Anki dos erros (D2 da segunda do template antigo — fronteira 03/08)", time: "2h" }], acts.slice(ia + 1));
+        }
         if (iso === "2026-10-08")
             acts = acts.map(a => (a.d === "D3" && /Aula online Bloco A/.test(a.text))
                 ? { d: "D1", color: "#9F1239", text: "D1 · AULA PRESENCIAL de ontem — gravada/online, Blocos A e B (substitui as aulas 1.5x desta semana · D2-B desliza p/ os tempos mortos dos plantões ou p/ segunda 12/10)", time: "3.5h" }
@@ -1338,13 +1392,12 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, onSaveSchedule
         onSaveSchedule(next);
     };
     const resolveBlock = (text) => {
-        const sb = text.match(/^Selar Bloco ([AB]) da semana passada/); if (sb) return sb[1] === "A" ? prevBlockA : prevBlockB;
-        if (/Bloco B da semana passada/.test(text)) return prevBlockB; // banco B da semana de simulado, na QUI seguinte
+        if (/^📌/.test(text)) return null; // bloco-nota (seed histórico de 25/06, anotações dela): sem módulo, sem tarefa (24/09)
+        const sb = text.match(/^Selar Bloco ([A-H]) da semana passada/); if (sb) return prevLetterOf(sb[1]);
+        const pb = text.match(/\bBloco ([A-H]) da semana passada/); if (pb) return prevLetterOf(pb[1]); // banco B pós-simulado (QUI) e banco de C+ (SEX', +5d)
         const r = blockRef(text);
-        if (r === "A")
-            return blockA;
-        if (r === "B")
-            return blockB;
+        if (r && r !== "DESAT")
+            return letterOf(r); // grupo A/B/C… desta semana (módulo único ou grupo de N módulos)
         if (r === "DESAT") {
             const fm = text.match(/Fio (\d+|[AB])( \(sem\. passada\)| \(há [23] sem\.\))?/);
             if (fm && wkPh !== "AMB") { // G2/POST/CATCHUP/FREE: fios congelados por semana (config.fioWeek); "(sem. passada)" = semana anterior; "(há 2/3 sem.)" = só fio extra de 2/3 semanas atrás; A/B = 1º/2º; além do ritmo = fio extra (sugestão aceita)
@@ -1365,8 +1418,8 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, onSaveSchedule
     // T1 (🧩 + ⚙️): tarefas marcáveis de um bloco → [{ mod, field }]. Etapas de execução sem registro (D1, D+1, D5/D6, REV, D7) devolvem [] (✓ manual do dia).
     const blockTasks = (text, mod) => {
         const t = text;
-        if (/^Resumo rápido/.test(t)) return [];
-        const sbt = t.match(/^Selar Bloco ([AB]) da semana passada/); if (sbt) return mod ? [{ mod, field: "smartcard", tag: sbt[1] }] : []; // selagem de A/B na QUA de manhã, blocos separados (24/09)
+        if (/^Resumo rápido|^📌/.test(t)) return []; // bloco-nota (📌 …) nunca é etapa (24/09)
+        const sbt = t.match(/^Selar Bloco ([A-H]) da semana passada/); if (sbt) return groupMods(mod).map(m => ({ mod: m, field: "smartcard", tag: sbt[1] })); // selagem de A/B/C na QUA de manhã, blocos separados (24/09); grupo → todos os módulos
         if (/^(Semana de simulado · )?Selar (o )?Fio/.test(t)) return mod ? [{ mod, field: "smartcard" }] : [];
         if (blockRef(t) === "DESAT") {
             if (!mod) return [];
@@ -1375,17 +1428,21 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, onSaveSchedule
             if (/toque 3/.test(t)) return [{ mod, field: "apostila" }];
             return [];
         }
-        const both = [blockA, blockB].filter(Boolean);
-        if (/AULA PRESENCIAL de ontem/.test(t)) return both.map((m, i) => ({ mod: m, field: "aula", tag: ["A", "B"][i] })); // 08/10: a gravada substitui a 1.5x da semana → marca `aula` de A e B
-        if (/Aula presencial/i.test(t)) return both.map((m, i) => ({ mod: m, field: "aulaPresencial", tag: ["A", "B"][i] })); // BUG 1: a presencial de quarta marca o registro complementar, não a 1.5x
-        if (/Apostila direcionada pelos erros \(A e B\)/.test(t)) return both.map((m, i) => ({ mod: m, field: "apostila", tag: ["A", "B"][i] }));
-        if (/D2 completo|D2 compacto/.test(t)) return both.map((m, i) => ({ mod: m, field: "questoesD2", tag: ["A", "B"][i] }));
-        const ref = blockRef(t); const m = ref === "A" ? blockA : ref === "B" ? blockB : null;
-        if (!m) return [];
+        const allWeek = groups.reduce((a, g, i) => a.concat(g.map(m => ({ mod: m, tag: GROUP_LETTERS[i] }))), []); // todos os blocos da semana (a presencial cobre A, B, C…)
+        const both = allWeek.filter(x => x.tag === "A" || x.tag === "B"); // blocos combinados A+B do template AMB
+        if (/AULA PRESENCIAL de ontem/.test(t)) return allWeek.map(x => ({ mod: x.mod, field: "aula", tag: x.tag })); // 08/10: a gravada substitui a 1.5x da semana → marca `aula` de todos os blocos
+        if (/Aula presencial/i.test(t)) return allWeek.map(x => ({ mod: x.mod, field: "aulaPresencial", tag: x.tag })); // BUG 1: a presencial de quarta marca o registro complementar, não a 1.5x
+        if (/Apostila direcionada pelos erros \(A e B\)/.test(t)) return both.map(x => ({ mod: x.mod, field: "apostila", tag: x.tag }));
+        if (/D2 completo/.test(t)) return both.map(x => ({ mod: x.mod, field: "questoesD2", tag: x.tag }));
+        if (/D2 compacto/.test(t)) return both.filter(x => x.tag === "B").map(x => ({ mod: x.mod, field: "aula", tag: "B" })).concat(both.map(x => ({ mod: x.mod, field: "questoesD2", tag: x.tag }))); // AMB, semana de simulado: "aula online B antes + 20q A + 20q B" — a aula do B se registra aqui (cobertura, 24/09)
+        const ref = blockRef(t); const g = ref && ref !== "DESAT" ? letterOf(ref) : null;
+        if (!g) return [];
         const out = [];
-        if (/aula online/i.test(t)) out.push({ mod: m, field: "aula" });
-        if (/D2-[AB]|30 questões Bloco [AB]|30q Bloco [AB]|20q Bloco [AB]/.test(t)) out.push({ mod: m, field: "questoesD2" });
-        if (/Apostila (do )?Bloco [AB]/i.test(t)) out.push({ mod: m, field: "apostila" });
+        groupMods(g).forEach(m => { // grupo com N módulos: a etapa marca todos (etiqueta = letra do grupo)
+            if (/aula online/i.test(t)) out.push({ mod: m, field: "aula", tag: ref });
+            if (/D2-[A-H]|30 questões Bloco [A-H]|30q Bloco [A-H]|20q Bloco [A-H]/.test(t)) out.push({ mod: m, field: "questoesD2", tag: ref });
+            if (/Apostila (do )?Bloco [A-H]/i.test(t)) out.push({ mod: m, field: "apostila", tag: ref });
+        });
         return out;
     };
     const isBlockDone = (a) => { const tk = blockTasks(a.text, resolveBlock(a.text)); const pg = reviews.progress || {}; return tk.length ? tk.every(t => !!((pg[t.mod.id] || {})[t.field])) : !!a.done; }; // T2: bloco com módulo reflete o card
@@ -1403,7 +1460,7 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, onSaveSchedule
     const LIGHT_TIE_H = 0.75;
     const shiftDates = Object.keys(DATED_SHIFTS);
     const distToShift = (iso) => shiftDates.length ? Math.min(...shiftDates.map(d => Math.abs(diffDays(d, iso)))) : 99;
-    const nextStageRe = (t) => { const m = t.match(/^(Fio [^·]+?) · toque (\d)/); if (m) return new RegExp("^" + m[1].replace(" (sem. passada)", "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "( \\(sem\\. passada\\))? · toque " + (Number(m[2]) + 1)); if (/D2-A|Aula online Bloco A \(1\.5x\)/.test(t)) return /Apostila do Bloco A/; if (/D2-B|deslocado da sexta/.test(t)) return /Apostila do Bloco B/; return null; }; // o elo pode cruzar a semana ("Fio 4 · toque 1" TER → "Fio 4 (sem. passada) · toque 2" QUA)
+    const nextStageRe = (t) => { const m = t.match(/^(Fio [^·]+?) · toque (\d)/); if (m) return new RegExp("^" + m[1].replace(" (sem. passada)", "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "( \\(sem\\. passada\\))? · toque " + (Number(m[2]) + 1)); const lm = t.match(/D2-([A-H])|Aula online Bloco ([A-H]) \(1\.5x\)/); if (lm) return new RegExp("Apostila do Bloco " + (lm[1] || lm[2])); if (/deslocado da sexta/.test(t)) return /Apostila do Bloco B/; return null; }; // o elo pode cruzar a semana ("Fio 4 · toque 1" TER → "Fio 4 (sem. passada) · toque 2" QUA)
     const contLinks = (d) => { const cur = listAt(d) || [], nxt = listAt(d + 1) || []; return cur.reduce((k, a) => { const re = nextStageRe(a.text); return k + (re && nxt.some(x => re.test(x.text)) ? 1 : 0); }, 0); };
     const lightDayFor = (k = 0) => { // k = 0 esta semana; 1–3 = semanas à frente (mesma regra: menor carga entre os dias livres daquela semana)
         const isSim = simFor(isoAt(7 * k + 2));
@@ -1447,16 +1504,28 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, onSaveSchedule
     // ── P5b · VIABILIDADE DA SEMANA (🧠/😴 pedem o aviso · 📚 preserva os 4 fios · 🧩 informação antes do fracasso, não depois) ──
     // Conta os dias com estudo acima de STUDY_WARN_H no ritmo atual (só G2/POST, onde o ritmo muda a semana); se passar de WEEK_FIT_MAX_OVER,
     // avisa e sugere o maior ritmo que cabe (ou o que menos estoura). A escolha continua dela: o botão só aplica a sugestão.
+    // ── GARANTIA DE COBERTURA (paciente, 24/09 — ⚙️ a tela não pode afirmar que um assunto é da semana sem que algum dia o estude; 📚 aula → questões → apostila):
+    // todo módulo listado em BLOCOS DESTA SEMANA precisa de aula, questões e apostila marcáveis em algum dia da semana (listas reais, inclusive dias editados à mão).
+    const coverageWarn = (() => {
+        if (!groups.length) return [];
+        const need = ["aula", "questoesD2", "apostila"]; const have = {};
+        for (let i = 0; i < 7; i++) (listFor(i) || []).forEach(a => blockTasks(a.text, resolveBlock(a.text)).forEach(t => { (have[t.mod.id] = have[t.mod.id] || new Set()).add(t.field); }));
+        const dup = (m) => mods.filter(x => x.code === m.code).length > 1; // código repetido na semana (ex.: PSI1 I e II): o título desambigua
+        return mods.filter(m => !need.every(f => have[m.id] && have[m.id].has(f))).map(m => "⚠️ " + m.code + (dup(m) ? " (" + m.title + ")" : "") + " está na lista da semana mas não tem tarefas — agrupe-o ou defina os dias.");
+    })();
     const weekFit = (() => {
-        if (wkPh !== "G2") return null;
+        if (wkPh === "AMB") return null;
+        const locked = wkPh !== "G2"; // CATCHUP (2 fios) e FREE (6): ritmo travado — o aviso existe do mesmo jeito (decisão da paciente, 24/09); a saída é mover blocos ou deixar um fio para a semana seguinte
         const over = (p) => { let k = 0; for (let i = 0; i < 7; i++) { const l = scheduleOv[dateFor(i)] || genActivities(i, p); if (studyHours(l) > STUDY_WARN_H + 1e-9) k++; } return k; };
-        const cur = over(paceCfg);
-        if (cur <= WEEK_FIT_MAX_OVER) return null;
-        let sug = null, sugOver = null;
-        for (let z = paceCfg - 1; z >= 1; z--) { const o = over(z); if (sug == null || o < sugOver) { sug = z; sugOver = o; } if (o <= WEEK_FIT_MAX_OVER) break; }
-        const shifts = [0, 1, 2, 3, 4, 5, 6].filter(i => DATED_SHIFTS[dateFor(i)]).length;
+        const paceNow = locked ? fiosWanted(wkPh, paceCfg) : paceCfg;
+        const cur = over(paceNow);
         const sim = simFor(dateFor(2)); // semana de simulado: se nem o ritmo 1 cabe, a saída explícita é pausar os fios (🧠/😴; 💬: é a semana, não ela)
-        return { pace: paceCfg, over: cur, shifts, sug, sugOver, sim, noFit: over(1) > WEEK_FIT_MAX_OVER };
+        const friH = studyHours(scheduleOv[dateFor(2)] || genActivities(2)); const simHeavy = locked && sim && friH > STUDY_WARN_H + 1e-9; // fase travada: a sexta de simulado (prova + correção + etapas de fio) sozinha já merece o aviso
+        if (cur <= WEEK_FIT_MAX_OVER && !simHeavy) return null;
+        let sug = null, sugOver = null;
+        if (!locked) for (let z = paceCfg - 1; z >= 1; z--) { const o = over(z); if (sug == null || o < sugOver) { sug = z; sugOver = o; } if (o <= WEEK_FIT_MAX_OVER) break; }
+        const shifts = [0, 1, 2, 3, 4, 5, 6].filter(i => DATED_SHIFTS[dateFor(i)]).length;
+        return { pace: paceNow, over: cur, shifts, sug, sugOver, sim, locked, friH, heavy: cur > WEEK_FIT_MAX_OVER, noFit: locked ? true : over(1) > WEEK_FIT_MAX_OVER, nGroups: groups.length }; // semana com 3+ blocos: 3 cascatas — o aviso propõe reduzir os fios, nunca corta etapa de bloco (🩺 conteúdo da semana > desatraso)
     })();
     // ── REDISTRIBUIÇÃO AVISADA (paciente, 24/09): a paciente decide, o app nunca mexe sozinho ──
     // Gatilho: etapa de fio concluída antes do dia programado (omitida dos dias futuros pelo BUG 2) libera espaço na semana corrente.
@@ -1474,6 +1543,14 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, onSaveSchedule
     const freedSig = freed.map(f => dateFor(f.i) + "|" + f.text).sort().join(";");
     const fillDismissed = (((config && config.fillDismissed) || {})[dateFor(0)] || "") === freedSig;
     const showFill = freed.length > 0 && !fillDismissed;
+    // 📌 fixado numa semana já congelada (decisão da paciente, 24/09): o congelamento fica (previsibilidade); o app OFERECE abri-lo já, como fio extra, pela mesma
+    // sugestão de redistribuição (custo de cada dia à vista; ela decide). Sem fixado esperando, nada aparece.
+    const pinsCfg = Array.isArray(config && config.catchupPins) ? config.catchupPins : [];
+    const openIds = new Set(wkIds.concat(extras.map(e => e.id), prevIds.slice(3, 4), prevExtras.map(e => e.id)));
+    const pinWait = (isCurWeek && wkPh !== "AMB") ? pinsCfg.map(id => queue.find(m => m.id === id)).filter(m => m && !openIds.has(m.id)) : [];
+    const pinSig = "pin:" + pinWait.map(m => m.id).sort((a, b) => a - b).join(",");
+    const pinDismissed = (((config && config.fillDismissed) || {})[dateFor(0) + "|pin"] || "") === pinSig;
+    const showPin = !showFill && pinWait.length > 0 && !pinDismissed;
     const stageWord = (t) => /toque 1/.test(t) ? "a aula" : /toque 2/.test(t) ? "as questões" : /toque 3/.test(t) ? "a apostila" : "a selagem";
     const dayName = (d) => DAY_LBL[((d % 7) + 7) % 7] + " " + fmtBR(addDaysISO(dateFor(0), d)) + (d >= 21 ? " (em 3 semanas)" : d >= 14 ? " (em 2 semanas)" : d >= 7 ? " (sem. seguinte)" : "");
     const FILL_HRS = { aula: 1.7, quest: 2, apost: 1.5, seal: 40 / 60 };
@@ -1488,7 +1565,7 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, onSaveSchedule
     const dayCost = (d, hrs) => { const l = loadAt(d); const tot = l ? l.study + hrs : null; const over = !!l && (tot > STUDY_WARN_H + 1e-9 || l.total + hrs > DAY_CAP_H + 1e-9); const L = lightOf(d); const when = d >= 21 ? "em 3 sem." : d >= 14 ? "em 2 sem." : d >= 7 ? "sem. seguinte" : ""; return (over ? "⚠️ " : "") + (L ? (L.breather ? "🌬️ " : "🌿 ") : "") + DAY_LBL[d % 7] + " " + fmtBR(isoAt(d)) + " (" + (tot == null ? "carga não avaliada" : fmtHrs(tot) + ((DATED_SHIFTS[isoAt(d)] || {}).kind === "dia" ? " + plantão" : "")) + (when ? ", " + when : "") + ")"; }; // custo do dia na proposta: carga resultante, ⚠️ acima de 8h de estudo ou do tempo hábil — sempre, inclusive nas semanas seguintes
     const freedDays = [...new Set(freed.map(f => f.i))].sort((a, b) => a - b).map(dayName);
     const freedWhat = freed.length ? stageWord(freed[0].text) + (freed[0].mod ? " de Sem." + freed[0].mod.week + " " + freed[0].mod.title : "") + (freed.length > 1 ? " (+" + (freed.length - 1) + ")" : "") : "";
-    const fillSuggest = () => {
+    const fillSuggest = (forceMod) => { // forceMod = módulo fixado (📌) que a paciente quer abrir já: só o passo 2, com ele
         const pg = reviews.progress || {}; const st = (id) => pg[id] || {};
         const HRS = FILL_HRS;
         const FIELD = { aula: "aula", quest: "questoesD2", apost: "apostila", seal: "smartcard" };
@@ -1502,28 +1579,28 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, onSaveSchedule
         const slots = [];
         wkIds.slice(0, 4).forEach((id, k) => { const dd = slotDays(k + 1), ov = plan[String(k + 1)] || {}; slots.push({ label: k + 1, id, kind: "tpl", key: String(k + 1), days: { aula: ov.aula != null ? ov.aula : dd.aula, quest: ov.quest != null ? ov.quest : dd.quest, apost: ov.apost != null ? ov.apost : dd.apost, seal: ov.seal != null ? ov.seal : dd.seal } }); });
         extras.forEach((e, j) => slots.push({ label: e.label, id: e.id, kind: "extra", key: j, days: { aula: e.aula, quest: e.quest, apost: e.apost, seal: e.seal } }));
-        const modOf = (id) => MODULES.find(m => m.id === id) || null;
-        for (const sl of slots) { // 1) adiantar etapa em andamento (não abre frente nova) — prioridade mantida mesmo em dia ⚠️ (decisão 24/09)
+        const modOf = (id) => ALL_MODS().find(m => m.id === id) || null;
+        for (const sl of (forceMod ? [] : slots)) { // 1) adiantar etapa em andamento (não abre frente nova) — prioridade mantida mesmo em dia ⚠️ (decisão 24/09)
             const p = st(sl.id); const k = ORDER.findIndex(t => !p[FIELD[t]]); if (k <= 0) continue;
             const t = ORDER[k], prevT = ORDER[k - 1]; const d = thisWeek(sl.days[prevT] + 1, HRS[t], sl.days[t] - 1);
             if (d != null) { const after = ORDER[k + 1]; if (!after || sl.days[after] > d) return { kind: 1, slot: sl, toque: t, day: d, hrs: HRS[t], mod: modOf(sl.id) }; }
         }
         const carryIds = wkIds.concat(extras.map(e => e.id), prevIds.slice(3, 4), prevExtras.map(e => e.id));
-        const cand = effectiveTargets(fioCandidates(queue, reviews.progress, carryIds), 1); // 2) abrir o próximo fio da fila (recência, pins)
+        const cand = forceMod ? [forceMod] : effectiveTargets(fioCandidates(queue, reviews.progress, carryIds), 1); // 2) abrir o próximo fio da fila (recência, pins) — ou o fixado que ela quer trazer já
         if (cand.length) { const d1 = thisWeek(todayIdxW + 1, HRS.aula); if (d1 != null) { const d2 = nextOk(d1 + 1, HRS.quest); const d3 = nextOk(d2 + 1, HRS.apost); const label = Math.max(wkIds.length, paceCfg, ...extras.map(e => e.label)) + 1;
             return { kind: 2, mod: cand[0], label, days: { aula: d1, quest: d2, apost: d3, seal: nextOk(d3 + 3, HRS.seal) } }; } }
-        for (const sl of slots) { // 3) antecipar selagem (+3d da apostila já atingidos)
+        for (const sl of (forceMod ? [] : slots)) { // 3) antecipar selagem (+3d da apostila já atingidos)
             const p = st(sl.id); if (p.aula && p.questoesD2 && p.apostila && !p.smartcard && sl.days.seal >= 7) { const d = thisWeek(sl.days.apost + 3, HRS.seal); if (d != null) return { kind: 3, slot: sl, day: d, hrs: HRS.seal, mod: modOf(sl.id) }; }
         }
         return { kind: 4 }; // só por regra pedagógica/pós-noturno — nunca por carga
     };
-    const fill = showFill && fillView ? fillSuggest() : null;
+    const fill = (showFill || showPin) && fillView ? fillSuggest(showFill ? null : pinWait[0]) : null;
     const modName = (m) => m ? "Sem." + m.week + " " + m.title : "";
     const toqueWord = { aula: "a aula", quest: "as questões", apost: "a apostila" };
     const fillText = !fill ? "" : fill.kind === 1 ? "Adiantar " + toqueWord[fill.toque] + " do Fio " + fill.slot.label + " — " + modName(fill.mod) + " para " + dayCost(fill.day, fill.hrs) + " (antes: " + dayName(fill.slot.days[fill.toque]) + ")."
         : fill.kind === 2 ? "Abrir o Fio " + fill.label + " — " + modName(fill.mod) + ": aula " + dayCost(fill.days.aula, FILL_HRS.aula) + " · questões " + dayCost(fill.days.quest, FILL_HRS.quest) + " · apostila " + dayCost(fill.days.apost, FILL_HRS.apost) + " · selagem " + dayCost(fill.days.seal, FILL_HRS.seal) + "."
         : fill.kind === 3 ? "Antecipar a selagem do Fio " + fill.slot.label + " — " + modName(fill.mod) + " para " + dayCost(fill.day, fill.hrs) + " (antes: " + dayName(fill.slot.days.seal) + ")."
-        : "Nada cabe sem quebrar a ordem aula→questões→apostila. Espaço protegido — descanse ou adiante o Anki.";
+        : (showPin ? "Não sobrou dia nesta semana para a aula sem quebrar a ordem aula→questões→apostila — o módulo fixado entra como 1º fio na próxima semana." : "Nada cabe sem quebrar a ordem aula→questões→apostila. Espaço protegido — descanse ou adiante o Anki.");
     const fillDays = !fill || fill.kind === 4 ? [] : fill.kind === 2 ? [fill.days.aula, fill.days.quest, fill.days.apost, fill.days.seal] : [fill.day];
     const fillNotes = [...new Set(fillDays.map(lightNote).filter(Boolean))]; // aviso explícito quando a proposta usa o dia leve (🌿/🌬️) de alguma semana
     const fillTextFull = fillText + (fillNotes.length ? " " + fillNotes.join(" · ") : "");
@@ -1544,10 +1621,10 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, onSaveSchedule
         if (fill.kind === 2) ["aula", "quest", "apost", "seal"].forEach(stg => putInto(fill.days[stg], fill.label, stg));
         else { const stg = fill.kind === 3 ? "seal" : fill.toque; putInto(fill.day, fill.slot.label, stg); takeFrom(fill.slot.days[stg], fill.slot.label, stg); }
         if (ovChanged) onSaveSchedule(ovNext);
-        __FILL_SAVE && __FILL_SAVE({ fioPlan: planAll, fioExtra: exAll, fillDismissed: { ...((config && config.fillDismissed) || {}), [wed]: freedSig } });
+        __FILL_SAVE && __FILL_SAVE({ fioPlan: planAll, fioExtra: exAll, fillDismissed: { ...((config && config.fillDismissed) || {}), [showPin ? wed + "|pin" : wed]: showPin ? pinSig : freedSig } });
         setFillView(false);
     };
-    const dismissFill = () => { __FILL_SAVE && __FILL_SAVE({ fillDismissed: { ...((config && config.fillDismissed) || {}), [dateFor(0)]: freedSig } }); setFillView(false); };
+    const dismissFill = () => { __FILL_SAVE && __FILL_SAVE({ fillDismissed: { ...((config && config.fillDismissed) || {}), [showPin ? dateFor(0) + "|pin" : dateFor(0)]: showPin ? pinSig : freedSig } }); setFillView(false); };
     const day = schedFor(dateFor(activeIdx))[activeIdx];
     const dayDate = dateFor(activeIdx);
     const list = listFor(activeIdx);
@@ -1560,7 +1637,7 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, onSaveSchedule
                 { d: "—", label: "Reta final", desc: "Sem ambulatório — dias 100% livres", color: "#6B7280" },
                 { d: "DESAT", label: "Pipeline", desc: "6 fios/sem: AULA do fio de hoje · QUESTÕES do de ontem · APOSTILA do de anteontem · SELAGEM do de há 5 dias — sábado abre fio, domingo só fecha etapas (questões · apostila · selagem) · selo 🌿 = dia de menor carga, calculado a cada semana", color: "#B91C1C" },
                 { d: "D7", label: "Sexta", desc: "Simulado quinzenal + correção", color: "#0F766E" },
-                { d: "🌿", label: "Sem remédio", desc: "Dia de menor carga da semana (selo 🌿), sábado por padrão", color: "#15803D" },
+                { d: "🌿", label: "Sem remédio", desc: "Dia de menor carga da semana (selo 🌿), calculado a cada semana — sem dia padrão; empate resolvido pelos critérios do seletor", color: "#15803D" },
             ] : dayDate >= CATCHUP_START ? [
                 { d: "—", label: "Curso", desc: "Aulas presenciais encerradas — fase de recuperação", color: "#6B7280" },
                 { d: "DESAT", label: "Fio A qua→qui→sáb · Fio B dom→seg→ter", desc: "Aula → questões → apostila em dias diferentes · selagem +3d da apostila: A na terça (desta semana), B na sexta seguinte (sábado em semana de simulado) · sáb = dia útil (apostila do A + temas fracos + PLAN) · selo 🌿 = dia de menor carga (provisório até a nova grade)", color: "#B91C1C" },
@@ -1568,7 +1645,7 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, onSaveSchedule
                 { d: "D7", label: "Sexta", desc: "Simulado quinzenal mantido", color: "#0F766E" },
             ] : dayDate >= G2_START ? [
                 { d: "D1", label: "Quarta", desc: "Dia 0: manhã com selagem de A e B da semana passada (blocos separados, +5d/+4d das apostilas) + 10q pré-aula (priming) · presencial A e B", color: "#2980B9" },
-                { d: "D3→D2", label: "Qui / Sex", desc: "Aula online do bloco → 30q no MESMO dia (A qui · B sex) — registre o %", color: "#C2410C" },
+                { d: "D3→D2", label: "Qui / Sex", desc: "Aula online do bloco → 30q no MESMO dia (A qui · B sex · semana com 3 blocos: C sáb → apostila dom, selagem qua' e banco sex') — registre o %", color: "#C2410C" },
                 { d: "D4", label: "Sex+Sáb", desc: "Apostila pelos erros (A sex, de quinta · B sáb, de sexta) + Feynman", color: "#7E22CE" },
                 { d: "D5/D6", label: "Seg / Ter", desc: "Banco A na segunda, banco B na terça (+3d das apostilas; em semana de simulado o banco B vai para a quinta seguinte, +3d) · selagem de A e B na QUA de manhã (semana seguinte) · fios da semana passada selados em blocos próprios (QUA/QUI/SEX/DOM) · SÁB e DOM = dias úteis com fios · selo 🌿 = dia sem Venvanse (o de menor carga, calculado a cada semana) · fios: ritmo 1–4 (o ⚠️ da semana avisa quando não cabe)", color: "#B45309" },
             ] : dayDate >= AMB_START && dayDate <= AMB_END ? [
@@ -1596,11 +1673,15 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, onSaveSchedule
                 React.createElement("strong", { style: { color: "#94a3b8" } }, "Flowtime"),
                 ", n\u00E3o Pomodoro: trabalhe at\u00E9 sentir a queda real de foco, registre e pause proporcional ao bloco. Reentrada: antes de parar, deixe a pr\u00F3xima linha escrita (\"retomar em: ___\").")),
         weekFit && React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", background: "#2a1a0a", border: "1px solid #b45309", borderRadius: 10, padding: "8px 12px" } },
-            React.createElement("span", { style: { color: "#fbbf24", fontSize: 11, fontWeight: 800, lineHeight: 1.4 } }, "⚠️ Ritmo " + weekFit.pace + " não cabe nesta semana (" + weekFit.over + (weekFit.over === 1 ? " dia" : " dias") + " acima de " + STUDY_WARN_H + "h · " + weekFit.shifts + (weekFit.shifts === 1 ? " plantão" : " plantões") + ")." + (weekFit.sug != null ? " Sugestão: ritmo " + weekFit.sug + (weekFit.sugOver > WEEK_FIT_MAX_OVER ? " (ainda " + weekFit.sugOver + " dias acima de " + STUDY_WARN_H + "h — mova blocos)" : "") + "." : " Mesmo no ritmo 1: mova blocos.")),
+            weekFit.locked && weekFit.heavy && React.createElement("span", { style: { color: "#fbbf24", fontSize: 11, fontWeight: 800, lineHeight: 1.4 } }, "⚠️ Semana pesada: " + weekFit.over + (weekFit.over === 1 ? " dia" : " dias") + " acima de " + STUDY_WARN_H + "h · " + weekFit.shifts + (weekFit.shifts === 1 ? " plantão" : " plantões") + " (ritmo travado nesta fase: " + weekFit.pace + " fios). Mova blocos ou deixe um fio para a semana seguinte — o app não corta."),
+            weekFit.locked && weekFit.sim && weekFit.friH > STUDY_WARN_H && React.createElement("span", { style: { color: "#fbbf24", fontSize: 11, fontWeight: 700, lineHeight: 1.4, flexBasis: "100%" } }, "⚠️ Semana de simulado: a prova + correção (8h) e as etapas de fio na sexta somam " + fmtHrs(weekFit.friH) + " — considere deixar um fio para a semana seguinte ou mover as etapas da sexta (ritmo travado nesta fase: " + weekFit.pace + " fios)."),
+            !weekFit.locked && React.createElement("span", { style: { color: "#fbbf24", fontSize: 11, fontWeight: 800, lineHeight: 1.4 } }, "⚠️ " + (weekFit.nGroups >= 3 ? "Semana com " + weekFit.nGroups + " blocos (" + GROUP_LETTERS.slice(0, weekFit.nGroups).split("").join(", ") + " — " + weekFit.nGroups + " cascatas completas): ritmo " : "Ritmo ") + weekFit.pace + " não cabe nesta semana (" + weekFit.over + (weekFit.over === 1 ? " dia" : " dias") + " acima de " + STUDY_WARN_H + "h · " + weekFit.shifts + (weekFit.shifts === 1 ? " plantão" : " plantões") + ")." + (weekFit.sug != null ? " Sugestão: ritmo " + weekFit.sug + (weekFit.sugOver > WEEK_FIT_MAX_OVER ? " (ainda " + weekFit.sugOver + " dias acima de " + STUDY_WARN_H + "h — mova blocos)" : "") + "." : " Mesmo no ritmo 1: mova blocos.") + (weekFit.nGroups >= 3 ? " Os blocos da semana têm prioridade sobre o desatraso — o app não corta etapa de bloco." : "")),
             weekFit.sug != null && React.createElement("button", { onClick: () => __PACE_SAVE && __PACE_SAVE(weekFit.sug), style: { background: "#0f172a", border: "1px solid #b45309", borderRadius: 8, color: "#fbbf24", fontSize: 11, fontWeight: 700, padding: "5px 10px", cursor: "pointer" } }, "Aplicar ritmo " + weekFit.sug),
-            weekFit.sim && weekFit.noFit && React.createElement("div", { style: { flexBasis: "100%", display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" } },
+            !weekFit.locked && weekFit.sim && weekFit.noFit && React.createElement("div", { style: { flexBasis: "100%", display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" } },
                 React.createElement("span", { style: { color: "#fbbf24", fontSize: 11, fontWeight: 700, lineHeight: 1.4 } }, "⚠️ Semana de simulado: mesmo no ritmo 1 a carga excede. A prova + correção (8h) ocupam um dia-motor inteiro — considere pausar os fios nesta semana."),
                 weekFit.pace > 1 && weekFit.sug !== 1 && React.createElement("button", { onClick: () => __PACE_SAVE && __PACE_SAVE(1), style: { background: "#0f172a", border: "1px solid #b45309", borderRadius: 8, color: "#fbbf24", fontSize: 11, fontWeight: 700, padding: "5px 10px", cursor: "pointer" } }, "Aplicar ritmo 1"))),
+        coverageWarn.length > 0 && React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 4, background: "#2a1a0a", border: "1px solid #b45309", borderRadius: 10, padding: "8px 12px" } },
+            coverageWarn.map((w, i) => React.createElement("div", { key: i, style: { color: "#fbbf24", fontSize: 11, fontWeight: 800, lineHeight: 1.4 } }, w))),
         showFill && React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 8, background: "#0b1f33", border: "1px solid #1d4ed8", borderRadius: 10, padding: "8px 12px" } },
             React.createElement("span", { style: { color: "#93c5fd", fontSize: 11, fontWeight: 800, lineHeight: 1.4 } }, "🔄 Você adiantou " + freedWhat + ". Sobrou espaço em " + freedDays.join(", ") + ". Quer preencher?"),
             !fillView && React.createElement("div", { style: { display: "flex", gap: 8, flexWrap: "wrap" } },
@@ -1612,9 +1693,20 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, onSaveSchedule
                     fill && fill.kind !== 4 && React.createElement("button", { onClick: applyFill, style: { background: "#1e3a8a", border: "1px solid #3b82f6", borderRadius: 8, color: "#bfdbfe", fontSize: 11, fontWeight: 700, padding: "5px 10px", cursor: "pointer" } }, "Aplicar"),
                     React.createElement("button", { onClick: () => setFillView(false), style: { background: "#0f172a", border: "1px solid #334155", borderRadius: 8, color: "#94a3b8", fontSize: 11, fontWeight: 700, padding: "5px 10px", cursor: "pointer" } }, "Cancelar"),
                     React.createElement("button", { onClick: dismissFill, style: { background: "#0f172a", border: "1px solid #334155", borderRadius: 8, color: "#94a3b8", fontSize: 11, fontWeight: 700, padding: "5px 10px", cursor: "pointer" } }, "Manter como está")))),
+        showPin && React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 8, background: "#0b1f33", border: "1px solid #1d4ed8", borderRadius: 10, padding: "8px 12px" } },
+            React.createElement("span", { style: { color: "#93c5fd", fontSize: 11, fontWeight: 800, lineHeight: 1.4 } }, "📌 Você fixou " + modName(pinWait[0]) + ". Os fios desta semana já estão congelados — ele entra como 1º fio na próxima semana. Quer abri-lo já, como fio extra?"),
+            !fillView && React.createElement("div", { style: { display: "flex", gap: 8, flexWrap: "wrap" } },
+                React.createElement("button", { onClick: () => setFillView(true), style: { background: "#1e3a8a", border: "1px solid #3b82f6", borderRadius: 8, color: "#bfdbfe", fontSize: 11, fontWeight: 700, padding: "5px 10px", cursor: "pointer" } }, "Ver sugestão"),
+                React.createElement("button", { onClick: dismissFill, style: { background: "#0f172a", border: "1px solid #334155", borderRadius: 8, color: "#94a3b8", fontSize: 11, fontWeight: 700, padding: "5px 10px", cursor: "pointer" } }, "Deixar para a próxima semana")),
+            fillView && React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6 } },
+                React.createElement("span", { style: { color: "#e0f2fe", fontSize: 11, lineHeight: 1.45 } }, "💡 " + fillTextFull),
+                React.createElement("div", { style: { display: "flex", gap: 8, flexWrap: "wrap" } },
+                    fill && fill.kind !== 4 && React.createElement("button", { onClick: applyFill, style: { background: "#1e3a8a", border: "1px solid #3b82f6", borderRadius: 8, color: "#bfdbfe", fontSize: 11, fontWeight: 700, padding: "5px 10px", cursor: "pointer" } }, "Aplicar"),
+                    React.createElement("button", { onClick: () => setFillView(false), style: { background: "#0f172a", border: "1px solid #334155", borderRadius: 8, color: "#94a3b8", fontSize: 11, fontWeight: 700, padding: "5px 10px", cursor: "pointer" } }, "Cancelar"),
+                    React.createElement("button", { onClick: dismissFill, style: { background: "#0f172a", border: "1px solid #334155", borderRadius: 8, color: "#94a3b8", fontSize: 11, fontWeight: 700, padding: "5px 10px", cursor: "pointer" } }, "Deixar para a próxima semana")))),
         showLight && React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", background: isBreather ? "#2a200a" : "#0f2e1a", border: "1px solid " + (isBreather ? "#b45309" : "#14532d"), borderRadius: 10, padding: "8px 12px" } },
             React.createElement("span", { style: { color: isBreather ? "#fbbf24" : "#86efac", fontSize: 11, fontWeight: 800, whiteSpace: "nowrap" } }, isBreather ? "🌬️ Respiro:" : "🌿 Sem remédio:"),
-            React.createElement("select", { value: lightOv == null ? "auto" : String(lightOv), onChange: e => setLightOverride(e.target.value), title: "Dia sem Venvanse desta semana — Auto = menor carga entre os dias livres (sábado por padrão; nunca pós-noturno) · validar com a psiquiatra", style: { background: "#0f172a", border: "1px solid " + (isBreather ? "#b45309" : "#14532d"), borderRadius: 8, color: isBreather ? "#fbbf24" : "#86efac", fontSize: 11, fontWeight: 700, padding: "5px 8px", cursor: "pointer" } },
+            React.createElement("select", { value: lightOv == null ? "auto" : String(lightOv), onChange: e => setLightOverride(e.target.value), title: "Dia sem Venvanse desta semana — Auto = menor carga entre os dias livres, sem dia padrão (empate a ≤45min resolvido por: sem aula fixa · não véspera de plantão/segunda · menos elos · longe de plantão; nunca pós-noturno) · validar com a psiquiatra", style: { background: "#0f172a", border: "1px solid " + (isBreather ? "#b45309" : "#14532d"), borderRadius: 8, color: isBreather ? "#fbbf24" : "#86efac", fontSize: 11, fontWeight: 700, padding: "5px 8px", cursor: "pointer" } },
                 React.createElement("option", { value: "auto" }, "Auto · " + (lightAuto.idx != null ? DAY_LBL[lightAuto.idx] : "—")),
                 DAY_LBL.map((nm, i) => React.createElement("option", { key: i, value: String(i) }, nm))),
             lightDay.idx != null
@@ -1664,13 +1756,32 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, onSaveSchedule
                         " feitos"),
                     (() => { const hrs = dayLoadHours(list); const st = studyHours(list); const postN = (DATED_SHIFTS[addDaysISO(dayDate, -1)] || {}).kind === "noite"; const warnH = postN ? STUDY_WARN_POSTNIGHT_H : STUDY_WARN_H; return React.createElement(React.Fragment, null, hrs > DAY_CAP_H ? React.createElement("div", { style: { color: "#f87171", fontSize: 9, fontWeight: 800, marginTop: 3 } }, "⚠️ " + hrs.toFixed(1).replace(".", ",") + "h — acima do tempo hábil") : null, st > warnH ? React.createElement("div", { style: { color: "#f5c518", fontSize: 9, fontWeight: 800, marginTop: 3 } }, "📚 " + st.toFixed(1).replace(".", ",") + "h de estudo — acima de " + warnH + "h" + (postN ? " (pós-noturno: janela desperta menor)" : "") + ": se não der, mova blocos") : null); })())),
             React.createElement("div", { style: { background: "#0f172a", borderRadius: 8, padding: "10px 12px", marginBottom: 14 } },
-                React.createElement("div", { style: { color: "#64748b", fontSize: 10, marginBottom: 6 } }, "BLOCOS DESTA SEMANA"),
-                mods.length ? (React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6 } }, mods.map((m, i) => (React.createElement("div", { key: m.id, style: { display: "flex", gap: 8, alignItems: "baseline" } },
-                    React.createElement(Badge, { label: ["A", "B", "C", "D"][i] || "+", color: ["#C2410C", "#B45309", "#7E22CE", "#0F766E"][i] || "#475569" }),
+                React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, marginBottom: 6 } },
+                    React.createElement("div", { style: { color: "#64748b", fontSize: 10 } }, "BLOCOS DESTA SEMANA" + (groups.length > 2 ? " · " + groups.length + " grupos — cada um com cascata própria" : "")),
+                    React.createElement("button", { onClick: () => setGrpEdit(v => !v), title: "Ver os blocos da semana, definir quais são estudados juntos (mesma letra) e adicionar/editar um bloco quando a grade real do curso divergir da lista", style: { background: grpEdit ? "#f5c518" : "#1e293b", border: "1px solid " + (grpEdit ? "#f5c518" : "#334155"), borderRadius: 6, color: grpEdit ? "#0f172a" : "#94a3b8", fontSize: 10, fontWeight: 700, padding: "3px 8px", cursor: "pointer" } }, grpEdit ? "✓ Pronto" : "✎ Blocos e grupos")),
+                groups.length ? (React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6 } }, groups.map((g, gi) => g.map((m, mi) => (React.createElement("div", { key: m.id, "data-mod": m.code + " · " + m.title, style: { display: "flex", gap: 8, alignItems: "baseline" } },
+                    React.createElement(Badge, { label: GROUP_LETTERS[gi] + (g.length > 1 ? (mi === 0 ? " ×" + g.length : " ↳") : ""), color: GROUP_COLORS[gi] || "#475569" }),
                     React.createElement("span", { style: { color: "#cbd5e1", fontSize: 12 } },
                         React.createElement("strong", { style: { color: "#f1f5f9" } }, m.code),
                         " \u00B7 ",
-                        m.title)))))) : (React.createElement("div", { style: { color: "#94a3b8", fontSize: 12 } }, "Semana de recupera\u00E7\u00E3o \u2014 sem m\u00F3dulos novos. Use os blocos para desatraso e revis\u00E3o."))),
+                        m.title,
+                        m.custom ? " " : "",
+                        m.custom ? React.createElement("span", { style: { color: "#64748b", fontSize: 9 } }, "(adicionado por você)") : null))))))) : (React.createElement("div", { style: { color: "#94a3b8", fontSize: 12 } }, "Semana de recupera\u00E7\u00E3o \u2014 sem m\u00F3dulos novos. Use os blocos para desatraso e revis\u00E3o.")),
+                grpEdit && (() => { // editor (paciente, 24/09): agrupamento por semana (config.weekGroups), bloco novo/editado (config.customModules / moduleEdits). Nada é apagado.
+                    const letterOfMod = (id) => { const i = groups.findIndex(g => g.some(m => m.id === id)); return i >= 0 ? GROUP_LETTERS[i] : "A"; };
+                    const letters = GROUP_LETTERS.slice(0, Math.min(8, groups.length + 1)).split("");
+                    const saveGroups = (assign) => { const byL = {}; mods.forEach(m => { const L = assign[m.id] || letterOfMod(m.id); (byL[L] = byL[L] || []).push(m.id); }); const gs = GROUP_LETTERS.split("").map(L => byL[L]).filter(a => a && a.length); __CFG_SAVE && __CFG_SAVE({ weekGroups: { ...((config && config.weekGroups) || {}), [week]: gs } }); };
+                    const editMod = (m, patch) => { if (m.custom) __CFG_SAVE && __CFG_SAVE({ customModules: ((config && config.customModules) || []).map(x => Number(x.id) === m.id ? { ...x, ...patch } : x) }); else __CFG_SAVE && __CFG_SAVE({ moduleEdits: { ...((config && config.moduleEdits) || {}), [m.id]: { ...(((config && config.moduleEdits) || {})[m.id] || {}), ...patch } } }); };
+                    const addMod = () => { const code = newMod.code.trim().toUpperCase(), title = newMod.title.trim(); if (!code || !title) return; const cm = (config && config.customModules) || []; const id = Math.max(999, ...cm.map(x => Number(x.id) || 0), ...MODULES.map(x => x.id)) + 1; __CFG_SAVE && __CFG_SAVE({ customModules: cm.concat([{ id, week, code, title }]) }); setNewMod({ code: "", title: "" }); };
+                    const removeMod = (m) => { if (!m.custom) return; const pg = (reviews.progress || {})[m.id]; if (pg && Object.keys(pg).length) { window.alert("Este bloco já tem registro de progresso — nada é apagado. Se precisar, renomeie-o ou agrupe-o."); return; } if (!window.confirm("Remover o bloco " + m.code + " (adicionado por você, sem registros)?")) return; __CFG_SAVE && __CFG_SAVE({ customModules: ((config && config.customModules) || []).filter(x => Number(x.id) !== m.id) }); };
+                    return React.createElement("div", { style: { marginTop: 8, borderTop: "1px solid #1e293b", paddingTop: 8, display: "flex", flexDirection: "column", gap: 6 } },
+                        React.createElement("div", { style: { color: "#64748b", fontSize: 10, lineHeight: 1.5 } }, "Mesma letra = estudados JUNTOS como uma unidade (a cascata soma as questões e marca os dois); letra nova = grupo separado, com cascata própria. Toque no código ou no título para corrigir pela grade real do curso."),
+                        mods.map(m => React.createElement(ModEditRow, { key: m.id, m: m, letter: letterOfMod(m.id), letters: letters, color: GROUP_COLORS[GROUP_LETTERS.indexOf(letterOfMod(m.id))] || "#475569", onLetter: (L) => saveGroups({ [m.id]: L }), onEdit: (patch) => editMod(m, patch), onRemove: () => removeMod(m) })),
+                        React.createElement("div", { style: { display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" } },
+                            React.createElement("input", { value: newMod.code, onChange: e => setNewMod(n => ({ ...n, code: e.target.value })), placeholder: "CÓD (ex.: INF2)", style: { ...inputStyle, width: 96, padding: "4px 6px", fontSize: 11 } }),
+                            React.createElement("input", { value: newMod.title, onChange: e => setNewMod(n => ({ ...n, title: e.target.value })), placeholder: "Título do bloco que a grade real traz", style: { ...inputStyle, flex: 1, minWidth: 140, padding: "4px 6px", fontSize: 11 } }),
+                            React.createElement("button", { onClick: addMod, style: { background: "#166534", border: "1px solid #22c55e", borderRadius: 6, color: "#22c55e", fontSize: 11, fontWeight: 700, padding: "4px 10px", cursor: "pointer" } }, "+ Adicionar bloco")));
+                })()),
             React.createElement(EventNote, { value: events[dayDate], onCommit: (val) => onSaveEvents({ ...events, [dayDate]: val }) }),
             (activeIdx === 2 && dayDate >= AMB_START) && (() => {
                 const shiftFri = !!DATED_SHIFTS[dayDate]; // P8 (⚙️): sexta de plantão = sem simulado pela regra, mas o toque religa — o override manual sempre vence
@@ -1714,6 +1825,7 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, onSaveSchedule
                     onUpdateProgress && onUpdateProgress(next);
                 };
                 const isSimFix = activeIdx === 2 && /CORREÇÃO DO SIMULADO/.test(act.text); // T7: % do simulado (acompanhamento entre provas)
+                const isRevBlock = act.d === "REV" && /Revis(ão|ões) (adaptativa|D\+7|D\+30|espaçada)/i.test(act.text) && !/^Selar/.test(act.text); // bloco de revisão do dia: "Revisei" + % aqui mesmo (24/09)
                 const simRes = ((config && config.simResults) || {})[dayDate];
                 return (React.createElement("div", { key: act.id, style: { background: "#0f172a", borderRadius: 8,
                         borderLeft: "3px solid " + act.color, padding: "10px 12px",
@@ -1728,11 +1840,11 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, onSaveSchedule
                         React.createElement("div", { style: { flex: 1, minWidth: 0 } },
                             React.createElement("span", { style: { color: "#cbd5e1", fontSize: 12, lineHeight: 1.5,
                                     textDecoration: isDone ? "line-through" : "none" } }, act.text),
-                            mod && !isDesat && (React.createElement("div", { style: { color: "#7c8aa0", fontSize: 11, marginTop: 3 } },
+                            mod && !isDesat && groupMods(mod).map(mm => React.createElement("div", { key: mm.id, style: { color: "#7c8aa0", fontSize: 11, marginTop: 3 } },
                                 "↳ ",
-                                React.createElement("strong", { style: { color: "#94a3b8" } }, mod.code),
+                                React.createElement("strong", { style: { color: "#94a3b8" } }, mm.code),
                                 " · ",
-                                mod.title)),
+                                mm.title)),
                             mod && isDesat && (React.createElement("div", { style: { marginTop: 6 } },
                                 React.createElement("div", { style: { background: "#13212e", border: "1px solid #1f3a4d",
                                         borderRadius: 6, padding: "7px 9px" } },
@@ -1751,12 +1863,16 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, onSaveSchedule
                                         React.createElement("span", { style: { color: "#64748b" } }, act2.rest)))))),
                             mod === null && isDesat && (React.createElement("div", { style: { color: "#22c55e", fontSize: 11, marginTop: 3 } }, "🎉 Sem desatraso pendente — use o slot para reforço da semana atual.")),
                             tasks.length > 0 && React.createElement(TaskRow, { tasks: tasks, progress: pg, onUpdate: onUpdateProgress, showCode: tasks.length > 1 }),
+                            isRevBlock && (dayReviews.length
+                                ? React.createElement("div", { style: { marginTop: 6 } }, React.createElement(ReviewRows, { alerts: dayReviews, onDone: onReviewDone }))
+                                : React.createElement("div", { style: { color: "#475569", fontSize: 11, marginTop: 3 } }, "nenhuma revisão vencendo hoje")),
                             isSimFix && React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginTop: 6, flexWrap: "wrap" } },
                                 React.createElement("span", { style: { color: "#94a3b8", fontSize: 10 } }, "📈 % do simulado:"),
                                 React.createElement("input", { type: "number", min: 0, max: 100, inputMode: "numeric", placeholder: "%", value: simRes == null ? "" : simRes,
                                     onChange: (e) => { const v = e.target.value; const o = { ...((config && config.simResults) || {}) }; if (v === "") delete o[dayDate]; else o[dayDate] = Math.max(0, Math.min(100, Number(v))); __SIMRES_SAVE && __SIMRES_SAVE(o); },
                                     style: { width: 64, background: "#1e293b", border: "1px solid #334155", borderRadius: 6, color: "#f1f5f9", padding: "4px 8px", fontSize: 12 } }),
-                                React.createElement("span", { style: { color: "#475569", fontSize: 9 } }, "acompanhamento entre provas — não calibra o motor"))),
+                                React.createElement("span", { style: { color: "#475569", fontSize: 9 } }, "acompanhamento entre provas — não calibra o motor"),
+                                simSeriesText(config && config.simResults) && React.createElement("div", { style: { color: "#7dd3fc", fontSize: 10, lineHeight: 1.5, flexBasis: "100%" } }, "📈 Evolução: " + simSeriesText(config && config.simResults)))),
                         act.time && act.time !== "livre" && (React.createElement("span", { style: { color: "#475569", fontSize: 10, whiteSpace: "nowrap", marginTop: 2 } }, act.time))),
                     editMode && (React.createElement("div", { style: { display: "flex", gap: 6, marginTop: 10, flexWrap: "wrap", alignItems: "center" } },
                         React.createElement("button", { onClick: () => reorder(activeIdx, i, -1), disabled: i === 0, style: ctrlBtn(i === 0) }, "\u2191"),
@@ -1790,16 +1906,7 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, onSaveSchedule
                 React.createElement("div", { style: { color: "#94a3b8", fontSize: 11, marginBottom: 8 } },
                     "REVIS\u00D5ES ESPA\u00C7ADAS \u2014 ",
                     fmtBR(dayDate)),
-                dayReviews.length > 0 ? (React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6 } }, dayReviews.map(r => (React.createElement("div", { key: r.id + r.kind, style: { color: "#22c55e", fontSize: 12 } },
-                    "\uD83D\uDD01 ",
-                    r.kind,
-                    ": revisar Sem.",
-                    r.week,
-                    " \u2014 ",
-                    r.code,
-                    " (",
-                    r.title,
-                    ")"))))) : (React.createElement("div", { style: { color: "#475569", fontSize: 12, lineHeight: 1.5 } }, "Sem revis\u00F5es D+7/D+30 vencendo aqui. Ap\u00F3s aula/estudo, mantenha o D+1: 5 quest\u00F5es rel\u00E2mpago + reler palavras-chave antes de dormir.")))),
+                dayReviews.length > 0 ? React.createElement(ReviewRows, { alerts: dayReviews, onDone: onReviewDone }) : (React.createElement("div", { style: { color: "#475569", fontSize: 12, lineHeight: 1.5 } }, "Sem revis\u00F5es D+7/D+30 vencendo aqui. Ap\u00F3s aula/estudo, mantenha o D+1: 5 quest\u00F5es rel\u00E2mpago + reler palavras-chave antes de dormir.")))),
         React.createElement("div", { style: { background: "#1e293b", borderRadius: 12, padding: 16 } },
             React.createElement("div", { style: { color: "#94a3b8", fontSize: 11, marginBottom: 12 } }, "ACADEMIA — 1 treino em 6 dos 7 dias · sem treino no dia pós-noturno"),
             React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(7,1fr)", gap: 4 } }, (dayDate >= AMB_START
@@ -1829,10 +1936,21 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, onSaveSchedule
 }
 const inputStyle = { background: "#0f172a", border: "1px solid #334155", borderRadius: 6,
     color: "#f1f5f9", padding: "8px 10px", fontSize: 12, fontFamily: "inherit" };
+// Linha do editor de blocos da semana (paciente, 24/09): letra do grupo + código/título editáveis (commit no blur) + remover só bloco dela sem registros
+function ModEditRow({ m, letter, letters, color, onLetter, onEdit, onRemove }) {
+    const [code, setCode] = useState(m.code); const [title, setTitle] = useState(m.title);
+    useEffect(() => { setCode(m.code); setTitle(m.title); }, [m.code, m.title]);
+    const commit = () => { const c = code.trim().toUpperCase(), t = title.trim(); if ((c && c !== m.code) || (t && t !== m.title)) onEdit({ code: c || m.code, title: t || m.title }); };
+    return React.createElement("div", { style: { display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", background: "#1e293b", borderRadius: 8, padding: "6px 8px" } },
+        React.createElement("select", { value: letter, onChange: e => onLetter(e.target.value), title: "Grupo em que este bloco é estudado (mesma letra = estudados juntos)", style: { background: "#0f172a", border: "1px solid " + color, borderRadius: 6, color: color, fontSize: 11, fontWeight: 800, padding: "4px 6px", cursor: "pointer" } }, letters.map(L => React.createElement("option", { key: L, value: L }, L))),
+        React.createElement("input", { value: code, onChange: e => setCode(e.target.value), onBlur: commit, placeholder: "CÓD", style: { ...inputStyle, width: 64, padding: "4px 6px", fontSize: 11 } }),
+        React.createElement("input", { value: title, onChange: e => setTitle(e.target.value), onBlur: commit, placeholder: "Título do bloco", style: { ...inputStyle, flex: 1, minWidth: 140, padding: "4px 6px", fontSize: 11 } }),
+        m.custom && React.createElement("button", { onClick: onRemove, title: "Remover — só bloco adicionado por você e sem registros", style: { background: "#1e293b", border: "1px solid #7f1d1d", borderRadius: 6, color: "#f87171", fontSize: 11, padding: "3px 7px", cursor: "pointer" } }, "✕"));
+}
 const ctrlBtn = (disabled) => ({ background: "#1e293b", border: "1px solid #334155",
     borderRadius: 6, color: disabled ? "#334155" : "#94a3b8", fontSize: 13, padding: "4px 9px",
     cursor: disabled ? "default" : "pointer" });
-function ModuleTracker({ progress, onUpdate, effWeek, reviews }) {
+function ModuleTracker({ progress, onUpdate, effWeek, reviews, simResults }) {
     const [filter, setFilter] = useState("all");
     const [search, setSearch] = useState("");
     const prog = (id) => (progress === null || progress === void 0 ? void 0 : progress[id]) || {};
@@ -1842,8 +1960,8 @@ function ModuleTracker({ progress, onUpdate, effWeek, reviews }) {
     };
     const toggle = (id, field) => onUpdate(toggleProgressField(progress, id, field)); // T1: função única
     const overallPct = () => {
-        const total = MODULES.length * PROGRESS_FIELDS.length;
-        const done = MODULES.reduce((acc, m) => acc + PROGRESS_FIELDS.filter(f => prog(m.id)[f]).length, 0);
+        const total = ALL_MODS().length * PROGRESS_FIELDS.length;
+        const done = ALL_MODS().reduce((acc, m) => acc + PROGRESS_FIELDS.filter(f => prog(m.id)[f]).length, 0);
         return Math.round(done / total * 100);
     };
     const statusColor = (p) => p === 100 ? "#22c55e" : p > 0 ? "#f5c518" : "#334155";
@@ -1853,7 +1971,7 @@ function ModuleTracker({ progress, onUpdate, effWeek, reviews }) {
         (reviews || []).forEach(r => s.add(r.id));
         return s;
     }, [reviews]);
-    const filtered = MODULES.filter(m => {
+    const filtered = ALL_MODS().filter(m => {
         const matchSearch = m.title.toLowerCase().includes(search.toLowerCase()) ||
             m.code.toLowerCase().includes(search.toLowerCase());
         if (filter === "all")
@@ -1872,20 +1990,21 @@ function ModuleTracker({ progress, onUpdate, effWeek, reviews }) {
             return matchSearch && dueIds.has(m.id);
         return matchSearch;
     });
-    const doneCount = MODULES.filter(m => pct(m.id) === 100).length;
-    const inProgCount = MODULES.filter(m => pct(m.id) > 0 && pct(m.id) < 100).length;
+    const doneCount = ALL_MODS().filter(m => pct(m.id) === 100).length;
+    const inProgCount = ALL_MODS().filter(m => pct(m.id) > 0 && pct(m.id) < 100).length;
     return (React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 16 } },
         React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 10 } }, [
             { label: "Progresso geral", val: `${overallPct()}%`, color: "#f5c518" },
             { label: "Completos", val: doneCount, color: "#22c55e" },
             { label: "Em progresso", val: inProgCount, color: "#f5c518" },
-            { label: "Não iniciados", val: MODULES.length - doneCount - inProgCount, color: "#ef4444" },
+            { label: "Não iniciados", val: ALL_MODS().length - doneCount - inProgCount, color: "#ef4444" },
         ].map((s, i) => (React.createElement("div", { key: i, style: { background: "#1e293b", borderRadius: 10, padding: "14px 12px", textAlign: "center" } },
             React.createElement("div", { style: { color: s.color, fontSize: 22, fontWeight: 700 } }, s.val),
             React.createElement("div", { style: { color: "#64748b", fontSize: 10, marginTop: 2 } }, s.label))))),
         React.createElement("div", { style: { background: "#1e293b", borderRadius: 10, padding: "4px 4px" } },
             React.createElement("div", { style: { background: "#22c55e", borderRadius: 8, height: 8, width: `${overallPct()}%`,
                     transition: "width .5s", minWidth: overallPct() > 0 ? 4 : 0 } })),
+        simSeriesText(simResults) && React.createElement("div", { style: { background: "#101c33", border: "1px solid #1e3a5f", borderRadius: 10, padding: "8px 12px", color: "#7dd3fc", fontSize: 11, lineHeight: 1.5 } }, "📈 Simulados (% por sexta): " + simSeriesText(simResults) + " — acompanhamento clínico, não calibra o motor"),
         React.createElement("input", { value: search, onChange: e => setSearch(e.target.value), placeholder: "\uD83D\uDD0D Buscar m\u00F3dulo...", style: { background: "#1e293b", border: "1px solid #334155",
                 borderRadius: 8, color: "#f1f5f9", padding: "8px 12px", fontSize: 13 } }),
         React.createElement("div", { style: { display: "flex", gap: 6, flexWrap: "wrap" } }, [
@@ -1914,6 +2033,7 @@ function ModuleTracker({ progress, onUpdate, effWeek, reviews }) {
                                 React.createElement(Badge, { label: m.code, color: TAG_COLORS[m.code] || "#475569" }),
                                 React.createElement(Badge, { label: `Sem.${m.week}`, color: isCurrentWeek ? "#92400e" : isCatchup ? "#7f1d1d" : "#1e293b" }),
                                 isCurrentWeek && React.createElement(Badge, { label: "ATUAL", color: "#92400e" }),
+                                m.custom && React.createElement(Badge, { label: "ADICIONADO POR VOCÊ", color: "#475569" }),
                                 isCatchup && p < 100 && React.createElement(Badge, { label: "DESATRASO", color: "#7f1d1d" }),
                                 due && React.createElement(Badge, { label: "\uD83D\uDD01 REVISAR", color: "#15803d" })),
                             React.createElement("div", { style: { color: "#f1f5f9", fontSize: 13, lineHeight: 1.4 } }, m.title),
@@ -1941,7 +2061,7 @@ function ModuleTracker({ progress, onUpdate, effWeek, reviews }) {
                         PROGRESS_LABELS[f])))),
                     React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginTop: 6, flexWrap: "wrap" } },
                         React.createElement("button", { onClick: () => toggle(m.id, "aulaPresencial"), style: { background: pr.aulaPresencial ? "#166534" : "#0f172a", border: "1px solid " + (pr.aulaPresencial ? "#22c55e" : "#334155"), borderRadius: 6, color: pr.aulaPresencial ? "#22c55e" : "#64748b", padding: "4px 8px", fontSize: 10, fontWeight: 600, cursor: "pointer" } }, (pr.aulaPresencial ? "✓ " : "") + PROGRESS_LABELS.aulaPresencial),
-                        React.createElement("span", { style: { color: "#475569", fontSize: 9 } }, "registro complementar — não conta nos 4 checks")),
+                        React.createElement("span", { style: { color: pr.aulaPresencialAt ? "#94a3b8" : "#475569", fontSize: 9 } }, (pr.aulaPresencialAt ? "presencial assistida em " + fmtBR(pr.aulaPresencialAt) + " · " : "") + "registro complementar — não conta nos 4 checks")),
                     React.createElement(PctBlock, { pr: pr, id: m.id, progress: progress, onUpdate: onUpdate })));
             }),
             filtered.length === 0 && (React.createElement("div", { style: { color: "#475569", textAlign: "center", padding: 40 } }, "Nenhum m\u00F3dulo encontrado.")))));
@@ -1985,9 +2105,9 @@ function PlanejadorSemana({ progress, onUpdate, effWeek, config, onSaveConfig })
     const queue = catchupQueue(progress, effWeek);
     const phNow = weekPhase(config.startDate, effWeek);
     const nFio = fiosWanted(phNow, pace);
-    const targets0 = (phNow === "AMB" ? effectiveTargets(queue, nFio) : weekFioIds(config, progress, effWeek, config.startDate, nFio).map(id => queue.find(m => m.id === id) || MODULES.find(m => m.id === id))).filter(Boolean).slice(0, nFio);
+    const targets0 = (phNow === "AMB" ? effectiveTargets(queue, nFio) : weekFioIds(config, progress, effWeek, config.startDate, nFio).map(id => queue.find(m => m.id === id) || ALL_MODS().find(m => m.id === id))).filter(Boolean).slice(0, nFio);
     const exWP = (config.fioExtra || {})[weekDayISO(config.startDate, effWeek, 0)] || []; // fios abertos pela sugestão entram no planejador (sinalização 3)
-    const targets = targets0.concat(exWP.map(e => queue.find(x => x.id === e.id) || MODULES.find(x => x.id === e.id)).filter(m => m && !targets0.some(t => t.id === m.id)));
+    const targets = targets0.concat(exWP.map(e => queue.find(x => x.id === e.id) || ALL_MODS().find(x => x.id === e.id)).filter(m => m && !targets0.some(t => t.id === m.id)));
     const proj = projectedZeroISO(progress);
     const projW = rawWeekOf(proj);
     const zerado = proj <= todayISO();
@@ -2058,9 +2178,9 @@ function CatchUp({ progress, onUpdate, effWeek, config, onSaveConfig }) {
     const queue = catchupQueue(progress, effWeek);
     const phNow = weekPhase(config.startDate, effWeek);
     const targets = phNow === "AMB" ? effectiveTargets(queue, pace)
-        : weekFioIds(config, progress, effWeek, config.startDate, fiosWanted(phNow, pace)).map(id => queue.find(m => m.id === id) || MODULES.find(m => m.id === id)).filter(Boolean); // fios congelados da semana (snapshot)
+        : weekFioIds(config, progress, effWeek, config.startDate, fiosWanted(phNow, pace)).map(id => queue.find(m => m.id === id) || ALL_MODS().find(m => m.id === id)).filter(Boolean); // fios congelados da semana (snapshot)
     const exW = (config.fioExtra || {})[weekDayISO(config.startDate, effWeek, 0)] || []; // sinalização 3 (🧩): fio aberto pela sugestão é matéria da semana — é aqui que ela marca o %
-    const targetsAll = targets.concat(exW.map(e => { const m = queue.find(x => x.id === e.id) || MODULES.find(x => x.id === e.id); return m && !targets.some(t => t.id === m.id) ? { ...m, _slot: "FIO " + e.label + " · sugestão" } : null; }).filter(Boolean));
+    const targetsAll = targets.concat(exW.map(e => { const m = queue.find(x => x.id === e.id) || ALL_MODS().find(x => x.id === e.id); return m && !targets.some(t => t.id === m.id) ? { ...m, _slot: "FIO " + e.label + " · sugestão" } : null; }).filter(Boolean));
     const pins = Array.isArray(config.catchupPins) ? config.catchupPins : [];
     const togglePin = (id) => {
         const next = pins.indexOf(id) >= 0 ? pins.filter(x => x !== id) : pins.concat([id]);
@@ -2144,7 +2264,7 @@ function CatchUp({ progress, onUpdate, effWeek, config, onSaveConfig }) {
                 ["4", "Especialidades intercaladas", "Os alvos da semana caem nos slots da fase atual (etiquetas na fila) e em áreas diferentes — prática distribuída."],
                 ["5", "Semana atual é intocável", "Desatraso em FIO de 3 toques: aula → questões → apostila, espalhados na semana (etiquetas na fila mostram os dias da fase). Nunca rouba o D1 nem o D2 da semana nova."],
                 ["6", "Ferramentas de foco", "Forest/Flora ligado em TODO bloco de estudo. Body double (FocusMate ou colega) nos blocos que você mais adia — presença alheia vira accountability imediata, ouro para TDAH."],
-                ["7", "Trocar ou acrescentar o fio", "O padrão segue automático (recência 1º). Toque 📌 em qualquer módulo da fila para FIXÁ-LO: ele assume o 1º slot da semana e o sugerido desliza para o próximo. Fixe 2 para controlar os dois slots; toque de novo para soltar e voltar ao automático."],
+                ["7", "Trocar ou acrescentar o fio", "O padrão segue automático (recência 1º). Toque 📌 em qualquer módulo da fila para FIXÁ-LO: ele assume o 1º slot A PARTIR DA PRÓXIMA SEMANA (os fios da semana corrente ficam congelados — previsibilidade). Para trazê-lo já, use a sugestão de redistribuição no Cronograma: quando há um fixado esperando, o app pergunta se quer abri-lo como fio extra e mostra a carga de cada dia. Fixe 2 para controlar os dois primeiros slots; toque de novo para soltar e voltar ao automático."],
                 ["8", "Aprender > zerar", "Fio fechado entra no MESMO motor de revisões adaptativas (D+7/D+30 pelo seu %) da semana atual. Desatraso não é riscar item — é semear memória: aula → questões espaçadas → apostila dos erros → Anki → revisões."],
             ].map(([n, t, d]) => (React.createElement("div", { key: n, style: { display: "flex", gap: 10 } },
                 React.createElement("span", { style: { color: "#0ea5a0", fontSize: 13, fontWeight: 800, minWidth: 14 } }, n),
@@ -2392,7 +2512,9 @@ function App() {
         return config.manualWeek != null ? config.manualWeek : computeWeek(config.startDate, todayISO());
     }, [config]);
     const isManual = (config === null || config === void 0 ? void 0 : config.manualWeek) != null;
-    const reviews = useMemo(() => computeReviews(progress), [progress]);
+    setModuleCfg(config); // módulos adicionados/editados pela paciente antes de qualquer cálculo (fila, projeção, revisões)
+    const reviews = useMemo(() => computeReviews(progress), [progress, config]);
+    setStartCfg(config && config.startDate);
     setPaceCfg((todayISO() >= CATCHUP_START && todayISO() < FREE_START) ? 2 : (config && config.catchupPace)); // ritmo primeiro: a projeção (e o horizonte) dependem dele · P7: CATCHUP = 2
     setDynTW(progress); // horizonte dinâmico: acompanha a projeção de zeramento
     setCatchupPins(config && config.catchupPins);
@@ -2401,6 +2523,7 @@ function App() {
     __PACE_SAVE = (p) => saveConfig(applyPace(config, p));
     __SIMRES_SAVE = (o) => saveConfig({ ...config, simResults: o });
     __FILL_SAVE = (p) => saveConfig({ ...config, ...p });
+    __CFG_SAVE = (p) => saveConfig({ ...config, ...p });
     // Congela os fios da semana CORRENTE (pela data real) em config.fioWeek[isoDaQuarta] na 1ª renderização — G2/POST, CATCHUP e FREE (P1/P2: ⚙️ + 🧩):
     // selagens e cascata cruzada referenciam a semana passada, que não pode deslizar quando um módulo é concluído. Se o ritmo subir no meio da
     // semana, completa o snapshot (nunca reordena o que já foi gravado).
@@ -2559,8 +2682,8 @@ function App() {
                             width: `${Math.round(effWeek / dynTW() * 100)}%` } })))),
         React.createElement("div", { style: { padding: "16px 16px 100px" } },
             (tab === "schedule" || tab === "modules" || tab === "catchup") && (React.createElement(ReviewAlerts, { alerts: reviews, onDone: markReviewDone })),
-            tab === "schedule" && (React.createElement(Schedule, { config: config, effWeek: effWeek, scheduleOv: scheduleOv, events: events, reviews: { progress }, onSaveSchedule: saveSchedule, onSaveEvents: saveEvents, onUpdateProgress: saveProgress })),
-            tab === "modules" && (React.createElement(ModuleTracker, { progress: progress, onUpdate: saveProgress, effWeek: effWeek, reviews: reviews })),
+            tab === "schedule" && (React.createElement(Schedule, { config: config, effWeek: effWeek, scheduleOv: scheduleOv, events: events, reviews: { progress }, onSaveSchedule: saveSchedule, onSaveEvents: saveEvents, onUpdateProgress: saveProgress, onReviewDone: markReviewDone })),
+            tab === "modules" && (React.createElement(ModuleTracker, { progress: progress, onUpdate: saveProgress, effWeek: effWeek, reviews: reviews, simResults: config.simResults })),
             tab === "catchup" && (React.createElement(React.Fragment, null, React.createElement(PlanejadorSemana, { progress: progress, onUpdate: saveProgress, effWeek: effWeek, config: config, onSaveConfig: saveConfig }), React.createElement(CatchUp, { progress: progress, onUpdate: saveProgress, effWeek: effWeek, config: config, onSaveConfig: saveConfig }))),
             tab === "dopamine" && React.createElement(DopamineMenu, { data: dopeData, onSave: saveDope }),
             tab === "sleep" && React.createElement(React.Fragment, null, React.createElement(SleepTracker, { data: sleepData, onSave: saveSleep }), React.createElement(BackupCard, null))),
