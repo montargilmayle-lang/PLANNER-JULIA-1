@@ -1181,6 +1181,7 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, onSaveSchedule
     const letterOf = (L) => groupAt(groups, L), prevLetterOf = (L) => groupAt(prevGroups, L);
     const blockA = letterOf("A"), blockB = letterOf("B");
     const [grpEdit, setGrpEdit] = useState(false);
+    const [moveAsk, setMoveAsk] = useState(null); // diálogo de movimento (carga + espaçamento) — decisão da paciente, 24/09
     const [newMod, setNewMod] = useState({ code: "", title: "" });
     // Trilha B (desatraso): alvos da semana, intercalando especialidades.
     const queue = catchupQueue(reviews.progress, effWeek);
@@ -1335,13 +1336,13 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, onSaveSchedule
     // Semanas seguintes (decisão da paciente, 24/09 — o limiar informa, nunca veta): a proposta mostra a carga de cada dia onde cai, até 3 semanas à frente
     const fioPlanAll = (config && config.fioPlan) || {}, fioExtraAll = (config && config.fioExtra) || {};
     const wedAt = (k) => weekDayISO(startISO, week + k, 0);
-    const idsAt = (k) => k <= 0 ? wkIds : weekFioIds(config, reviews.progress, week + k, startISO, fiosWanted(weekPhase(startISO, week + k), paceCfg)); // semana futura sem snapshot: só o tamanho importa (cascata cruzada)
+    const idsAt = (k) => k === 0 ? wkIds : k === -1 ? prevIds : k < -1 ? weekFioIds(config, reviews.progress, week + k, startISO) : weekFioIds(config, reviews.progress, week + k, startISO, fiosWanted(weekPhase(startISO, week + k), paceCfg)); // semana futura sem snapshot: só o tamanho importa (cascata cruzada); semanas passadas: snapshot delas
     const ctxAt = (k) => { const ids = idsAt(k - 1); return { week: week + k, wkPh: weekPhase(startISO, week + k), prevPh: weekPhase(startISO, week + k - 1), prevIds: ids, plan: fioPlanAll[wedAt(k)] || {}, prevPlan: fioPlanAll[wedAt(k - 1)] || {}, extras: fioExtraAll[wedAt(k)] || [], prevExtras: fioExtraAll[wedAt(k - 1)] || [], prev2Extras: fioExtraAll[wedAt(k - 2)] || [], prev3Extras: fioExtraAll[wedAt(k - 3)] || [], prevIdsFor: () => ids, cur: false }; };
     const dateFor = (dayIdx) => weekDayISO(startISO, week, dayIdx);
     const listFor = (dayIdx) => { var _a; return (_a = scheduleOv[dateFor(dayIdx)]) !== null && _a !== void 0 ? _a : genActivities(dayIdx); };
     const isCustom = (dayIdx) => !!scheduleOv[dateFor(dayIdx)];
     const isoAt = (d) => addDaysISO(dateFor(0), d); // dia absoluto d: 0–6 esta semana, 7–27 até 3 semanas à frente
-    const listAt = (d) => { if (d < 0 || d > 27) return null; if (d <= 6) return listFor(d); const k = Math.floor(d / 7); return scheduleOv[isoAt(d)] || genForCtx(ctxAt(k), d % 7, null, true); }; // lista do dia (editada à mão ou gerada)
+    const listAt = (d) => { if (d < -7 || d > 27) return null; if (d < 0) return scheduleOv[isoAt(d)] || genForCtx(ctxAt(-1), d + 7, null, true); if (d <= 6) return listFor(d); const k = Math.floor(d / 7); return scheduleOv[isoAt(d)] || genForCtx(ctxAt(k), d % 7, null, true); }; // lista do dia (editada à mão ou gerada); −7…−1 = semana passada (espaçamento)
     const loadMemo = {};
     const loadAt = (d) => { if (!(d in loadMemo)) { const l = listAt(d); loadMemo[d] = l ? { study: studyHours(l), total: dayLoadHours(l) } : null; } return loadMemo[d]; }; // carga do dia (estudo / total); null além de 3 semanas
     const saveList = (dayIdx, list) => onSaveSchedule({ ...scheduleOv, [dateFor(dayIdx)]: list });
@@ -1360,12 +1361,14 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, onSaveSchedule
             return;
         const act = listFor(fromIdx)[idx];
         const destHrs = dayLoadHours(listFor(toIdx)) + actHours(act);
-        if (destHrs > DAY_CAP_H) {
-            const keep = window.confirm("⚠️ " + (WEEKDAY_ABBR[toIdx] || "O dia") + " ficaria com ~" + destHrs.toFixed(1).replace(".", ",") + "h de atividades — acima do tempo hábil (~" + DAY_CAP_H + "h). Nada será apagado nem trocado. Manter TUDO nesse dia mesmo assim?");
-            if (!keep)
-                return; // cancela apenas o movimento
+        const capMsg = destHrs > DAY_CAP_H ? "⚠️ " + (DAY_LBL[toIdx] || "O dia") + " ficaria com ~" + destHrs.toFixed(1).replace(".", ",") + "h de atividades — acima do tempo hábil (~" + String(DAY_CAP_H).replace(".", ",") + "h). Nada será apagado nem trocado." : "";
+        const an = analyzeMove(act, fromIdx, idx, toIdx); // bloco ligado a módulo: intervalos na posição nova (decisão 38/40, 24/09)
+        if (!an) { // bloco sem módulo (Anki, PLAN, academia, lazer, plantão): como antes — só a checagem de carga
+            if (capMsg && !window.confirm(capMsg + " Manter TUDO nesse dia mesmo assim?")) return; // cancela apenas o movimento
+            __moveActCore(fromIdx, idx, toIdx); return;
         }
-        __moveActCore(fromIdx, idx, toIdx);
+        if (!an.issues.length && !capMsg) { __moveActCore(fromIdx, idx, toIdx); return; } // espaçamento mantido ou melhorado e carga ok: move sem avisar
+        setMoveAsk({ fromIdx, idx, toIdx, act, capMsg, ...an, view: false });
     };
     const __moveActCore = (fromIdx, idx, toIdx) => {
         if (toIdx === fromIdx)
@@ -1391,32 +1394,39 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, onSaveSchedule
         delete next[dateFor(dayIdx)];
         onSaveSchedule(next);
     };
-    const resolveBlock = (text) => {
+    // ── QUADRO DE SEMANA (24/09 — aviso de espaçamento): um bloco de outra semana (k = −1, +1, +2) resolve com os fios/grupos DAQUELA semana ──
+    const exAt = (k) => fioExtraAll[wedAt(k)] || [];
+    const groupsAt = (k) => k === 0 ? groups : k === -1 ? prevGroups : weekGroupsFor(config, week + k);
+    const frameMemo = {};
+    const frameAt = (k) => { if (!(k in frameMemo)) frameMemo[k] = k === 0 ? { k: 0, wkIds, prevIds, extras, prevExtras, prev2Extras, prev3Extras, groups, prevGroups, amb: wkPh === "AMB" } : { k, wkIds: idsAt(k), prevIds: idsAt(k - 1), extras: exAt(k), prevExtras: exAt(k - 1), prev2Extras: exAt(k - 2), prev3Extras: exAt(k - 3), groups: groupsAt(k), prevGroups: groupsAt(k - 1), amb: weekPhase(startISO, week + k) === "AMB" }; return frameMemo[k]; };
+    const resolveBlockIn = (text, F) => {
         if (/^📌/.test(text)) return null; // bloco-nota (seed histórico de 25/06, anotações dela): sem módulo, sem tarefa (24/09)
-        const sb = text.match(/^Selar Bloco ([A-H]) da semana passada/); if (sb) return prevLetterOf(sb[1]);
-        const pb = text.match(/\bBloco ([A-H]) da semana passada/); if (pb) return prevLetterOf(pb[1]); // banco B pós-simulado (QUI) e banco de C+ (SEX', +5d)
+        const sb = text.match(/^Selar Bloco ([A-H]) da semana passada/); if (sb) return groupAt(F.prevGroups, sb[1]);
+        const pb = text.match(/\bBloco ([A-H]) da semana passada/); if (pb) return groupAt(F.prevGroups, pb[1]); // banco B pós-simulado (QUI) e banco de C+ (SEX', +5d)
         const r = blockRef(text);
         if (r && r !== "DESAT")
-            return letterOf(r); // grupo A/B/C… desta semana (módulo único ou grupo de N módulos)
+            return groupAt(F.groups, r); // grupo A/B/C… da semana do quadro (módulo único ou grupo de N módulos)
         if (r === "DESAT") {
             const fm = text.match(/Fio (\d+|[AB])( \(sem\. passada\)| \(há [23] sem\.\))?/);
-            if (fm && wkPh !== "AMB") { // G2/POST/CATCHUP/FREE: fios congelados por semana (config.fioWeek); "(sem. passada)" = semana anterior; "(há 2/3 sem.)" = só fio extra de 2/3 semanas atrás; A/B = 1º/2º; além do ritmo = fio extra (sugestão aceita)
+            if (fm && !F.amb) { // G2/POST/CATCHUP/FREE: fios congelados por semana (config.fioWeek); "(sem. passada)" = semana anterior; "(há 2/3 sem.)" = só fio extra de 2/3 semanas atrás; A/B = 1º/2º; além do ritmo = fio extra (sugestão aceita)
                 const k = /\d/.test(fm[1]) ? Number(fm[1]) : (fm[1] === "A" ? 1 : 2);
-                if (fm[2] && /há \d/.test(fm[2])) { const e2 = (/há 3/.test(fm[2]) ? prev3Extras : prev2Extras).find(e => e.label === k); return e2 ? modOfId(e2.id) : null; }
-                const ids = fm[2] ? prevIds : wkIds, ex = fm[2] ? prevExtras : extras;
+                if (fm[2] && /há \d/.test(fm[2])) { const e2 = (/há 3/.test(fm[2]) ? F.prev3Extras : F.prev2Extras).find(e => e.label === k); return e2 ? modOfId(e2.id) : null; }
+                const ids = fm[2] ? F.prevIds : F.wkIds, ex = fm[2] ? F.prevExtras : F.extras;
                 const id = k <= ids.length ? ids[k - 1] : ((ex.find(e => e.label === k) || {}).id);
                 return id == null ? null : modOfId(id);
             }
+            if (F.k !== 0) return null; // templates históricos (antigo/AMB) só na semana visível
             if (fm)
                 return targets[Number(fm[1]) - 1] || null;
             return /2º bloco antigo/.test(text) ? (targets[1] || targets[0] || null) : catchupForDay(activeIdx);
         }
         const fa = text.match(/Selar o Fio ([AB]) da semana passada/); // CATCHUP: selagem do fio da semana passada mostra o módulo selado
-        if (fa) { const id = prevIds[fa[1] === "A" ? 0 : 1]; return id == null ? null : modOfId(id); }
+        if (fa) { const id = F.prevIds[fa[1] === "A" ? 0 : 1]; return id == null ? null : modOfId(id); }
         return null;
     };
+    const resolveBlock = (text) => resolveBlockIn(text, frameAt(0));
     // T1 (🧩 + ⚙️): tarefas marcáveis de um bloco → [{ mod, field }]. Etapas de execução sem registro (D1, D+1, D5/D6, REV, D7) devolvem [] (✓ manual do dia).
-    const blockTasks = (text, mod) => {
+    const blockTasksIn = (text, mod, F) => {
         const t = text;
         if (/^Resumo rápido|^📌/.test(t)) return []; // bloco-nota (📌 …) nunca é etapa (24/09)
         const sbt = t.match(/^Selar Bloco ([A-H]) da semana passada/); if (sbt) return groupMods(mod).map(m => ({ mod: m, field: "smartcard", tag: sbt[1] })); // selagem de A/B/C na QUA de manhã, blocos separados (24/09); grupo → todos os módulos
@@ -1428,14 +1438,14 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, onSaveSchedule
             if (/toque 3/.test(t)) return [{ mod, field: "apostila" }];
             return [];
         }
-        const allWeek = groups.reduce((a, g, i) => a.concat(g.map(m => ({ mod: m, tag: GROUP_LETTERS[i] }))), []); // todos os blocos da semana (a presencial cobre A, B, C…)
+        const allWeek = F.groups.reduce((a, g, i) => a.concat(g.map(m => ({ mod: m, tag: GROUP_LETTERS[i] }))), []); // todos os blocos da semana (a presencial cobre A, B, C…)
         const both = allWeek.filter(x => x.tag === "A" || x.tag === "B"); // blocos combinados A+B do template AMB
         if (/AULA PRESENCIAL de ontem/.test(t)) return allWeek.map(x => ({ mod: x.mod, field: "aula", tag: x.tag })); // 08/10: a gravada substitui a 1.5x da semana → marca `aula` de todos os blocos
         if (/Aula presencial/i.test(t)) return allWeek.map(x => ({ mod: x.mod, field: "aulaPresencial", tag: x.tag })); // BUG 1: a presencial de quarta marca o registro complementar, não a 1.5x
         if (/Apostila direcionada pelos erros \(A e B\)/.test(t)) return both.map(x => ({ mod: x.mod, field: "apostila", tag: x.tag }));
         if (/D2 completo/.test(t)) return both.map(x => ({ mod: x.mod, field: "questoesD2", tag: x.tag }));
         if (/D2 compacto/.test(t)) return both.filter(x => x.tag === "B").map(x => ({ mod: x.mod, field: "aula", tag: "B" })).concat(both.map(x => ({ mod: x.mod, field: "questoesD2", tag: x.tag }))); // AMB, semana de simulado: "aula online B antes + 20q A + 20q B" — a aula do B se registra aqui (cobertura, 24/09)
-        const ref = blockRef(t); const g = ref && ref !== "DESAT" ? letterOf(ref) : null;
+        const ref = blockRef(t); const g = ref && ref !== "DESAT" ? groupAt(F.groups, ref) : null;
         if (!g) return [];
         const out = [];
         groupMods(g).forEach(m => { // grupo com N módulos: a etapa marca todos (etiqueta = letra do grupo)
@@ -1445,6 +1455,7 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, onSaveSchedule
         });
         return out;
     };
+    const blockTasks = (text, mod) => blockTasksIn(text, mod, frameAt(0));
     const isBlockDone = (a) => { const tk = blockTasks(a.text, resolveBlock(a.text)); const pg = reviews.progress || {}; return tk.length ? tk.every(t => !!((pg[t.mod.id] || {})[t.field])) : !!a.done; }; // T2: bloco com módulo reflete o card
     // ── DIA SEM VENVANSE: domingo é SEMPRE dia de estudo; o dia sem remédio varia pela demanda da semana ──
     // Candidatos: os 7 dias da semana visível, menos a quarta enquanto houver presencial (até 24/11), os dias com
@@ -1625,6 +1636,115 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, onSaveSchedule
         setFillView(false);
     };
     const dismissFill = () => { __FILL_SAVE && __FILL_SAVE({ fillDismissed: { ...((config && config.fillDismissed) || {}), [showPin ? dateFor(0) + "|pin" : dateFor(0)]: showPin ? pinSig : freedSig } }); setFillView(false); };
+    // ── AVISO DE ESPAÇAMENTO AO MOVER (paciente, 24/09 — decisão 38: a distribuição é pedagógica, não por horas) ──
+    // Ao mover um bloco ligado a módulo, os intervalos DAQUELE módulo são recalculados na posição nova e comparados com a faixa vigente (decisão 40):
+    // (a) nunca duas etapas do mesmo módulo no mesmo dia · (b) questões→apostila ~1d · (c) apostila→banco e apostila→selagem ~3d · (d) aula→questões 1–2d.
+    // Avisa sem bloquear, no mesmo diálogo da carga; oferece reorganizar só as etapas ainda não feitas e não vividas do módulo (mesma proposta/confirmação da
+    // redistribuição avisada: pós-noturno nunca recebe, dia leve por último com aviso, ⚠️ à vista). Faixas aceitas = as já registradas (§16 40: Fio 1 a→q 2d, sim B s +2d, C banco +5d).
+    const STAGE_OF_FIELD = { aula: "aula", questoesD2: "quest", apostila: "apost", smartcard: "seal" };
+    const NOM = { aula: "a aula", quest: "as questões", apost: "a apostila", banco: "o banco", seal: "a selagem" };
+    const OF = { aula: "da aula", quest: "das questões", apost: "da apostila", banco: "do banco", seal: "da selagem" };
+    const BARE = { aula: "aula", quest: "questões", apost: "apostila", banco: "banco", seal: "selagem" };
+    const STAGE_HRS = { aula: 1.7, quest: 2, apost: 1.5, banco: 2, seal: 40 / 60 };
+    const CHAIN = ["aula", "quest", "apost", "banco", "seal"];
+    const RANGES = (abc) => ({ aq: [abc ? 0 : 1, 2], qp: [1, 2], pb: [2, 5], ps: [2, 5] }); // A/B/C: aula online → D2 no mesmo dia é a exceção justificada
+    const IDEAL = { aq: "1 a 2 dias", qp: "~1 dia", pb: "~3 dias", ps: "~3 dias" };
+    const PAIRS = [["aula", "quest", "aq"], ["quest", "apost", "qp"], ["apost", "banco", "pb"], ["apost", "seal", "ps"]];
+    const isAbcBlock = (t) => { const r = blockRef(t); return !!r && r !== "DESAT"; };
+    const stagesOf = (a, k) => { // etapas de módulo que um bloco representa: [{ mod, stage, field }]
+        if (!a || /^📌/.test(a.text)) return [];
+        const F = frameAt(k); const mod = resolveBlockIn(a.text, F); if (!mod) return [];
+        const out = []; blockTasksIn(a.text, mod, F).forEach(t => { const st = STAGE_OF_FIELD[t.field]; if (st) out.push({ mod: t.mod, stage: st, field: t.field }); });
+        if (!out.length && (a.d === "D5" || a.d === "D6") && /questões por conteúdo/i.test(a.text)) groupMods(mod).forEach(m => out.push({ mod: m, stage: "banco", field: null }));
+        return out;
+    };
+    const pastAbs = isCurWeek ? todayIdxW : (dateFor(0) < todayI ? 99 : -99); // dias "vividos" (inclusive hoje): d ≤ pastAbs
+    const familyOf = (a, k) => { // a cadeia de um bloco: o próprio fio (rótulo + semana do slot) ou a cascata A/B/C (letra + semana) — um módulo pode ter as duas (Bloco A da semana passada e Fio 1 desta)
+        const t = a.text; const fm = t.match(/^(?:Semana de simulado · )?(?:Selar (?:o )?)?Fio (\d+|[AB])( \(sem\. passada\)| \(há ([23]) sem\.\)| da semana passada)?/);
+        if (fm && !isAbcBlock(t)) { const ago = fm[2] ? (fm[3] ? Number(fm[3]) : 1) : 0; return "fio:" + wedAt(k - ago) + ":" + fm[1]; }
+        const pb = t.match(/\bBloco ([A-H]) da semana passada/); if (pb) return "abc:" + wedAt(k - 1) + ":" + pb[1];
+        const r = blockRef(t); if (r && r !== "DESAT") return "abc:" + wedAt(k) + ":" + r;
+        return "outro";
+    };
+    const stageMapFor = (modId, lists, fam) => { // stage → [{ d, a, done, past, abc }] nos dias −7…20 (semana passada, esta e as duas seguintes), só a cadeia `fam`
+        const pg = reviews.progress || {}; const map = {};
+        for (let d = -7; d <= 20; d++) { const l = lists(d); if (!l) continue; const k = Math.floor(d / 7);
+            l.forEach(a => { if (fam && familyOf(a, k) !== fam) return; stagesOf(a, k).forEach(sg => { if (sg.mod.id !== modId) return; (map[sg.stage] = map[sg.stage] || []).push({ d, a, done: sg.field ? !!((pg[modId] || {})[sg.field]) : false, past: d <= pastAbs, abc: isAbcBlock(a.text) }); }); }); }
+        return map;
+    };
+    const dayOfStage = (map, st) => map[st] && map[st].length ? Math.min(...map[st].map(x => x.d)) : null;
+    const spacingIssues = (map, abc, involved) => { // violações da faixa que envolvem as etapas em `involved` — ordem de prioridade da decisão 40
+        const D = {}; CHAIN.forEach(st => { D[st] = dayOfStage(map, st); }); const R = RANGES(abc); const out = []; const inv = (st) => involved.indexOf(st) >= 0;
+        for (let i = 0; i < CHAIN.length; i++) for (let j = i + 1; j < CHAIN.length; j++) { const x = CHAIN[i], y = CHAIN[j]; if (D[x] == null || D[y] == null || D[x] !== D[y]) continue; if (abc && x === "aula" && y === "quest") continue; if (!inv(x) && !inv(y)) continue; out.push({ prio: 0, key: x + "=" + y, x, y, same: true, gap: 0, text: inv(y) ? NOM[y] + " no mesmo dia " + OF[x] : NOM[x] + " no mesmo dia " + OF[y] }); }
+        PAIRS.forEach(([x, y, key]) => { if (D[x] == null || D[y] == null || !(inv(x) || inv(y))) return; const gap = D[y] - D[x]; if (gap === 0) return; const [lo, hi] = R[key]; if (gap >= lo && gap <= hi) return;
+            out.push({ prio: key === "qp" ? 1 : key === "aq" ? 3 : 2, key, x, y, gap, same: false, text: gap < 0 ? NOM[y] + " " + (-gap) + (gap === -1 ? " dia" : " dias") + " ANTES " + OF[x] + " (a ordem é " + BARE[x] + " → " + BARE[y] + ")" : NOM[y] + " a " + gap + (gap === 1 ? " dia" : " dias") + " " + OF[x] + " (ideal: " + IDEAL[key] + ")" }); });
+        return out.sort((p, q) => p.prio - q.prio);
+    };
+    const gapTxt = (g) => g == null ? "—" : g === 0 ? "mesmo dia" : g + "d";
+    const isTemplFioG2 = (a, k) => { const fm = a && a.text.match(/^(?:Semana de simulado · )?(?:Selar )?Fio (\d+|[AB])( \(sem\. passada\)| \(há ([23]) sem\.\))?/); if (!fm || isAbcBlock(a.text)) return false; const ago = fm[2] ? (fm[3] ? Number(fm[3]) : 1) : 0; return weekPhase(startISO, week + k - ago) === "G2"; }; // fio do motor G2/POST (fioPlan/fioExtra); CATCHUP/FREE e A/B/C só se movem dentro da própria semana (texto relativo à semana)
+    const reorganize = (modId, movedStages, dx, map, abc) => { // reacomoda as etapas não feitas/não vividas do módulo em torno da(s) movida(s); null = não cabe na faixa
+        const R = RANGES(abc); const days = {}; const fixed = {}; const movable = [];
+        CHAIN.forEach(st => { const occ = map[st] || []; if (!occ.length) return; const o = occ.slice().sort((p, q) => p.d - q.d)[0]; if (movedStages.indexOf(st) >= 0) { fixed[st] = dx; return; } if (o.done || o.past) fixed[st] = o.d; else movable.push({ st, occ: o }); });
+        Object.assign(days, fixed);
+        const pick = (lo, hi, hrs, keepWeek, kOld) => { for (let p = 0; p < 4; p++) for (let d = lo; d <= hi; d++) { if (d < 0 || d > 20 || d <= pastAbs || !open(d)) continue; if (Object.values(days).indexOf(d) >= 0) continue; if (keepWeek && Math.floor(d / 7) !== kOld) continue; if (!!lightOf(d) !== (p >= 2)) continue; if (p % 2 === 0 && !fitsAt(d, hrs)) continue; return d; } return null; };
+        const plan = [];
+        for (const m of movable) { const st = m.st; let lo, hi;
+            if (st === "aula") { const q = days.quest; if (q == null) { days.aula = m.occ.d; continue; } lo = q - R.aq[1]; hi = q - R.aq[0]; }
+            else if (st === "quest") { const a = days.aula, p = days.apost; if (a == null && p == null) { days.quest = m.occ.d; continue; } lo = a != null ? a + R.aq[0] : p - R.qp[1]; hi = a != null ? a + R.aq[1] : p - R.qp[0]; if (a != null && p != null && fixed.apost != null) { lo = Math.max(lo, p - R.qp[1]); hi = Math.min(hi, p - R.qp[0]); } }
+            else if (st === "apost") { const q = days.quest; if (q == null) { days.apost = m.occ.d; continue; } lo = q + R.qp[0]; hi = q + R.qp[1]; }
+            else { const p = days.apost; if (p == null) { days[st] = m.occ.d; continue; } lo = p + R.pb[0]; hi = p + R.pb[1]; }
+            const keepWeek = !isTemplFioG2(m.occ.a, Math.floor(m.occ.d / 7));
+            const d = pick(lo, hi, STAGE_HRS[st], keepWeek, Math.floor(m.occ.d / 7));
+            if (d == null) return null;
+            days[st] = d; if (d !== m.occ.d) plan.push({ st, from: m.occ.d, to: d, a: m.occ.a, abc: m.occ.abc });
+        }
+        const map2 = {}; CHAIN.forEach(st => { if (days[st] != null) map2[st] = [{ d: days[st] }]; });
+        return spacingIssues(map2, abc, CHAIN).length ? null : { plan, days };
+    };
+    const analyzeMove = (act, fromIdx, idx, toIdx) => { // null = bloco sem módulo
+        const stages = stagesOf(act, 0); if (!stages.length) return null;
+        const abc = isAbcBlock(act.text);
+        const mods = [...new Map(stages.map(sg => [sg.mod.id, sg.mod])).values()];
+        const movedStages = [...new Set(stages.map(sg => sg.stage))];
+        const listsAfter = (d) => d === fromIdx ? listFor(fromIdx).filter((_, i) => i !== idx) : d === toIdx ? listFor(toIdx).concat([act]) : listAt(d);
+        const fam = familyOf(act, 0);
+        const res = mods.map(m => { const before = stageMapFor(m.id, listAt, fam), after = stageMapFor(m.id, listsAfter, fam); const D0 = {}; CHAIN.forEach(st => { D0[st] = dayOfStage(before, st); });
+            const issues = spacingIssues(after, abc, movedStages).map(is => ({ ...is, before: (D0[is.x] != null && D0[is.y] != null) ? D0[is.y] - D0[is.x] : null })); return { mod: m, before, after, issues }; });
+        const first = res.find(r => r.issues.length) || res[0];
+        const proposal = first.issues.length ? reorganize(first.mod.id, movedStages, toIdx, first.after, abc) : null;
+        return { mods, abc, movedStages, res, issues: first.issues, proposal, mod: first.mod };
+    };
+    const askLines = (ask) => ask.issues.map(i => BARE[i.x] + " → " + BARE[i.y] + ": " + gapTxt(i.before) + " → " + gapTxt(i.gap) + (i.same ? " (nunca no mesmo dia)" : " (ideal " + IDEAL[i.key] + ")"));
+    const propText = (ask) => { if (!ask.proposal) return "Não consigo reacomodar sem quebrar outra regra — mover assim mesmo mantém " + ask.issues[0].text + "."; const P = ask.proposal;
+        const parts = CHAIN.filter(st => P.days[st] != null).map(st => { const mv = P.plan.find(p => p.st === st); return BARE[st] + " " + (ask.movedStages.indexOf(st) >= 0 ? dayName(P.days[st]) + " (seu movimento)" : mv ? dayCost(mv.to, STAGE_HRS[st]) + " (antes: " + dayName(mv.from) + ")" : dayName(P.days[st]) + " (fica)"); });
+        const notes = [...new Set(P.plan.map(p => lightNote(p.to)).filter(Boolean))];
+        return "Reorganizar " + modName(ask.mod) + ": " + parts.join(" · ") + "." + (notes.length ? " " + notes.join(" · ") : ""); };
+    const applyMovePlan = (ask) => { // grava o movimento pedido + a reorganização — fios G2/POST pelo plano (fioPlan/fioExtra), o resto materializando os dias; nada é apagado
+        const ovNext = { ...scheduleOv };
+        { const fromList = [...listFor(ask.fromIdx)]; const [item] = fromList.splice(ask.idx, 1); ovNext[dateFor(ask.fromIdx)] = fromList; ovNext[dateFor(ask.toIdx)] = [...listFor(ask.toIdx), { ...item, done: false }]; }
+        const planAll = { ...((config && config.fioPlan) || {}) }, exAll = { ...((config && config.fioExtra) || {}) }; let cfgChanged = false;
+        const listOf = (d) => ovNext[isoAt(d)] || listAt(d) || [];
+        const insertBefore = (l, b) => { const li = l.map(x => x.d).lastIndexOf("LAZER"); const nb = { id: "c-" + Date.now() + "-" + Math.random().toString(36).slice(2, 6), ...b }; return li >= 0 ? l.slice(0, li).concat([nb], l.slice(li)) : l.concat([nb]); };
+        (ask.proposal ? ask.proposal.plan : []).forEach(p => {
+            const a = p.a; const kFrom = Math.floor(p.from / 7), kTo = Math.floor(p.to / 7);
+            if (isTemplFioG2(a, kFrom)) {
+                const fm = a.text.match(/^(?:Semana de simulado · )?(?:Selar )?Fio (\d+|[AB])( \(sem\. passada\)| \(há ([23]) sem\.\))?/);
+                const label = /\d/.test(fm[1]) ? Number(fm[1]) : (fm[1] === "A" ? 1 : 2); const ago = fm[2] ? (fm[3] ? Number(fm[3]) : 1) : 0; const kSlot = kFrom - ago; const wed = wedAt(kSlot); const stg = p.st; const relTo = p.to - 7 * kSlot;
+                const exW = (exAll[wed] || []).map(e => ({ ...e })); const ei = exW.findIndex(e => e.label === label);
+                if (ei >= 0) { exW[ei][stg] = relTo; exAll[wed] = exW; } else { const pw = { ...(planAll[wed] || {}) }; pw[String(label)] = { ...(pw[String(label)] || {}), [stg]: relTo }; planAll[wed] = pw; }
+                cfgChanged = true;
+                const agoTo = kTo - kSlot; let b = stg === "seal" ? fioSealBlock(label) : fioBlock(label, stg, agoTo > 0); if (stg === "seal" && agoTo === 0) b = { ...b, text: b.text.replace(" (sem. passada)", "") }; if (agoTo >= 2) b = { ...b, text: b.text.replace(" (sem. passada)", " (há " + agoTo + " sem.)") };
+                if (ovNext[isoAt(p.from)]) ovNext[isoAt(p.from)] = ovNext[isoAt(p.from)].filter(x => x.text !== a.text); // dia editado à mão: o bloco sai dele (o gerador cuida dos dias não editados)
+                if (ovNext[isoAt(p.to)] && !ovNext[isoAt(p.to)].some(x => x.text === b.text)) ovNext[isoAt(p.to)] = insertBefore(ovNext[isoAt(p.to)], b);
+            } else { // A/B/C, CATCHUP/FREE: mesma semana — materializa os dois dias (como um movimento à mão)
+                ovNext[isoAt(p.from)] = listOf(p.from).filter(x => x.text !== a.text);
+                ovNext[isoAt(p.to)] = insertBefore(listOf(p.to), { d: a.d, color: a.color, text: a.text, time: a.time });
+            }
+        });
+        onSaveSchedule(ovNext);
+        if (cfgChanged) __FILL_SAVE && __FILL_SAVE({ fioPlan: planAll, fioExtra: exAll });
+        setMoveAsk(null);
+    };
     const day = schedFor(dateFor(activeIdx))[activeIdx];
     const dayDate = dateFor(activeIdx);
     const list = listFor(activeIdx);
@@ -1806,6 +1926,17 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, onSaveSchedule
                 isCustom(activeIdx) && (React.createElement("button", { onClick: () => resetDay(activeIdx), style: { background: "#0f172a",
                         border: "1px solid #7f1d1d", borderRadius: 8, color: "#f87171", padding: "8px 12px",
                         fontSize: 12, cursor: "pointer" } }, "\u21BA Voltar ao padr\u00E3o"))),
+            moveAsk && React.createElement("div", { "data-pw": "move-ask", style: { display: "flex", flexDirection: "column", gap: 6, background: "#0b1f33", border: "1px solid #1d4ed8", borderRadius: 10, padding: "8px 12px", marginBottom: 12 } },
+                React.createElement("span", { style: { color: "#93c5fd", fontSize: 11, fontWeight: 800, lineHeight: 1.45 } }, "Mover \"" + moveAsk.act.text.slice(0, 48) + (moveAsk.act.text.length > 48 ? "…" : "") + "\" de " + dayName(moveAsk.fromIdx) + " para " + dayName(moveAsk.toIdx) + " · carga do destino: " + dayCost(moveAsk.toIdx, actHours(moveAsk.act))),
+                moveAsk.capMsg && React.createElement("span", { style: { color: "#fbbf24", fontSize: 11, fontWeight: 700, lineHeight: 1.45 } }, moveAsk.capMsg),
+                moveAsk.issues.length > 0 && React.createElement("span", { style: { color: "#fbbf24", fontSize: 11, fontWeight: 800, lineHeight: 1.45 } }, "⚠️ Isso deixa " + moveAsk.issues.map(i => i.text).join(" e ") + "."),
+                moveAsk.issues.length > 0 && React.createElement("div", { style: { color: "#e0f2fe", fontSize: 10, lineHeight: 1.5 } }, askLines(moveAsk).map((l, i) => React.createElement("div", { key: i }, "· " + l))),
+                moveAsk.view && React.createElement("span", { style: { color: "#e0f2fe", fontSize: 11, lineHeight: 1.45 } }, "💡 " + propText(moveAsk)),
+                React.createElement("div", { style: { display: "flex", gap: 8, flexWrap: "wrap" } },
+                    moveAsk.view && moveAsk.proposal && React.createElement("button", { onClick: () => applyMovePlan(moveAsk), style: { background: "#1e3a8a", border: "1px solid #3b82f6", borderRadius: 8, color: "#bfdbfe", fontSize: 11, fontWeight: 700, padding: "5px 10px", cursor: "pointer" } }, "Aplicar"),
+                    React.createElement("button", { onClick: () => { __moveActCore(moveAsk.fromIdx, moveAsk.idx, moveAsk.toIdx); setMoveAsk(null); }, style: { background: moveAsk.issues.length ? "#0f172a" : "#1e3a8a", border: "1px solid " + (moveAsk.issues.length ? "#334155" : "#3b82f6"), borderRadius: 8, color: moveAsk.issues.length ? "#94a3b8" : "#bfdbfe", fontSize: 11, fontWeight: 700, padding: "5px 10px", cursor: "pointer" } }, "Mover assim mesmo"),
+                    !moveAsk.view && moveAsk.issues.length > 0 && React.createElement("button", { onClick: () => setMoveAsk({ ...moveAsk, view: true }), style: { background: "#1e3a8a", border: "1px solid #3b82f6", borderRadius: 8, color: "#bfdbfe", fontSize: 11, fontWeight: 700, padding: "5px 10px", cursor: "pointer" } }, "Ver como reorganizar o fio"),
+                    React.createElement("button", { onClick: () => setMoveAsk(null), style: { background: "#0f172a", border: "1px solid #334155", borderRadius: 8, color: "#94a3b8", fontSize: 11, fontWeight: 700, padding: "5px 10px", cursor: "pointer" } }, "Cancelar"))),
             React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 8 } }, list.map((act, i) => {
                 const mod = resolveBlock(act.text);
                 const isDesat = blockRef(act.text) === "DESAT";

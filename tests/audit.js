@@ -963,6 +963,69 @@ async function scenario(browser, name, dateISO, seeds, fn) {
         check('Aba Módulos mostra a série "📈 Simulados (% por sexta): 62% (14/08) · 70% (28/08) · 75% (23/10) — acompanhamento clínico"', await page.evaluate(() => /📈 Simulados \(% por sexta\): 62% \(14\/08\) · 70% \(28\/08\) · 75% \(23\/10\) — acompanhamento clínico, não calibra o motor/.test(document.body.innerText)));
     });
 
+    // ── S20: AVISO DE ESPAÇAMENTO AO MOVER TAREFA (paciente, 24/09 — decisões 38/40) ──
+    const SCH = 'medplanner_schedule_v1';
+    const moveViaUI = async (page, blockRe, toIdx) => {
+        await page.evaluate(() => { if (![...document.querySelectorAll('button')].some(b => b.innerText.trim() === '✓ Pronto')) { const e = [...document.querySelectorAll('button')].find(b => b.innerText.trim() === '✎ Reorganizar dia'); if (e) e.click(); } });
+        await page.waitForTimeout(200);
+        const r = await page.evaluate(([bs, to]) => { const bre = new RegExp(bs); const blocks = [...document.querySelectorAll('div')].filter(el => el.style && /^3px solid/.test(el.style.borderLeft)); const el = blocks.find(b => { const body = b.children[0] && b.children[0].children[2]; const s = body && body.querySelector('span'); return s && bre.test(s.textContent.trim()); }); if (!el) return 'bloco não encontrado: ' + bs; const sel = [...el.querySelectorAll('select')].find(s => [...s.options].some(o => /mover p\/ dia/.test(o.textContent))); if (!sel) return 'select não encontrado'; Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(sel, String(to)); sel.dispatchEvent(new Event('change', { bubbles: true })); return true; }, [blockRe.source, toIdx]);
+        if (r !== true) throw new Error(r); await page.waitForTimeout(300);
+    };
+    const readAsk = (page) => page.evaluate(() => { const el = document.querySelector('[data-pw="move-ask"]'); if (!el) return null; return { lines: [...el.querySelectorAll('span, div')].filter(x => x.children.length === 0 || x.tagName === 'SPAN').map(x => x.textContent.trim()).filter(Boolean), btns: [...el.querySelectorAll('button')].map(b => b.innerText.trim()) }; });
+    const clickAsk = async (page, label) => { const ok = await page.evaluate((l) => { const el = document.querySelector('[data-pw="move-ask"]'); const b = el && [...el.querySelectorAll('button')].find(b => b.innerText.trim() === l); if (!b) return false; b.click(); return true; }, label); if (!ok) throw new Error('botão do diálogo não encontrado: ' + label); await page.waitForTimeout(300); };
+    const has20 = (ask, re) => !!ask && ask.lines.some(l => re.test(l));
+    const cfg20 = { ...baseCfg, catchupPace: 2, fioWeek: { '2026-10-14': [77, 78] } };
+    await scenario(browser, 'S20a-mover-questoes-4d-da-aula-1410', '2026-10-14', { [CFG]: cfg20 }, async (page) => {
+        await clickDay(page, 'SAB'); await moveViaUI(page, /^Fio 1 · toque 2/, 5);
+        let ask = await readAsk(page);
+        check('Fio 1 · questões SÁB 17/10 → SEG 19/10: diálogo (mesmo da carga) avisa sem bloquear: "as questões a 4 dias da aula (ideal: 1 a 2 dias)" e "a apostila 1 dia ANTES das questões"', has20(ask, /carga do destino: SEG 19\/10 \(6,6h\)/) && has20(ask, /^⚠️ Isso deixa a apostila 1 dia ANTES das questões \(a ordem é questões → apostila\) e as questões a 4 dias da aula \(ideal: 1 a 2 dias\)\.$/), JSON.stringify(ask));
+        check('Antes e depois de cada intervalo afetado: "aula → questões: 2d → 4d" e "questões → apostila: 1d → -1d"', has20(ask, /^· aula → questões: 2d → 4d \(ideal 1 a 2 dias\)$/) && has20(ask, /^· questões → apostila: 1d → -1d \(ideal ~1 dia\)$/), ask.lines.filter(l => /^·/.test(l)).join(' | '));
+        check('Três opções: "Mover assim mesmo", "Ver como reorganizar o fio", "Cancelar"; nada gravado ainda', JSON.stringify(ask.btns) === JSON.stringify(['Mover assim mesmo', 'Ver como reorganizar o fio', 'Cancelar']) && !(await getLS(page, SCH)), JSON.stringify(ask.btns));
+        await clickAsk(page, 'Ver como reorganizar o fio'); ask = await readAsk(page);
+        check('Proposta (mesma linguagem da redistribuição): aula SÁB 17/10 (6,5h) · questões SEG (seu movimento) · apostila ⚠️ QUA 21/10 (9,3h, sem. seguinte) · selagem SÁB 24/10 (5,0h) — dia leve (TER) preterido, ⚠️ à vista; botão "Aplicar"', has20(ask, /^💡 Reorganizar Sem\.40 Síndromes Febris: aula SÁB 17\/10 \(6,5h\) \(antes: QUI 15\/10\) · questões SEG 19\/10 \(seu movimento\) · apostila ⚠️ QUA 21\/10 \(9,3h, sem\. seguinte\) \(antes: DOM 18\/10\) · selagem SÁB 24\/10 \(5,0h, sem\. seguinte\) \(antes: QUA 21\/10 \(sem\. seguinte\)\)\.$/) && ask.btns[0] === 'Aplicar', ask.lines[ask.lines.length - 1]);
+        await clickAsk(page, 'Aplicar');
+        const cfg = await getLS(page, CFG), sch = await getLS(page, SCH);
+        check('"Aplicar" grava o movimento (SÁB e SEG editados) e a reorganização no plano do fio: fioPlan[14/10][1] = { aula: 3, apost: 7, seal: 10 }; diálogo fecha', JSON.stringify(cfg.fioPlan) === '{"2026-10-14":{"1":{"aula":3,"apost":7,"seal":10}}}' && Object.keys(sch || {}).sort().join(',') === '2026-10-17,2026-10-19' && !(await readAsk(page)), JSON.stringify(cfg.fioPlan) + ' ' + Object.keys(sch || {}).join(','));
+        const w = await dumpWeek(page);
+        check('Depois: aula do Fio 1 no SÁB, questões na SEG, nada na QUI/DOM; TER intacta', has(w.SAB, /^Fio 1 · toque 1/) && has(w.SEG, /^Fio 1 · toque 2/) && !has(w.QUI, /^Fio 1 · toque 1/) && !has(w.DOM, /^Fio 1 · toque 3/) && !has(w.SAB, /^Fio 1 · toque 2/), short(w.SAB) + ' || ' + short(w.SEG));
+        await page.evaluate(() => { [...document.querySelectorAll('button')].find(b => b.innerText.trim() === '▶').click(); }); await page.waitForTimeout(400);
+        const w2 = await dumpWeek(page, ['QUA', 'SAB']);
+        check('Semana seguinte: apostila "Fio 1 (sem. passada) · toque 3" na QUA 21/10 e "Selar Fio 1 (sem. passada)" no SÁB 24/10 ⇒ Sem.40 Síndromes Febris', has(w2.QUA, /^Fio 1 \(sem\. passada\) · toque 3/) && /Síndromes Febris/.test(modOf(w2.QUA, /^Fio 1 \(sem\. passada\) · toque 3/)) && has(w2.SAB, /^Selar Fio 1 \(sem\. passada\)/), short(w2.QUA) + ' || ' + short(w2.SAB));
+    });
+    await scenario(browser, 'S20b-apostila-no-dia-do-banco-1410', '2026-10-14', { [CFG]: cfg20 }, async (page) => {
+        await clickDay(page, 'SEX'); await moveViaUI(page, /^D4: Apostila do Bloco A/, 5);
+        let ask = await readAsk(page);
+        check('Apostila do A SEX → SEG (dia do banco A): a violação de maior prioridade vem primeiro — "a apostila no mesmo dia do banco" — e depois "a apostila a 4 dias das questões"', has20(ask, /^⚠️ Isso deixa a apostila no mesmo dia do banco e a apostila a 4 dias das questões \(ideal: ~1 dia\)\.$/) && has20(ask, /^· apostila → banco: 3d → mesmo dia \(nunca no mesmo dia\)$/) && has20(ask, /^· questões → apostila: 1d → 4d \(ideal ~1 dia\)$/), JSON.stringify(ask && ask.lines));
+        await clickAsk(page, 'Ver como reorganizar o fio'); ask = await readAsk(page);
+        check('Sem reorganização possível (banco de A/B/C só se move dentro da semana): "Não consigo reacomodar sem quebrar outra regra — mover assim mesmo mantém a apostila no mesmo dia do banco."; só "Mover assim mesmo" e "Cancelar"', has20(ask, /^💡 Não consigo reacomodar sem quebrar outra regra — mover assim mesmo mantém a apostila no mesmo dia do banco\.$/) && JSON.stringify(ask.btns) === JSON.stringify(['Mover assim mesmo', 'Cancelar']), JSON.stringify(ask && ask.btns));
+        await clickAsk(page, 'Cancelar');
+        check('"Cancelar" não move nada (nenhum dia editado, nenhum plano)', !(await getLS(page, SCH)) && !(await getLS(page, CFG)).fioPlan && !(await readAsk(page)));
+    });
+    await scenario(browser, 'S20c-melhora-sem-aviso-1410', '2026-10-14', { [CFG]: cfg20 }, async (page) => {
+        await clickDay(page, 'SAB'); await moveViaUI(page, /^Fio 1 · toque 2/, 2);
+        const sch = await getLS(page, SCH); const w = await dumpWeek(page, ['SEX', 'SAB']);
+        check('Fio 1 · questões SÁB → SEX (1 dia da aula, apostila DOM a +2): espaçamento mantido/melhorado → move sem diálogo', !(await readAsk(page)) && Object.keys(sch || {}).sort().join(',') === '2026-10-16,2026-10-17' && has(w.SEX, /^Fio 1 · toque 2/) && !has(w.SAB, /^Fio 1 · toque 2/), Object.keys(sch || {}).join(','));
+    });
+    await scenario(browser, 'S20d-mover-assim-mesmo-1410', '2026-10-14', { [CFG]: cfg20 }, async (page) => {
+        await clickDay(page, 'SAB'); await moveViaUI(page, /^Fio 1 · toque 2/, 5); await clickAsk(page, 'Mover assim mesmo');
+        const cfg = await getLS(page, CFG), sch = await getLS(page, SCH); const w = await dumpWeek(page, ['QUI', 'SAB', 'DOM', 'SEG']);
+        check('"Mover assim mesmo" grava SÓ o movimento pedido (SÁB e SEG editados; sem fioPlan); aula QUI e apostila DOM ficam onde estavam', !cfg.fioPlan && Object.keys(sch || {}).sort().join(',') === '2026-10-17,2026-10-19' && has(w.SEG, /^Fio 1 · toque 2/) && has(w.QUI, /^Fio 1 · toque 1/) && has(w.DOM, /^Fio 1 · toque 3/) && !(await readAsk(page)), Object.keys(sch || {}).join(','));
+    });
+    await scenario(browser, 'S20e-sem-modulo-1410', '2026-10-14', { [CFG]: cfg20 }, async (page) => {
+        await clickDay(page, 'QUI'); await moveViaUI(page, /^Anki \+ Meditação/, 2);
+        const sch = await getLS(page, SCH);
+        check('Bloco sem módulo (Anki) QUI → SEX: sem verificação de espaçamento, move como antes (só carga)', !(await readAsk(page)) && Object.keys(sch || {}).sort().join(',') === '2026-10-15,2026-10-16', Object.keys(sch || {}).join(','));
+    });
+    await scenario(browser, 'S20f-carga-e-ordem-sem38-2409', '2026-09-24', { [CFG]: { ...baseCfg, catchupPace: 2 } }, async (page) => {
+        await clickDay(page, 'QUI'); await moveViaUI(page, /^D3 · Aula online Bloco A/, 3);
+        const ask = await readAsk(page);
+        check('Aula A QUI 24/09 → SÁB 26/09 (plantão): o mesmo diálogo traz a carga ("SÁB ficaria com ~22,5h … tempo hábil (~14,5h)") e o espaçamento ("a aula no mesmo dia da apostila e as questões 2 dias ANTES da aula")', has20(ask, /^⚠️ SÁB ficaria com ~22,5h de atividades — acima do tempo hábil \(~14,5h\)\. Nada será apagado nem trocado\.$/) && has20(ask, /^⚠️ Isso deixa a aula no mesmo dia da apostila e as questões 2 dias ANTES da aula \(a ordem é aula → questões\)\.$/) && has20(ask, /^· aula → questões: mesmo dia → -2d/), JSON.stringify(ask && ask.lines));
+        await clickAsk(page, 'Ver como reorganizar o fio');
+        check('D2-A de hoje (vivido) é fixo → "Não consigo reacomodar … mantém a aula no mesmo dia da apostila."', has20(await readAsk(page), /^💡 Não consigo reacomodar sem quebrar outra regra — mover assim mesmo mantém a aula no mesmo dia da apostila\.$/));
+        await clickAsk(page, 'Cancelar');
+        check('Cancelar: nada gravado', !(await getLS(page, SCH)));
+    });
+
     await browser.close();
     const fails = H.results.filter(r => !r.ok);
     console.log(`\n══════════ RESUMO: ${H.results.length} checks · ${H.results.length - fails.length} ✅ · ${fails.length} ❌ ══════════`);
