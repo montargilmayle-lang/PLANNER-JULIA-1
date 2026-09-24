@@ -182,7 +182,27 @@ Gravidade: **crítico** = conteúdo não estudado ou dado perdido · **médio** 
 
 ---
 
-## Resumo do que precisa do seu aval
+## Decisões da paciente (24/09, 2ª rodada) — aplicadas no mesmo PR #13
+
+| # | Decisão | O que mudou no código | Verificação |
+|---|---|---|---|
+| 1 | Semana 38 com o C: aceita como está | nada | — |
+| 2 | Banco C na **sexta seguinte (+5d)**, não na quinta | `cascadeFor`: banco em `d0 + 6`; texto "(+5d da apostila)" | S18a2: QUI 01/10 sem banco C; SEX 02/10 com banco C ⇒ ATB. Sem.39 QUI cai de 10,0h para 8,0h (SEX 8,5h). **Sinalização:** quando a semana seguinte é de simulado (sem.44, 06/11) o banco C cai na sexta da prova — 11,2h com o selo 📚; o app avisa, não corta |
+| 3 | C em sábado/domingo | mantido | — |
+| 4 | Semana 30: **D2-A injetado na segunda 03/08** | `genForCtx`: bloco "30 questões Bloco A … (D2 da segunda do template antigo — fronteira 03/08)" após o Anki; `coverage45.js` sem exceções | S19a; cobertura 45/45 sem `KNOWN` |
+| 5 | Ritmo por semana: feature aprovada, **fora deste PR** | registrado em briefing §14 E | — |
+| 6 | 📌: corrigir a promessa, não o congelamento; oferecer na sugestão | regra 7 reescrita ("a partir da próxima semana … use a sugestão"); `pinWait` + aviso "📌 Você fixou … Quer abri-lo já, como fio extra?" → `fillSuggest(forceMod)` (só o passo 2) → "Aplicar" grava `fioExtra`; "Deixar para a próxima semana" grava `fillDismissed[wed\|pin]` | S19b, S19b2 |
+| 7 | "Revisei" + % dentro do bloco de revisão | `ReviewRows` (extraído do card amarelo) nos blocos REV de revisão e na seção REVISÕES ESPAÇADAS; sem revisão vencida: "nenhuma revisão vencendo hoje", sem botão | S19c (grava `reviewD7Done`, `r1DoneAt`, `accR1`; D+30 recalcula) |
+| 8 | Textos desatualizados | seletor 🌿, card FREE, comentário CATCHUP; protocolo §2/§12; briefing decisão 3 | grep sem "sábado por padrão" |
+| 9 | Aviso de semana também na CATCHUP/FREE | `weekFit` em todas as fases ≥ G2; fase travada: "Semana pesada … (ritmo travado nesta fase: K fios). Mova blocos ou deixe um fio…"; sexta de simulado >8h avisa sozinha | S19d (FREE 30/12: 13,8h), S19d2 (CATCHUP 04/12: 8,6h) |
+| 10 | 📌-nota, data-base, `catchupForDay` | `resolveBlock`/`blockTasks` ignoram "📌 …"; `__START_ISO` (`setStartCfg`) em `rawWeekOf` e `catchupAction`; `catchupForDay` só para templates históricos (ramos G2/CATCHUP/FREE removidos) | S19e, S19f; S0/S1 (histórico) inalterados |
+| 11 | `aulaPresencial` informativa | `aulaPresencialAt` gravado no toggle; card: "presencial assistida em dd/mm · registro complementar" | S19g |
+| 12 | Série do % dos simulados | `simSeriesText`: no bloco de correção ("📈 Evolução: …") e no topo da aba Módulos | S19h |
+| 13 | Fios sem banco: decisão explícita | briefing §16 decisão 46; protocolo §7 | — |
+
+Bateria final: `audit.js` S0–S19 e `coverage45.js` (números no PR). `index.html` idêntico.
+
+## Resumo do que precisava do seu aval (histórico — decidido em 24/09, tabela acima)
 
 1. **Mesclar o PR #13** (Bloco C + grupos + cobertura + testes) — ou pedir ajustes nos conflitos 1–3 da Parte 1.
 2. **Semana 30**: exceção documentada (como está) ou injetar o D2-A histórico.

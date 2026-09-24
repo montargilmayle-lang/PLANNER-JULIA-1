@@ -788,7 +788,9 @@ async function scenario(browser, name, dateISO, seeds, fn) {
         check('QUA 30/09: "Selar Bloco C da semana passada" ⇒ ATB, logo após a selagem do B, com "Selagem ✓ · C · ATB" (+3d da apostila de DOM)', has(d, /^Selar Bloco C da semana passada/) && modsOf(d, /^Selar Bloco C/) === 'ATB · Bônus Antibioticoterapia' && tasksOf(d, /^Selar Bloco C/) === 'Selagem ✓ · C · ATB' && idx(d, /^Selar Bloco C/) === idx(d, /^Selar Bloco B/) + 1, short(d));
         check('QUA 30/09: selagens A ⇒ INF1 e B ⇒ INF2 (grupos da semana passada, bônus por último)', modsOf(d, /^Selar Bloco A/) === 'INF1 · AIDS' && modsOf(d, /^Selar Bloco B/) === 'INF2 · Parasitoses Intestinais');
         await clickDay(page, 'QUI'); d = await readDay(page);
-        check('QUI 01/10: banco do C da semana passada ⇒ ATB (+4d da apostila, nunca no dia da selagem) + banco B pós-simulado ⇒ INF2; sem registro (etapa de execução)', has(d, /^D6 · Banco: questões por conteúdo do Bloco C da semana passada/) && modsOf(d, /Bloco C da semana passada/) === 'ATB · Bônus Antibioticoterapia' && tasksOf(d, /Bloco C da semana passada/) === '' && modsOf(d, /Bloco B da semana passada/) === 'INF2 · Parasitoses Intestinais', short(d));
+        check('QUI 01/10: banco B pós-simulado ⇒ INF2 e NENHUM banco C (decisão 24/09: dois bancos no mesmo dia é repetição sem ganho)', !has(d, /Bloco C da semana passada/) && modsOf(d, /Bloco B da semana passada/) === 'INF2 · Parasitoses Intestinais', short(d));
+        await clickDay(page, 'SEX'); d = await readDay(page);
+        check('SEX 02/10: banco do C da semana passada ⇒ ATB (+5d da apostila de DOM); sem registro (etapa de execução)', has(d, /^D6 · Banco: questões por conteúdo do Bloco C da semana passada \(\+5d da apostila\)/) && modsOf(d, /Bloco C da semana passada/) === 'ATB · Bônus Antibioticoterapia' && tasksOf(d, /Bloco C da semana passada/) === '', short(d));
         check('Sem.39 (2 blocos): lista A/B, nenhum "Bloco C" novo, sem aviso de cobertura', (await weekList(page)).length === 2 && !has(d, /Bloco C \(/) && (await warnTexts(page)).length === 0);
     });
     await scenario(browser, 'S18b-blocoC-sem43-2910', '2026-10-29', { [CFG]: { ...baseCfg, catchupPace: 2 } }, async (page) => {
@@ -889,6 +891,76 @@ async function scenario(browser, name, dateISO, seeds, fn) {
         await clickBtn18(page, /^Aplicar ritmo 2$/);
         const cfg = await getLS(page, CFG); const w = await dumpWeek(page, ['SAB', 'DOM']);
         check('"Aplicar ritmo 2" grava catchupPace 2 (a paciente decide); o C continua inteiro (SÁB aula+D2, DOM apostila)', cfg.catchupPace === 2 && has(w.SAB, /^D2-C/) && has(w.DOM, /^D4: Apostila do Bloco C/), JSON.stringify(cfg.catchupPace));
+    });
+
+    // ── S19: decisões da 2ª rodada (24/09) ──
+    await scenario(browser, 'S19a-sem30-fronteira-0308', '2026-08-03', {}, async (page) => {
+        await clickDay(page, 'SEG'); const d = await readDay(page);
+        check('SEG 03/08 (AMB, fronteira): "30 questões Bloco A … (fronteira 03/08)" ⇒ CAR3 logo após o Anki, marcável (toque 2)', idx(d, /^30 questões Bloco A .*fronteira 03\/08/) === 1 && modsOf(d, /fronteira 03\/08/) === 'CAR3 · DAC: IAM e Angina' && tasksOf(d, /fronteira 03\/08/) === 'D2 · 30q (toque 2) ✓ · A · CAR3', short(d));
+        check('Sem.30 sem aviso de cobertura (CAR3 agora tem aula, questões e apostila)', (await warnTexts(page)).length === 0, (await warnTexts(page)).join(' / '));
+    });
+    await scenario(browser, 'S19b-pin-meio-da-semana-1510', '2026-10-15', { [CFG]: { ...baseCfg, catchupPace: 2, fioWeek: { '2026-10-14': [77, 78] }, catchupPins: [60] } }, async (page) => {
+        const banner = await page.evaluate(() => ([...document.querySelectorAll('span')].map(s => s.textContent.trim()).find(t => /^📌 Você fixou/.test(t)) || ''));
+        check('📌 fixado (60) com a semana já congelada [77, 78] → aviso "📌 Você fixou Sem.31 … Quer abri-lo já, como fio extra?"', /^📌 Você fixou Sem\.31 Lesões Precursoras.*Os fios desta semana já estão congelados — ele entra como 1º fio na próxima semana\. Quer abri-lo já, como fio extra\?$/.test(banner), banner);
+        await clickTab(page, 'DESATRASO'); const t = await bodyText(page);
+        check('Regra 7 reescrita: "assume o 1º slot A PARTIR DA PRÓXIMA SEMANA … use a sugestão de redistribuição"', /assume o 1º slot A PARTIR DA PRÓXIMA SEMANA/.test(t) && /use a sugestão de redistribuição no Cronograma/.test(t) && /MATÉRIAS DESTA SEMANA \(2\)/.test(t));
+        await clickTab(page, 'CRONOGRAMA'); await clickBtn18(page, /^Ver sugestão$/);
+        const sug = await page.evaluate(() => ([...document.querySelectorAll('span')].map(s => s.textContent.trim()).find(t => /^💡/.test(t)) || ''));
+        check('"Ver sugestão" propõe abrir o fixado como Fio 3 com a carga de cada dia (aula · questões · apostila · selagem)', /^💡 Abrir o Fio 3 — Sem\.31 Lesões Precursoras.*: aula .* · questões .* · apostila .* · selagem /.test(sug), sug);
+        await clickBtn18(page, /^Aplicar$/);
+        const cfg = await getLS(page, CFG);
+        check('"Aplicar" grava o fixado em config.fioExtra[2026-10-14] (label 3, id 60) e fecha o aviso (fillDismissed["…|pin"] = "pin:60")', cfg.fioExtra && cfg.fioExtra['2026-10-14'] && cfg.fioExtra['2026-10-14'].some(e => e.id === 60 && e.label === 3) && cfg.fillDismissed && cfg.fillDismissed['2026-10-14|pin'] === 'pin:60' && !(await page.evaluate(() => /📌 Você fixou/.test(document.body.innerText))), JSON.stringify(cfg.fioExtra) + ' ' + JSON.stringify(cfg.fillDismissed));
+        const w = await dumpWeek(page);
+        check('O Fio 3 (extra) aparece nos dias propostos ⇒ Sem.31 Lesões Precursoras; os fios 1 e 2 congelados não mudam (77, 78)', DAYS.some(dn => w[dn].blocks.some(b => /^Fio 3 · toque 1/.test(b.text) && /Sem\.31 Lesões Precursoras/.test(b.mod || ''))) && /Síndromes Febris/.test(modOf(w.QUI, /^Fio 1 · toque 1/)), '');
+        await clickTab(page, 'DESATRASO');
+        check('MATÉRIAS DESTA SEMANA passa a listar o fio extra (3) com "sugestão"', /MATÉRIAS DESTA SEMANA \(3\)/.test(await bodyText(page)) && /FIO 3 · sugestão/.test(await bodyText(page)));
+    });
+    await scenario(browser, 'S19b2-pin-deixar-1510', '2026-10-15', { [CFG]: { ...baseCfg, catchupPace: 2, fioWeek: { '2026-10-14': [77, 78] }, catchupPins: [60] } }, async (page) => {
+        await clickBtn18(page, /^Deixar para a próxima semana$/);
+        const cfg = await getLS(page, CFG);
+        check('"Deixar para a próxima semana" só grava fillDismissed["2026-10-14|pin"] = "pin:60" (nenhum fio aberto) e o aviso some', cfg.fillDismissed && cfg.fillDismissed['2026-10-14|pin'] === 'pin:60' && !(cfg.fioExtra && cfg.fioExtra['2026-10-14'] && cfg.fioExtra['2026-10-14'].length) && !(await page.evaluate(() => /📌 Você fixou/.test(document.body.innerText))), JSON.stringify(cfg.fillDismissed));
+    });
+    await scenario(browser, 'S19c-revisei-no-bloco-1510', '2026-10-15', { [CFG]: { ...baseCfg, catchupPace: 2, fioWeek: { '2026-10-14': [77, 78] } }, [PRG]: { 60: { aula: true, questoesD2: true, apostila: true, smartcard: true, completedAt: '2026-10-08', accSelagem: 70 } } }, async (page) => {
+        await clickDay(page, 'DOM'); let d = await readDay(page);
+        const rows = await page.evaluate(() => { const blocks = [...document.querySelectorAll('div')].filter(el => el.style && /^3px solid/.test(el.style.borderLeft)); const el = blocks.find(b => /Revisão adaptativa/.test(b.textContent)); return el ? { txt: el.textContent, btn: [...el.querySelectorAll('button')].map(b => b.innerText.trim()) } : null; });
+        check('DOM 18/10: bloco "Revisão adaptativa" lista a revisão vencida "D+7 · Sem.31 — GIN5" com o botão "Revisei" dentro do bloco', rows && /D\+7/.test(rows.txt) && /Hora de revisar Sem\.31 — GIN5/.test(rows.txt) && rows.btn.includes('Revisei'), rows && rows.btn.join(' | '));
+        await clickTask(page, /^Revisão adaptativa/, /^Revisei$/);
+        await page.fill('input[placeholder="% acerto"]', '85'); await clickTask(page, /^Revisão adaptativa/, /^OK$/);
+        const pg = await getLS(page, PRG);
+        check('"Revisei" + 85% no bloco grava reviewD7Done, r1DoneAt = hoje (15/10) e accR1 = 85 (mesmo fluxo do card amarelo)', pg[60].reviewD7Done === true && pg[60].r1DoneAt === '2026-10-15' && pg[60].accR1 === 85, JSON.stringify(pg[60]));
+        const after = await page.evaluate(() => { const blocks = [...document.querySelectorAll('div')].filter(el => el.style && /^3px solid/.test(el.style.borderLeft)); const el = blocks.find(b => /Revisão adaptativa/.test(b.textContent)); return el ? el.textContent : ''; });
+        check('Depois de revisar: o bloco diz "nenhuma revisão vencendo hoje" e não tem mais o botão', /nenhuma revisão vencendo hoje/.test(after) && !/Revisei/.test(after), after.slice(0, 120));
+        const card = await readCard(page, /Lesões Precursoras/);
+        check('Card do módulo: D+30 recalculado a partir do r1DoneAt (15/10 + 30 = 14/11)', card && card.d30 === '14/11', JSON.stringify(card));
+    });
+    await scenario(browser, 'S19d-aviso-semana-free-sim-3012', '2026-12-31', { [CFG]: { ...baseCfg, fioWeek: { '2026-12-16': [1, 2, 3, 4, 5, 6], '2026-12-23': [8, 9, 10, 11, 12, 13], '2026-12-30': [14, 15, 16, 17, 18, 19] } } }, async (page) => {
+        const t = await page.evaluate(() => ([...document.querySelectorAll('span')].map(s => s.textContent.trim()).filter(t => /^⚠️ Semana/.test(t)).join(' || ')));
+        check('FREE, semana de simulado: aviso de semana existe ("prova + correção (8h) e as etapas de fio na sexta somam 13,8h … ritmo travado nesta fase: 6 fios"), sem botão de ritmo', /^⚠️ Semana de simulado: a prova \+ correção \(8h\) e as etapas de fio na sexta somam 13,8h — considere deixar um fio para a semana seguinte ou mover as etapas da sexta \(ritmo travado nesta fase: 6 fios\)\.$/.test(t) && !(await page.evaluate(() => [...document.querySelectorAll('button')].some(b => /Aplicar ritmo/.test(b.innerText)))), t);
+    });
+    await scenario(browser, 'S19d2-aviso-semana-catchup-sim-0412', '2026-12-03', {}, async (page) => {
+        const t = await page.evaluate(() => ([...document.querySelectorAll('span')].map(s => s.textContent.trim()).filter(t => /^⚠️ Semana/.test(t)).join(' || ')));
+        check('CATCHUP, semana de simulado (04/12): sexta = prova + correção (8h) + Anki → 8,6h → aviso de simulado com "ritmo travado nesta fase: 2 fios"', /^⚠️ Semana de simulado: a prova \+ correção \(8h\) e as etapas de fio na sexta somam 8,6h .*ritmo travado nesta fase: 2 fios/.test(t), t);
+    });
+    await scenario(browser, 'S19e-nota-25-06', '2026-06-25', { medplanner_schedule_v1: { '2026-06-25': [{ id: 'sd-t1', d: 'AMB', color: '#6B7280', text: 'Ambulatório 8h–11h', time: '3h', done: false }, { id: 'sd-t3', d: 'EXTRA', color: '#0EA5E9', text: '📌 Estudo desta quinta (aulas online A/B + questões/apostila Bloco A) → movido p/ sáb (tarde) e dom', time: '', done: false }] } }, async (page) => {
+        await clickDay(page, 'QUI'); const d = await readDay(page); const b = d.blocks[idx(d, /^📌 Estudo desta quinta/)];
+        check('Bloco-nota "📌 Estudo desta quinta (… apostila Bloco A)" não oferece tarefa nem ↳ módulo', b && b.tasks.length === 0 && !b.mod && (b.mods || []).length === 0, JSON.stringify(b));
+    });
+    await scenario(browser, 'S19f-data-base-do-config', '2026-10-15', { [CFG]: { ...baseCfg, startDate: '2026-01-14', catchupPace: 2 }, [PRG]: { 60: { aula: true } } }, async (page) => {
+        await clickTab(page, 'DESATRASO'); const t = await bodyText(page);
+        check('Data-base do config (14/01): hoje = Sem.40 → dica do módulo 60 (sem.31, aula vista) diz "há ~9 sem" (com a constante fixa seria 10)', /Aula vista há ~9 sem/.test(t) && /Calculada: hoje = Sem\.40|Sem\.40/.test(t), (t.match(/Aula vista há ~\d+ sem/) || [])[0]);
+    });
+    await scenario(browser, 'S19g-presencial-com-data-1510', '2026-10-15', { [CFG]: { ...baseCfg, catchupPace: 2 } }, async (page) => {
+        await clickDay(page, 'QUA'); await clickTask(page, /Aula presencial/, null);
+        const pg = await getLS(page, PRG); const ids = MODS.filter(m => m.week === 41).map(m => m.id);
+        check('Marcar a presencial grava aulaPresencialAt = 2026-10-15 nos blocos da semana', ids.every(id => pg[id] && pg[id].aulaPresencial === true && pg[id].aulaPresencialAt === '2026-10-15'), JSON.stringify(pg));
+        const card = await readCard(page, /Neurologia I — Cefaleias/);
+        check('Card mostra "presencial assistida em 15/10 · registro complementar"', await page.evaluate(() => /presencial assistida em 15\/10 · registro complementar — não conta nos 4 checks/.test(document.body.innerText)) && card && card.btns.includes('✓ Aula presencial ✓'), JSON.stringify(card && card.btns));
+    });
+    await scenario(browser, 'S19h-serie-simulado-2310', '2026-10-23', { [CFG]: { ...baseCfg, catchupPace: 2, simResults: { '2026-08-14': 62, '2026-08-28': 70, '2026-10-23': 75 } } }, async (page) => {
+        await clickDay(page, 'SEX');
+        check('Bloco de correção do simulado mostra "📈 Evolução: 62% (14/08) · 70% (28/08) · 75% (23/10)"', await page.evaluate(() => /📈 Evolução: 62% \(14\/08\) · 70% \(28\/08\) · 75% \(23\/10\)/.test(document.body.innerText)));
+        await clickTab(page, 'MÓDULOS');
+        check('Aba Módulos mostra a série "📈 Simulados (% por sexta): 62% (14/08) · 70% (28/08) · 75% (23/10) — acompanhamento clínico"', await page.evaluate(() => /📈 Simulados \(% por sexta\): 62% \(14\/08\) · 70% \(28\/08\) · 75% \(23\/10\) — acompanhamento clínico, não calibra o motor/.test(document.body.innerText)));
     });
 
     await browser.close();

@@ -42,9 +42,8 @@ async function dayTasks(page, weekMods) { // [{ mod: 'CODE · título', st }]
 (async () => {
     const browser = await H.pw.chromium.launch();
     const weeks = process.argv[2] ? process.argv[2].split(',').map(Number) : Array.from({ length: 46 }, (_, i) => i + 1).filter(w => w !== 7);
-    // Exceção DOCUMENTADA (relatório 24/09, decisão pendente da paciente): sem.30 (29/07→04/08) é a fronteira template antigo → AMB — o D2-A que o template
-    // antigo dava na segunda 03/08 foi substituído pelo template AMB (banco A). Semana histórica; o app mostra o aviso ⚠️ (honesto). Passa só se for EXATAMENTE isso.
-    const KNOWN = { 30: 'CAR3 · DAC: IAM e Angina [13]' };
+    // Sem exceções (decisão da paciente, 24/09): a semana 30 (fronteira template antigo → AMB) recebeu o D2-A na segunda 03/08.
+    const KNOWN = {};
     let failing = 0; const failed = [];
     for (const w of weeks) {
         const wed = addDays('2026-01-07', 7 * (w - 1));
