@@ -424,7 +424,7 @@ const WEEK_SCHEDULE_CATCHUP = [
             { d: "LAZER", color: "#6B7280", text: "Noite livre ❤️", time: "livre" },
         ] },
 ];
-// ── RETA FINAL (a partir da quarta 16/12): PIPELINE — 1 fio novo por dia, sábado incluído (QUA·QUI·SEX·SÁB·DOM·SEG·TER = Fio 1..7; decisão 24/09);
+// ── RETA FINAL (a partir da quarta 16/12): PIPELINE — 6 fios/semana (decisão de capacidade, 24/09): fio novo QUA·QUI·SEX·SÁB·SEG·TER = Fio 1..6; o DOMINGO não abre fio, fecha etapas dos fios em andamento (questões do Fio 4 · apostila do Fio 3 · selagem do Fio 6 anterior);
 // cada dia = AULA do fio de hoje + QUESTÕES do fio de ontem + APOSTILA do fio de anteontem + SELAGEM do fio cuja apostila foi há ~3 dias.
 // "(sem. passada)" aponta para os fios da semana anterior (snapshot config.fioWeek); na 1ª semana esses blocos são omitidos. SÁB = dia útil (apostila do B + fios) desde 24/09.
 // ── GRADE REAL (10/09 a 11/10) + PROVISÓRIO até a próxima grade ──────────────
@@ -606,29 +606,29 @@ function buildShiftDay(sh, shPrev, base) {
 const SIMULADO_ANCHOR = "2026-08-14"; // sexta COM simulado (informado pela usuária) — cadência quinzenal real
 const FREE_START = "2026-12-16"; // QUARTA da 1ª semana da reta final (📚: a terça 15/12 fecha o Fio B da última semana CATCHUP; ⚙️: fase alinhada à semana QUA→TER)
 const WEEK_SCHEDULE_FREE = [
-    { day: "QUA", full: "Quarta", phase1_venv: "Reta final · pipeline: aula do Fio 1 · questões do Fio 7 (ter) · apostila do Fio 6 (seg) · selagem do Fio 3 da semana passada", emoji: "📚",
+    { day: "QUA", full: "Quarta", phase1_venv: "Reta final · pipeline: aula do Fio 1 · questões do Fio 6 (ter) · apostila do Fio 5 (seg) · selagem do Fio 3 da semana passada", emoji: "📚",
         activities: [
             { d: "ANKI", color: "#0369A1", text: "Anki + Meditação 15min", time: "35min" },
             { d: "DESAT", color: "#B91C1C", text: "Fio 1 · toque 1: AULA online (bloco antigo, 1.5x) + resumo — aula antes das questões, sempre", time: "1.7h" },
-            { d: "DESAT", color: "#B91C1C", text: "Fio 7 (sem. passada) · toque 2: 30 questões (bloco antigo) + caderno + Anki dos erros — registre o %", time: "2h" },
-            { d: "DESAT", color: "#B91C1C", text: "Fio 6 (sem. passada) · toque 3: apostila dirigida pelos erros (bloco antigo) + Feynman — fecha o fio", time: "1.5h" },
+            { d: "DESAT", color: "#B91C1C", text: "Fio 6 (sem. passada) · toque 2: 30 questões (bloco antigo) + caderno + Anki dos erros — registre o %", time: "2h" },
+            { d: "DESAT", color: "#B91C1C", text: "Fio 5 (sem. passada) · toque 3: apostila dirigida pelos erros (bloco antigo) + Feynman — fecha o fio", time: "1.5h" },
             { d: "REV", color: "#15803D", text: "Selar Fio 3 (sem. passada): 10 questões + smartcards + os 4 checks (bloco antigo) — o % da selagem agenda as revisões", time: "40min" },
             { d: "REV", color: "#15803D", text: "Revisão adaptativa (o app avisa pelo seu %)", time: "1h" },
             { d: "GYM", color: "#1D4ED8", text: "Academia — horário livre", time: "1h" },
             { d: "LAZER", color: "#6B7280", text: "Lazer à noite ❤️", time: "livre" },
         ] },
-    { day: "QUI", full: "Quinta", phase1_venv: "Reta final · pipeline: aula do Fio 2 · questões do Fio 1 · apostila do Fio 7 da semana passada · selagem do Fio 4 da semana passada", emoji: "📚",
+    { day: "QUI", full: "Quinta", phase1_venv: "Reta final · pipeline: aula do Fio 2 · questões do Fio 1 · apostila do Fio 6 da semana passada · selagem do Fio 4 da semana passada", emoji: "📚",
         activities: [
             { d: "ANKI", color: "#0369A1", text: "Anki + Meditação 15min", time: "35min" },
             { d: "DESAT", color: "#B91C1C", text: "Fio 2 · toque 1: AULA online (bloco antigo, 1.5x) + resumo — aula antes das questões, sempre", time: "1.7h" },
             { d: "DESAT", color: "#B91C1C", text: "Fio 1 · toque 2: 30 questões (bloco antigo) + caderno + Anki dos erros — registre o %", time: "2h" },
-            { d: "DESAT", color: "#B91C1C", text: "Fio 7 (sem. passada) · toque 3: apostila dirigida pelos erros (bloco antigo) + Feynman — fecha o fio", time: "1.5h" },
+            { d: "DESAT", color: "#B91C1C", text: "Fio 6 (sem. passada) · toque 3: apostila dirigida pelos erros (bloco antigo) + Feynman — fecha o fio", time: "1.5h" },
             { d: "REV", color: "#15803D", text: "Selar Fio 4 (sem. passada): 10 questões + smartcards + os 4 checks (bloco antigo) — o % da selagem agenda as revisões", time: "40min" },
             { d: "REV", color: "#15803D", text: "Questões dos temas fracos + Smartcards", time: "1h" },
             { d: "GYM", color: "#1D4ED8", text: "Academia — horário livre", time: "1h" },
             { d: "LAZER", color: "#6B7280", text: "Lazer à noite ❤️", time: "livre" },
         ] },
-    { day: "SEX", full: "Sexta", phase1_venv: "SIMULADO quinzenal + pipeline: aula do Fio 3 · questões do Fio 2 · apostila do Fio 1 · selagem do Fio 5 da semana passada", emoji: "🎯",
+    { day: "SEX", full: "Sexta", phase1_venv: "SIMULADO quinzenal + pipeline: aula do Fio 3 · questões do Fio 2 · apostila do Fio 1", emoji: "🎯",
         activities: [
             { d: "ANKI", color: "#0369A1", text: "Anki + Meditação 15min", time: "35min" },
             { d: "D7", color: "#0F766E", text: "D7 · SIMULADO NA ÍNTEGRA (quinzenal): manhã, cronometrado", time: "5h" },
@@ -636,50 +636,46 @@ const WEEK_SCHEDULE_FREE = [
             { d: "DESAT", color: "#B91C1C", text: "Fio 3 · toque 1: AULA online (bloco antigo, 1.5x) + resumo — aula antes das questões, sempre", time: "1.7h" },
             { d: "DESAT", color: "#B91C1C", text: "Fio 2 · toque 2: 30 questões (bloco antigo) + caderno + Anki dos erros — registre o %", time: "2h" },
             { d: "DESAT", color: "#B91C1C", text: "Fio 1 · toque 3: apostila dirigida pelos erros (bloco antigo) + Feynman — fecha o fio", time: "1.5h" },
-            { d: "REV", color: "#15803D", text: "Selar Fio 5 (sem. passada): 10 questões + smartcards + os 4 checks (bloco antigo) — o % da selagem agenda as revisões", time: "40min" },
             { d: "REV", color: "#15803D", text: "Sem simulado: caderno de erros dos simulados anteriores", time: "1h" },
             { d: "GYM", color: "#1D4ED8", text: "Academia — horário livre (dia de simulado: pós-correção)", time: "1h" },
             { d: "LAZER", color: "#6B7280", text: "Lazer à noite ❤️", time: "livre" },
         ] },
-    { day: "SAB", full: "Sábado", phase1_venv: "Reta final · pipeline: aula do Fio 4 · questões do Fio 3 · apostila do Fio 2 · selagem do Fio 6 da semana passada · PLAN da semana + backup (o dia SEM Venvanse é o de menor carga, selo 🌿)", emoji: "📚",
+    { day: "SAB", full: "Sábado", phase1_venv: "Reta final · pipeline: aula do Fio 4 · questões do Fio 3 · apostila do Fio 2 · selagem do Fio 5 da semana passada · PLAN da semana + backup (o dia SEM Venvanse é o de menor carga, selo 🌿)", emoji: "📚",
         activities: [
             { d: "ANKI", color: "#0369A1", text: "Anki + Meditação 15min", time: "35min" },
             { d: "DESAT", color: "#B91C1C", text: "Fio 4 · toque 1: AULA online (bloco antigo, 1.5x) + resumo — aula antes das questões, sempre", time: "1.7h" },
             { d: "DESAT", color: "#B91C1C", text: "Fio 3 · toque 2: 30 questões (bloco antigo) + caderno + Anki dos erros — registre o %", time: "2h" },
             { d: "DESAT", color: "#B91C1C", text: "Fio 2 · toque 3: apostila dirigida pelos erros (bloco antigo) + Feynman — fecha o fio", time: "1.5h" },
-            { d: "REV", color: "#15803D", text: "Selar Fio 6 (sem. passada): 10 questões + smartcards + os 4 checks (bloco antigo) — o % da selagem agenda as revisões", time: "40min" },
+            { d: "REV", color: "#15803D", text: "Selar Fio 5 (sem. passada): 10 questões + smartcards + os 4 checks (bloco antigo) — o % da selagem agenda as revisões", time: "40min" },
             { d: "REV", color: "#15803D", text: "Revisão D+30 adaptativa + caderno de erros", time: "1h" },
             { d: "PLAN", color: "#0F766E", text: "Implementação de intenção + RECOMPENSA por escrito · pomodoros: aba Desatraso · backup semanal", time: "15min" },
             { d: "LAZER", color: "#6B7280", text: "Noite livre ❤️", time: "livre" },
         ] },
-    { day: "DOM", full: "Domingo", phase1_venv: "Dia ATIVO · pipeline: aula do Fio 5 · questões do Fio 4 · apostila do Fio 3 · selagem do Fio 7 da semana passada", emoji: "🔥",
+    { day: "DOM", full: "Domingo", phase1_venv: "Dia ATIVO · pipeline sem fio novo (6 fios/semana): questões do Fio 4 · apostila do Fio 3 · selagem do Fio 6 da semana passada", emoji: "🔥",
         activities: [
             { d: "ANKI", color: "#0369A1", text: "Anki + Meditação 15min", time: "35min" },
-            { d: "DESAT", color: "#B91C1C", text: "Fio 5 · toque 1: AULA online (bloco antigo, 1.5x) + resumo — aula antes das questões, sempre", time: "1.7h" },
             { d: "DESAT", color: "#B91C1C", text: "Fio 4 · toque 2: 30 questões (bloco antigo) + caderno + Anki dos erros — registre o %", time: "2h" },
             { d: "DESAT", color: "#B91C1C", text: "Fio 3 · toque 3: apostila dirigida pelos erros (bloco antigo) + Feynman — fecha o fio", time: "1.5h" },
-            { d: "REV", color: "#15803D", text: "Selar Fio 7 (sem. passada): 10 questões + smartcards + os 4 checks (bloco antigo) — o % da selagem agenda as revisões", time: "40min" },
+            { d: "REV", color: "#15803D", text: "Selar Fio 6 (sem. passada): 10 questões + smartcards + os 4 checks (bloco antigo) — o % da selagem agenda as revisões", time: "40min" },
             { d: "REV", color: "#15803D", text: "Revisão adaptativa + Anki dos erros", time: "1h" },
             { d: "GYM", color: "#1D4ED8", text: "Academia — horário livre", time: "1h" },
             { d: "LAZER", color: "#6B7280", text: "Noite leve — dormir bem para a segunda", time: "livre" },
         ] },
-    { day: "SEG", full: "Segunda", phase1_venv: "Reta final · pipeline: aula do Fio 6 · questões do Fio 5 · apostila do Fio 4 · selagem do Fio 1 desta semana", emoji: "🔥",
+    { day: "SEG", full: "Segunda", phase1_venv: "Reta final · pipeline: aula do Fio 5 · apostila do Fio 4 · selagem do Fio 1 desta semana", emoji: "🔥",
         activities: [
             { d: "ANKI", color: "#0369A1", text: "Anki + Meditação 15min", time: "35min" },
-            { d: "DESAT", color: "#B91C1C", text: "Fio 6 · toque 1: AULA online (bloco antigo, 1.5x) + resumo — aula antes das questões, sempre", time: "1.7h" },
-            { d: "DESAT", color: "#B91C1C", text: "Fio 5 · toque 2: 30 questões (bloco antigo) + caderno + Anki dos erros — registre o %", time: "2h" },
+            { d: "DESAT", color: "#B91C1C", text: "Fio 5 · toque 1: AULA online (bloco antigo, 1.5x) + resumo — aula antes das questões, sempre", time: "1.7h" },
             { d: "DESAT", color: "#B91C1C", text: "Fio 4 · toque 3: apostila dirigida pelos erros (bloco antigo) + Feynman — fecha o fio", time: "1.5h" },
             { d: "REV", color: "#15803D", text: "Selar Fio 1: 10 questões + smartcards + os 4 checks (bloco antigo) — o % da selagem agenda as revisões", time: "40min" },
             { d: "REV", color: "#15803D", text: "Questões dos temas fracos + Smartcards", time: "1h" },
             { d: "GYM", color: "#1D4ED8", text: "Academia — horário livre", time: "1h" },
             { d: "LAZER", color: "#6B7280", text: "Lazer à noite ❤️", time: "livre" },
         ] },
-    { day: "TER", full: "Terça", phase1_venv: "Reta final · pipeline: aula do Fio 7 · questões do Fio 6 · apostila do Fio 5 · selagem do Fio 2 desta semana", emoji: "📚",
+    { day: "TER", full: "Terça", phase1_venv: "Reta final · pipeline: aula do Fio 6 · questões do Fio 5 · selagem do Fio 2 desta semana", emoji: "📚",
         activities: [
             { d: "ANKI", color: "#0369A1", text: "Anki + Meditação 15min", time: "35min" },
-            { d: "DESAT", color: "#B91C1C", text: "Fio 7 · toque 1: AULA online (bloco antigo, 1.5x) + resumo — aula antes das questões, sempre", time: "1.7h" },
-            { d: "DESAT", color: "#B91C1C", text: "Fio 6 · toque 2: 30 questões (bloco antigo) + caderno + Anki dos erros — registre o %", time: "2h" },
-            { d: "DESAT", color: "#B91C1C", text: "Fio 5 · toque 3: apostila dirigida pelos erros (bloco antigo) + Feynman — fecha o fio", time: "1.5h" },
+            { d: "DESAT", color: "#B91C1C", text: "Fio 6 · toque 1: AULA online (bloco antigo, 1.5x) + resumo — aula antes das questões, sempre", time: "1.7h" },
+            { d: "DESAT", color: "#B91C1C", text: "Fio 5 · toque 2: 30 questões (bloco antigo) + caderno + Anki dos erros — registre o %", time: "2h" },
             { d: "REV", color: "#15803D", text: "Selar Fio 2: 10 questões + smartcards + os 4 checks (bloco antigo) — o % da selagem agenda as revisões", time: "40min" },
             { d: "REV", color: "#15803D", text: "Revisão adaptativa (o app avisa pelo seu %)", time: "1h" },
             { d: "GYM", color: "#1D4ED8", text: "Academia — horário livre", time: "1h" },
@@ -717,7 +713,7 @@ function fmtBR(iso) { const [, m, d] = iso.split("-"); return `${d}/${m}`; }
 function todayDayIdx() { return (new Date().getDay() - 3 + 7) % 7; } // 0=QUA..6=TER (semana QUA→TER)
 // ── PROJEÇÃO DE ZERAMENTO + HORIZONTE DINÂMICO ────────────────────────────
 // Ritmo honesto por fase (módulos/semana, com fio de 3 toques) — ajustável:
-const PROJ_PACE = { amb: 1, g2: 2, catchup: 2, free: 7 }; // free: o pipeline abre 7 fios/semana (1 por dia, sábado incluído — 24/09)
+const PROJ_PACE = { amb: 1, g2: 2, catchup: 2, free: 6 }; // free: o pipeline abre 6 fios/semana (decisão de capacidade — 24/09); o domingo fecha etapas, não abre fio
 // ── T1/T2/T5 (🧩 + ⚙️): UM só caminho de gravação do progresso, usado pelo card (Módulos), pela linha (Desatraso) e pelo bloco do dia (Cronograma) ──
 function toggleProgressField(progress, id, field) {
     const cur = (progress || {})[id] || {};
@@ -854,14 +850,14 @@ function effectiveTargets(queue, n) {
     const auto = catchupTargets(queue.filter(m => !pinSet.has(m.id)), n);
     return pinned.concat(auto).slice(0, Math.max(n, pinned.length));
 }
-// ── RETA FINAL: os 7 fios da semana ficam CONGELADOS (config.fioWeek[isoDaQuarta] = [ids]) para o pipeline não deslizar
+// ── RETA FINAL: os 6 fios da semana ficam CONGELADOS (config.fioWeek[isoDaQuarta] = [ids]) para o pipeline não deslizar
 // quando um módulo é concluído no meio da semana (⚙️: o app não mente; 🧩: previsibilidade). Sem snapshot → cálculo vivo.
 // ── Fase da semana (pelos dias que ela contém) e nº de fios que a fase abre ──
 function weekPhase(startISO, wk) {
     const wed = weekDayISO(startISO, wk, 0), ter = weekDayISO(startISO, wk, 6);
     return wed >= FREE_START ? "FREE" : wed >= CATCHUP_START ? "CATCHUP" : ter >= G2_START ? "G2" : "AMB"; // "G2" cobre G2 e POST (mesmo desenho de fios)
 }
-function fiosWanted(phase, pace) { return phase === "FREE" ? 7 : phase === "CATCHUP" ? 2 : Math.max(1, Math.min(4, Number(pace) || 2)); }
+function fiosWanted(phase, pace) { return phase === "FREE" ? 6 : phase === "CATCHUP" ? 2 : Math.max(1, Math.min(4, Number(pace) || 2)); }
 // P1 (📚 continuidade + ⚙️ a tela não pode mentir): candidatos a fio NOVO — módulo FECHADO (aula + questões + apostila marcadas) sai dos slots
 // (só a selagem o chama); módulo EM ANDAMENTO (aula marcada, questões pendentes) entra PRIMEIRO; depois, recência. `carry` = ids que a semana
 // passada ainda conduz (Fio 4 em cascata cruzada na G2/POST; todos os fios na FREE): não viram fio novo.
@@ -1164,7 +1160,7 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, onSaveSchedule
     const catchupForDay = (dayIdx) => {
         const iso = weekDayISO(startISO, week, dayIdx);
         if (iso >= FREE_START) {
-            const map = { 0: 0, 1: 1, 2: 2, 3: 3, 4: 4, 5: 5, 6: 6 }; // Reta final (7 fios, sábado incluído): só para blocos SEM "Fio N" (os do pipeline resolvem pelo snapshot)
+            const map = { 0: 0, 1: 1, 2: 2, 3: 3, 4: 3, 5: 4, 6: 5 }; // Reta final (6 fios: QUA·QUI·SEX·SÁB·SEG·TER; DOM fecha etapas do Fio 4/3): só para blocos SEM "Fio N" (os do pipeline resolvem pelo snapshot)
             return (dayIdx in map) ? (targets[map[dayIdx]] || null) : null;
         }
         if (iso >= CATCHUP_START) {
@@ -1387,21 +1383,39 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, onSaveSchedule
     // Override por semana em config.lightDayOverrides (escolha manual = dia sem remédio, com selo de validação).
     // O selo 🌿 NÃO altera os blocos do dia — "faça só o leve, mova o pesado". Pausa de medicação: validar com a psiquiatra.
     const showLight = dateFor(6) >= G2_START; // semanas totalmente históricas (antes de 10/09) não mostram o seletor
+    // Desempate (decisão da paciente, 24/09): cargas a ≤ 45min entre si são "parecidas" — a escolha por minutos seria arbitrária. Ordem:
+    // (a) dia sem aula da faculdade/presencial (bloco AULA) · (b) não véspera de plantão nem de dia-motor (segunda) · (c) menos etapas que dependem de
+    // continuidade no dia seguinte · (d) o mais distante de um plantão · empate final: o 1º dia. A interface avisa e ela pode trocar no seletor.
+    const LIGHT_TIE_H = 0.75;
+    const shiftDates = Object.keys(DATED_SHIFTS);
+    const distToShift = (iso) => shiftDates.length ? Math.min(...shiftDates.map(d => Math.abs(diffDays(d, iso)))) : 99;
+    const nextStageRe = (t) => { const m = t.match(/^(Fio [^·]+?) · toque (\d)/); if (m) return new RegExp("^" + m[1].replace(" (sem. passada)", "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "( \\(sem\\. passada\\))? · toque " + (Number(m[2]) + 1)); if (/D2-A|Aula online Bloco A \(1\.5x\)/.test(t)) return /Apostila do Bloco A/; if (/D2-B|deslocado da sexta/.test(t)) return /Apostila do Bloco B/; return null; }; // o elo pode cruzar a semana ("Fio 4 · toque 1" TER → "Fio 4 (sem. passada) · toque 2" QUA)
+    const contLinks = (d) => { const cur = listAt(d) || [], nxt = listAt(d + 1) || []; return cur.reduce((k, a) => { const re = nextStageRe(a.text); return k + (re && nxt.some(x => re.test(x.text)) ? 1 : 0); }, 0); };
     const lightDayFor = (k = 0) => { // k = 0 esta semana; 1–3 = semanas à frente (mesma regra: menor carga entre os dias livres daquela semana)
         const isSim = simFor(isoAt(7 * k + 2));
-        let best = null;
+        const cands = [];
         for (let i = 0; i < 7; i++) {
             const iso = isoAt(7 * k + i);
             if (i === 0 && iso <= "2026-11-24") continue;   // quarta com aula presencial
             if (DATED_SHIFTS[iso]) continue;                 // plantão datado
             if ((DATED_SHIFTS[addDaysISO(iso, -1)] || {}).kind === "noite") continue; // dia pós-noturno (veto 🧠)
             if (i === 2 && isSim) continue;                  // sexta de simulado
-            const ld = loadAt(7 * k + i); if (!ld) continue; const hrs = ld.study;
-            if (!best || hrs < best.hours - 1e-9) best = { idx: i, hours: hrs }; // menor carga estrita; empate = o 1º dia (SÁB sem tratamento especial — decisão 24/09)
+            const ld = loadAt(7 * k + i); if (!ld) continue;
+            cands.push({ idx: i, hours: ld.study, iso });
         }
-        if (!best) return { idx: null, hours: null, min: null, source: "auto", breather: false };
-        if (best.hours > STUDY_WARN_H) return { idx: best.idx, hours: best.hours, min: best.hours, source: "auto", breather: true }; // respiro, COM Venvanse
-        return { idx: best.idx, hours: best.hours, min: best.hours, source: "auto", breather: false };
+        if (!cands.length) return { idx: null, hours: null, min: null, source: "auto", breather: false, tie: [] };
+        const minH = Math.min(...cands.map(c => c.hours));
+        const group = cands.filter(c => c.hours <= minH + LIGHT_TIE_H + 1e-9);
+        const score = (c) => { const d = 7 * k + c.idx; const list = listAt(d) || []; return [
+            list.some(a => a.d === "AULA") ? 1 : 0,                                                             // (a) aula da faculdade / presencial
+            (DATED_SHIFTS[addDaysISO(c.iso, 1)] || (c.idx + 1) % 7 === 5) ? 1 : 0,                             // (b) véspera de plantão ou de dia-motor (segunda)
+            contLinks(d),                                                                                        // (c) etapas que dependem do dia seguinte
+            -distToShift(c.iso),                                                                                 // (d) mais distante de um plantão
+            c.idx]; };
+        const best = group.slice().sort((x, y) => { const a = score(x), b = score(y); for (let j = 0; j < a.length; j++) if (a[j] !== b[j]) return a[j] - b[j]; return 0; })[0];
+        const tie = group.length > 1 ? group.map(c => c.idx) : [];
+        if (best.hours > STUDY_WARN_H) return { idx: best.idx, hours: best.hours, min: minH, source: "auto", breather: true, tie }; // respiro, COM Venvanse
+        return { idx: best.idx, hours: best.hours, min: minH, source: "auto", breather: false, tie };
     };
     const lightAuto = lightDayFor();
     const lightOvRaw = ((config && config.lightDayOverrides) || {})[dateFor(0)];
@@ -1530,7 +1544,7 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, onSaveSchedule
             React.createElement("div", { style: { color: "#94a3b8", fontSize: 11, marginBottom: 10 } }, "ESTRUTURA DOS DIAS D"),
             React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 6 } }, (dayDate >= FREE_START ? [
                 { d: "—", label: "Reta final", desc: "Sem ambulatório — dias 100% livres", color: "#6B7280" },
-                { d: "DESAT", label: "Pipeline", desc: "Cada dia, sábado incluído: AULA do fio de hoje · QUESTÕES do de ontem · APOSTILA do de anteontem · SELAGEM do de há 5 dias (7 fios/sem) · selo 🌿 = dia de menor carga, calculado a cada semana", color: "#B91C1C" },
+                { d: "DESAT", label: "Pipeline", desc: "6 fios/sem: AULA do fio de hoje · QUESTÕES do de ontem · APOSTILA do de anteontem · SELAGEM do de há 5 dias — sábado abre fio, domingo só fecha etapas (questões · apostila · selagem) · selo 🌿 = dia de menor carga, calculado a cada semana", color: "#B91C1C" },
                 { d: "D7", label: "Sexta", desc: "Simulado quinzenal + correção", color: "#0F766E" },
                 { d: "🌿", label: "Sem remédio", desc: "Dia de menor carga da semana (selo 🌿), sábado por padrão", color: "#15803D" },
             ] : dayDate >= CATCHUP_START ? [
@@ -1593,7 +1607,8 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, onSaveSchedule
                 ? (isBreather
                     ? React.createElement("span", { style: { color: "#fbbf24", fontSize: 10, fontWeight: 700, lineHeight: 1.4 } }, DAY_LBL[lightDay.idx] + " " + fmtBR(dateFor(lightDay.idx)) + " · " + fmtHrs(lightDay.hours) + " de estudo · semana sem pausa: nenhum dia ficou abaixo de " + STUDY_WARN_H + "h — dia de respiro COM Venvanse (o mais leve da semana)")
                     : React.createElement("span", { style: { color: "#64748b", fontSize: 10, lineHeight: 1.4 } }, DAY_LBL[lightDay.idx] + " " + fmtBR(dateFor(lightDay.idx)) + " · " + fmtHrs(lightDay.hours) + " de estudo" + (lightDay.source === "manual" ? " · escolha manual" : " · menor carga entre os dias livres") + " · validar com a psiquiatra"))
-                : React.createElement("span", { style: { color: "#f5c518", fontSize: 10, fontWeight: 800, lineHeight: 1.4 } }, "🌿 Nenhum dia candidato esta semana (todos com plantão, pós-noturno, presencial ou simulado)")),
+                : React.createElement("span", { style: { color: "#f5c518", fontSize: 10, fontWeight: 800, lineHeight: 1.4 } }, "🌿 Nenhum dia candidato esta semana (todos com plantão, pós-noturno, presencial ou simulado)"),
+            lightDay.source === "auto" && lightAuto.tie && lightAuto.tie.length > 1 && React.createElement("span", { style: { color: "#86efac", fontSize: 10, fontWeight: 700, lineHeight: 1.4, width: "100%" } }, "🌿 Vários dias com carga parecida (" + lightAuto.tie.map(i => DAY_LBL[i]).join(", ") + ") — escolhi " + DAY_LBL[lightAuto.idx] + "; toque para trocar.")),
         React.createElement("div", { style: { display: "flex", gap: 6, overflowX: "auto", paddingBottom: 4 } }, WEEK_SCHEDULE.map((_d, i) => {
             const dt = dateFor(i);
             const d = schedFor(dt)[i];
@@ -2047,7 +2062,7 @@ function CatchUp({ progress, onUpdate, effWeek, config, onSaveConfig }) {
     const onTrack = remaining === 0 || proj <= "2026-12-31";
     const slotFor = (i) => {
         const t = todayISO();
-        if (t >= FREE_START) return ["QUA", "QUI", "SEX", "SÁB", "DOM", "SEG", "TER"][i] || "…";
+        if (t >= FREE_START) return ["QUA", "QUI", "SEX", "SÁB", "SEG", "TER"][i] || "…";
         if (t >= CATCHUP_START) return i === 0 ? "FIO A · Qua/Qui/Sáb" : "FIO B · Dom/Seg/Ter";
         if (t >= G2_START) return "FIO " + (i + 1);
         if (t >= AMB_START && t <= AMB_END) return i === 0 ? "FIO · Ter→Sex→Sáb" : "PRÓXIMO · Dom (áudio)";
