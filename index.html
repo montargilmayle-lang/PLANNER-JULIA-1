@@ -811,28 +811,32 @@ const SEAL_NEXT_DAY = { 1: 7, 3: 8, 2: 9, 4: 11 }; // = FIO_SEAL_NEXT invertido,
 function slotDays(s) { const p = {}; (FIO_PAT[s - 1] || []).forEach(x => { p[x[1]] = x[0]; }); if (s === 4) { p.quest = 7; p.apost = 8; } p.seal = SEAL_NEXT_DAY[s]; return p; }
 // REDISTRIBUIÇÃO AVISADA (paciente decide): config.fioPlan[isoDaQuarta][slot] = { aula|quest|apost|seal: dia } sobrescreve o dia padrão de um toque;
 // config.fioExtra[isoDaQuarta] = [{ label, id, aula, quest, apost, seal }] são fios ABERTOS pela sugestão aceita (dias absolutos, podem cruzar a semana).
-function fioPrevBlocksFor(dayIdx, prevN, prevPlan, prevExtras) {
+function extraBlocksFor(dayIdx, extras, prevExtras, prev2Extras) { // fios abertos pela sugestão: desta semana, da passada (−7) e de há 2 semanas (−14) — valem em TODAS as fases ≥ G2
+    const out = [], T = ["aula", "quest", "apost"];
+    const ago2 = (b) => ({ ...b, text: b.text.replace(" (sem. passada)", " (há 2 sem.)") }); // rótulo próprio: o mesmo "Fio N" pode existir na semana passada (resolveBlock)
+    (prev2Extras || []).forEach(e => { T.forEach(st => { if (e[st] - 14 === dayIdx) out.push(ago2(fioBlock(e.label, st, true))); }); if (e.seal - 14 === dayIdx) out.push(ago2(fioSealBlock(e.label))); });
+    (prevExtras || []).forEach(e => { T.forEach(st => { if (e[st] - 7 === dayIdx) out.push(fioBlock(e.label, st, true)); }); if (e.seal - 7 === dayIdx) out.push(fioSealBlock(e.label)); });
+    (extras || []).forEach(e => { T.forEach(st => { if (e[st] === dayIdx) out.push(fioBlock(e.label, st)); }); if (e.seal === dayIdx) out.push({ ...fioSealBlock(e.label), text: fioSealBlock(e.label).text.replace(" (sem. passada)", "") }); });
+    return out;
+}
+function fioPrevBlocksFor(dayIdx, prevN, prevPlan) {
     const pn = Math.max(0, Math.min(4, Number(prevN) || 0)); // quantos fios a semana passada abriu (0 = 1ª semana da G2: nada a fechar)
-    const pl = prevPlan || {}, pe = prevExtras || [];
+    const pl = prevPlan || {};
     const out = [];
     for (let s = 1; s <= pn; s++) { // toques da semana passada que caem nesta (Fio 4 cruzado por padrão; qualquer slot se o plano os moveu para cá)
         const dd = slotDays(s), ov = pl[String(s)] || {};
         ["quest", "apost"].forEach(st => { const d = ov[st] != null ? ov[st] : dd[st]; if (d - 7 === dayIdx) out.push(fioBlock(s, st, true)); });
     }
-    pe.forEach(e => ["aula", "quest", "apost"].forEach(st => { if (e[st] - 7 === dayIdx) out.push(fioBlock(e.label, st, true)); }));
     for (let s = 1; s <= pn; s++) { const ov = pl[String(s)] || {}; const d = ov.seal != null ? ov.seal : SEAL_NEXT_DAY[s]; if (d - 7 === dayIdx) out.push(fioSealBlock(s)); } // selagem por fio (+3d da apostila), salvo se antecipada na própria semana
-    pe.forEach(e => { if (e.seal - 7 === dayIdx) out.push(fioSealBlock(e.label)); });
     return out;
 }
-function fioBlocksFor(dayIdx, pace, prevN, plan, prevPlan, extras, prevExtras) {
+function fioBlocksFor(dayIdx, pace, prevN, plan, prevPlan, extras, prevExtras, prev2Extras) {
     const n = Math.max(1, Math.min(4, Number(pace) || 2));
-    const pl = plan || {}, ex = extras || [];
-    const out = fioPrevBlocksFor(dayIdx, prevN, prevPlan, prevExtras);
+    const pl = plan || {};
+    const out = fioPrevBlocksFor(dayIdx, prevN, prevPlan);
     for (let s = 1; s <= n; s++) { const dd = slotDays(s), ov = pl[String(s)] || {}; ["aula", "quest", "apost"].forEach(st => { const d = ov[st] != null ? ov[st] : dd[st]; if (d === dayIdx) out.push(fioBlock(s, st)); }); }
-    ex.forEach(e => ["aula", "quest", "apost"].forEach(st => { if (e[st] === dayIdx) out.push(fioBlock(e.label, st)); }));
     for (let s = 1; s <= n; s++) { const ov = pl[String(s)] || {}; if (ov.seal != null && ov.seal === dayIdx) out.push({ ...fioSealBlock(s), text: fioSealBlock(s).text.replace(" (sem. passada)", "") }); } // selagem antecipada nesta semana
-    ex.forEach(e => { if (e.seal === dayIdx) out.push({ ...fioSealBlock(e.label), text: fioSealBlock(e.label).text.replace(" (sem. passada)", "") }); });
-    return out;
+    return out.concat(extraBlocksFor(dayIdx, extras, prevExtras, prev2Extras));
 }
 // ── ESCOLHA MANUAL DO DESATRASO: fixar/trocar/acrescentar o fio da semana ──
 let __PINS = [];
@@ -1147,6 +1151,7 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, onSaveSchedule
     const wedISO0 = weekDayISO(startISO, week, 0), prevWedISO = weekDayISO(startISO, week - 1, 0);
     const plan = ((config && config.fioPlan) || {})[wedISO0] || {}, prevPlan = ((config && config.fioPlan) || {})[prevWedISO] || {};
     const extras = ((config && config.fioExtra) || {})[wedISO0] || [], prevExtras = ((config && config.fioExtra) || {})[prevWedISO] || [];
+    const prev2Extras = ((config && config.fioExtra) || {})[weekDayISO(startISO, week - 2, 0)] || [];
     const modOfId = (id) => queue.find(m => m.id === id) || MODULES.find(m => m.id === id) || null;
     const targets = wkPh === "AMB" ? effectiveTargets(queue, 6) : wkIds.map(modOfId).filter(Boolean);
     const catchupForDay = (dayIdx) => {
@@ -1189,7 +1194,9 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, onSaveSchedule
     };
     // Sexta de simulado? override manual → sexta de plantão = não → paridade quinzenal (âncora 14/08)
     const simFor = (fri) => { const ovr = ((config && config.simOverrides) || {})[fri]; return ovr !== undefined ? ovr : (DATED_SHIFTS[fri] ? false : (((diffDays(SIMULADO_ANCHOR, fri) % 14) + 14) % 14 === 0)); };
-    const genActivities = (dayIdx, paceOv, keepDone) => {
+    // Gerador por CONTEXTO de semana (a sugestão de redistribuição usa o da semana seguinte para avaliar a carga dos dias onde cai)
+    const genForCtx = (ctx, dayIdx, paceOv, keepDone) => {
+        const week = ctx.week, wkPh = ctx.wkPh, prevPh = ctx.prevPh, prevIds = ctx.prevIds, plan = ctx.plan, prevPlan = ctx.prevPlan, extras = ctx.extras, prevExtras = ctx.prevExtras, prev2Extras = ctx.prev2Extras, prevIdsFor = ctx.prevIdsFor;
         const iso = weekDayISO(startISO, week, dayIdx);
         let acts = schedFor(iso)[dayIdx].activities;
         if (iso >= AMB_START) {
@@ -1205,7 +1212,7 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, onSaveSchedule
             }
         }
         if (iso >= G2_START && iso < CATCHUP_START) {
-            const fb = fioBlocksFor(dayIdx, paceOv || paceCfg, (paceOv ? prevIdsFor(paceOv) : prevIds).length, plan, prevPlan, extras, prevExtras);
+            const fb = fioBlocksFor(dayIdx, paceOv || paceCfg, (paceOv ? prevIdsFor(paceOv) : prevIds).length, plan, prevPlan, extras, prevExtras, prev2Extras);
             if (fb.length) {
                 let li = acts.map(a => a.d).lastIndexOf("LAZER");
                 if (li < 0 && acts.length && acts[acts.length - 1].d === "AULA") li = acts.length - 1; // sem LAZER (TER da G2): fios antes da aula da faculdade à noite
@@ -1217,8 +1224,12 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, onSaveSchedule
         // ── FRONTEIRA DE FASE (📚 nenhuma etapa fica órfã · ⚙️ a transição de template não perde estado) ──
         if (wkPh === "CATCHUP" && prevPh === "G2") { // 1ª semana da CATCHUP: sela os fios fechados no fim do POST (+3d) e fecha o Fio 4 cruzado; o template ainda não tem Fio A/B "da semana passada"
             acts = acts.filter(a => !/Selar o Fio [AB] da semana passada/.test(a.text));
-            const pb = fioPrevBlocksFor(dayIdx, prevIds.length, prevPlan, prevExtras);
+            const pb = fioPrevBlocksFor(dayIdx, prevIds.length, prevPlan);
             if (pb.length) { const li = acts.map(a => a.d).lastIndexOf("LAZER"); acts = li >= 0 ? acts.slice(0, li).concat(pb, acts.slice(li)) : acts.concat(pb); }
+        }
+        if (wkPh === "CATCHUP" || wkPh === "FREE") { // fios extras (sugestão aceita) também nas fases de template fixo
+            const eb = extraBlocksFor(dayIdx, extras, prevExtras, prev2Extras);
+            if (eb.length) { const li = acts.map(a => a.d).lastIndexOf("LAZER"); acts = li >= 0 ? acts.slice(0, li).concat(eb, acts.slice(li)) : acts.concat(eb); }
         }
         if (wkPh === "FREE" && prevPh === "CATCHUP" && dayIdx === 2 && prevIds.length >= 2) { // 1ª semana da FREE: o Fio B da última semana da CATCHUP (apostila na terça) é selado na sexta (+3d)
             const pb = [{ d: "REV", color: "#15803D", text: "Selar Fio B (sem. passada): 10 questões + smartcards + os 4 checks (bloco antigo) — o % da selagem agenda as revisões", time: "40min" }];
@@ -1238,7 +1249,7 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, onSaveSchedule
                 : a);
         // BUG 2 (paciente, 24/09): etapa de fio JÁ FEITA não ocupa dia ainda não vivido — o snapshot congela os fios, mas um módulo fechado/selado
         // sai dos slots a partir do fechamento. Dias passados e o de hoje ficam como histórico (nada é reescrito).
-        if (!keepDone && wkPh !== "AMB" && iso > todayISO()) {
+        if (ctx.cur && !keepDone && wkPh !== "AMB" && iso > todayISO()) {
             const pg = reviews.progress || {};
             acts = acts.filter(a => {
                 if (!(a.d === "DESAT" || /^(Semana de simulado · )?Selar (o )?Fio/.test(a.text))) return true;
@@ -1250,6 +1261,12 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, onSaveSchedule
             id: `g-${week}-${dayIdx}-${i}`, d: a.d, color: a.color, text: a.text, time: a.time,
         }));
     };
+    const curCtx = { week, wkPh, prevPh, prevIds, plan, prevPlan, extras, prevExtras, prev2Extras, prevIdsFor, cur: true };
+    const genActivities = (dayIdx, paceOv, keepDone) => genForCtx(curCtx, dayIdx, paceOv, keepDone);
+    // Semana seguinte (sinalização 2, ⚙️ + 🧠/😴): a proposta confere a carga dos dias onde cai com o mesmo limiar e diz quando passa de 8h
+    const nextWed = weekDayISO(startISO, week + 1, 0);
+    const nextCtx = { week: week + 1, wkPh: weekPhase(startISO, week + 1), prevPh: wkPh, prevIds: wkIds, plan: ((config && config.fioPlan) || {})[nextWed] || {}, prevPlan: plan, extras: ((config && config.fioExtra) || {})[nextWed] || [], prevExtras: extras, prev2Extras: prevExtras, prevIdsFor: () => wkIds, cur: false };
+    const nextHours = (d7) => { const iso = weekDayISO(startISO, week + 1, d7); return studyHours(scheduleOv[iso] || genForCtx(nextCtx, d7, null, true)); };
     const dateFor = (dayIdx) => weekDayISO(startISO, week, dayIdx);
     const listFor = (dayIdx) => { var _a; return (_a = scheduleOv[dateFor(dayIdx)]) !== null && _a !== void 0 ? _a : genActivities(dayIdx); };
     const isCustom = (dayIdx) => !!scheduleOv[dateFor(dayIdx)];
@@ -1307,9 +1324,10 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, onSaveSchedule
         if (r === "B")
             return blockB;
         if (r === "DESAT") {
-            const fm = text.match(/Fio (\d+|[AB])( \(sem\. passada\))?/);
-            if (fm && wkPh !== "AMB") { // G2/POST/CATCHUP/FREE: fios congelados por semana (config.fioWeek); "(sem. passada)" = semana anterior; A/B = 1º/2º; além do ritmo = fio extra (sugestão aceita)
+            const fm = text.match(/Fio (\d+|[AB])( \(sem\. passada\)| \(há 2 sem\.\))?/);
+            if (fm && wkPh !== "AMB") { // G2/POST/CATCHUP/FREE: fios congelados por semana (config.fioWeek); "(sem. passada)" = semana anterior; "(há 2 sem.)" = só fio extra de 2 semanas atrás; A/B = 1º/2º; além do ritmo = fio extra (sugestão aceita)
                 const k = /\d/.test(fm[1]) ? Number(fm[1]) : (fm[1] === "A" ? 1 : 2);
+                if (fm[2] && /há 2/.test(fm[2])) { const e2 = prev2Extras.find(e => e.label === k); return e2 ? modOfId(e2.id) : null; }
                 const ids = fm[2] ? prevIds : wkIds, ex = fm[2] ? prevExtras : extras;
                 const id = k <= ids.length ? ids[k - 1] : ((ex.find(e => e.label === k) || {}).id);
                 return id == null ? null : modOfId(id);
@@ -1415,7 +1433,7 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, onSaveSchedule
     const fillDismissed = (((config && config.fillDismissed) || {})[dateFor(0)] || "") === freedSig;
     const showFill = freed.length > 0 && !fillDismissed;
     const stageWord = (t) => /toque 1/.test(t) ? "a aula" : /toque 2/.test(t) ? "as questões" : /toque 3/.test(t) ? "a apostila" : "a selagem";
-    const dayName = (d) => DAY_LBL[((d % 7) + 7) % 7] + " " + fmtBR(addDaysISO(dateFor(0), d)) + (d >= 7 ? " (sem. seguinte)" : "");
+    const dayName = (d) => DAY_LBL[((d % 7) + 7) % 7] + " " + fmtBR(addDaysISO(dateFor(0), d)) + (d >= 14 ? " (em 2 semanas)" : d >= 7 ? " (sem. seguinte)" : "");
     const freedDays = [...new Set(freed.map(f => f.i))].sort((a, b) => a - b).map(dayName);
     const freedWhat = freed.length ? stageWord(freed[0].text) + (freed[0].mod ? " de Sem." + freed[0].mod.week + " " + freed[0].mod.title : "") + (freed.length > 1 ? " (+" + (freed.length - 1) + ")" : "") : "";
     const fillSuggest = () => {
@@ -1426,7 +1444,8 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, onSaveSchedule
         const eligible = (i) => { if (i <= todayIdxW || i > 6 || i === 3 || i === lightDay.idx) return false; const iso = dateFor(i); if ((DATED_SHIFTS[addDaysISO(iso, -1)] || {}).kind === "noite") return false; if ((DATED_SHIFTS[iso] || {}).kind === "dia") return false; return true; };
         const fits = (i, hrs) => { const l = listFor(i); return studyHours(l) + hrs <= STUDY_WARN_H + 1e-9 && dayLoadHours(l) + hrs <= DAY_CAP_H + 1e-9; };
         const firstDay = (from, hrs) => { for (let i = Math.max(from, todayIdxW + 1); i <= 6; i++) if (eligible(i) && fits(i, hrs)) return i; return null; };
-        const nextOk = (from, hrs) => { const d = firstDay(from, hrs); if (d != null) return d; let x = Math.max(from, 7); while (x % 7 === 3) x++; return x; }; // cai na semana seguinte: só evita o sábado leve (a carga daquela semana é avaliada lá)
+        const nextFits = (x, hrs) => x >= 7 && x <= 13 && nextHours(x - 7) + hrs <= STUDY_WARN_H + 1e-9;
+        const nextOk = (from, hrs) => { const d = firstDay(from, hrs); if (d != null) return d; for (let y = Math.max(from, 7); y <= 13; y++) { if (y % 7 === 3) continue; if (nextFits(y, hrs)) return y; } let x = Math.max(from, 7); while (x % 7 === 3) x++; return x; }; // semana seguinte: mesmo limiar (8h); se nada cabe, o 1º dia útil — e a proposta mostra a carga (⚠️)
         const slots = [];
         wkIds.slice(0, 4).forEach((id, k) => { const dd = slotDays(k + 1), ov = plan[String(k + 1)] || {}; slots.push({ label: k + 1, id, kind: "tpl", key: String(k + 1), days: { aula: ov.aula != null ? ov.aula : dd.aula, quest: ov.quest != null ? ov.quest : dd.quest, apost: ov.apost != null ? ov.apost : dd.apost, seal: ov.seal != null ? ov.seal : dd.seal } }); });
         extras.forEach((e, j) => slots.push({ label: e.label, id: e.id, kind: "extra", key: j, days: { aula: e.aula, quest: e.quest, apost: e.apost, seal: e.seal } }));
@@ -1438,7 +1457,11 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, onSaveSchedule
         }
         const carryIds = wkIds.concat(extras.map(e => e.id), prevIds.slice(3, 4), prevExtras.map(e => e.id));
         const cand = effectiveTargets(fioCandidates(queue, reviews.progress, carryIds), 1); // 2) abrir o próximo fio da fila (recência, pins)
-        if (cand.length) { const d1 = firstDay(todayIdxW + 1, HRS.aula); if (d1 != null) { const d2 = nextOk(d1 + 1, HRS.quest); const d3 = nextOk(d2 + 1, HRS.apost); const label = Math.max(paceCfg, ...extras.map(e => e.label)) + 1; return { kind: 2, mod: cand[0], label, days: { aula: d1, quest: d2, apost: d3, seal: nextOk(d3 + 3, HRS.seal) } }; } }
+        if (cand.length) { const d1 = firstDay(todayIdxW + 1, HRS.aula); if (d1 != null) { const d2 = nextOk(d1 + 1, HRS.quest); const d3 = nextOk(d2 + 1, HRS.apost); const label = Math.max(paceCfg, ...extras.map(e => e.label)) + 1;
+            const days = { aula: d1, quest: d2, apost: d3, seal: nextOk(d3 + 3, HRS.seal) };
+            const byDay = {}; Object.keys(days).forEach(t => { if (days[t] >= 7) byDay[days[t]] = (byDay[days[t]] || 0) + HRS[t]; });
+            const warn = Object.keys(byDay).map(Number).sort((a, b) => a - b).map(d => { if (d > 13) return "⚠️ " + dayName(d) + ": carga não avaliada"; const tot = nextHours(d - 7) + byDay[d]; return tot > STUDY_WARN_H + 1e-9 ? "⚠️ " + dayName(d) + " ficará em " + fmtHrs(tot) : null; }).filter(Boolean);
+            return { kind: 2, mod: cand[0], label, days, warn }; } }
         for (const sl of slots) { // 3) antecipar selagem (+3d da apostila já atingidos)
             const p = st(sl.id); if (p.aula && p.questoesD2 && p.apostila && !p.smartcard && sl.days.seal >= 7) { const d = firstDay(sl.days.apost + 3, HRS.seal); if (d != null) return { kind: 3, slot: sl, day: d, mod: modOf(sl.id) }; }
         }
@@ -1448,7 +1471,7 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, onSaveSchedule
     const modName = (m) => m ? "Sem." + m.week + " " + m.title : "";
     const toqueWord = { aula: "a aula", quest: "as questões", apost: "a apostila" };
     const fillText = !fill ? "" : fill.kind === 1 ? "Adiantar " + toqueWord[fill.toque] + " do Fio " + fill.slot.label + " — " + modName(fill.mod) + " para " + dayName(fill.day) + " (antes: " + dayName(fill.slot.days[fill.toque]) + ")."
-        : fill.kind === 2 ? "Abrir o Fio " + fill.label + " — " + modName(fill.mod) + ": aula " + dayName(fill.days.aula) + " · questões " + dayName(fill.days.quest) + " · apostila " + dayName(fill.days.apost) + " · selagem " + dayName(fill.days.seal) + "."
+        : fill.kind === 2 ? "Abrir o Fio " + fill.label + " — " + modName(fill.mod) + ": aula " + dayName(fill.days.aula) + " · questões " + dayName(fill.days.quest) + " · apostila " + dayName(fill.days.apost) + " · selagem " + dayName(fill.days.seal) + "." + (fill.warn && fill.warn.length ? " " + fill.warn.join(" · ") : "")
         : fill.kind === 3 ? "Antecipar a selagem do Fio " + fill.slot.label + " — " + modName(fill.mod) + " para " + dayName(fill.day) + " (antes: " + dayName(fill.slot.days.seal) + ")."
         : "Nada cabe sem quebrar a ordem aula→questões→apostila. Espaço protegido — descanse ou adiante o Anki.";
     const applyFill = () => {
@@ -1899,7 +1922,9 @@ function PlanejadorSemana({ progress, onUpdate, effWeek, config, onSaveConfig })
     const queue = catchupQueue(progress, effWeek);
     const phNow = weekPhase(config.startDate, effWeek);
     const nFio = fiosWanted(phNow, pace);
-    const targets = (phNow === "AMB" ? effectiveTargets(queue, nFio) : weekFioIds(config, progress, effWeek, config.startDate, nFio).map(id => queue.find(m => m.id === id) || MODULES.find(m => m.id === id))).filter(Boolean).slice(0, nFio);
+    const targets0 = (phNow === "AMB" ? effectiveTargets(queue, nFio) : weekFioIds(config, progress, effWeek, config.startDate, nFio).map(id => queue.find(m => m.id === id) || MODULES.find(m => m.id === id))).filter(Boolean).slice(0, nFio);
+    const exWP = (config.fioExtra || {})[weekDayISO(config.startDate, effWeek, 0)] || []; // fios abertos pela sugestão entram no planejador (sinalização 3)
+    const targets = targets0.concat(exWP.map(e => queue.find(x => x.id === e.id) || MODULES.find(x => x.id === e.id)).filter(m => m && !targets0.some(t => t.id === m.id)));
     const proj = projectedZeroISO(progress);
     const projW = rawWeekOf(proj);
     const zerado = proj <= todayISO();
@@ -1971,6 +1996,8 @@ function CatchUp({ progress, onUpdate, effWeek, config, onSaveConfig }) {
     const phNow = weekPhase(config.startDate, effWeek);
     const targets = phNow === "AMB" ? effectiveTargets(queue, pace)
         : weekFioIds(config, progress, effWeek, config.startDate, fiosWanted(phNow, pace)).map(id => queue.find(m => m.id === id) || MODULES.find(m => m.id === id)).filter(Boolean); // fios congelados da semana (snapshot)
+    const exW = (config.fioExtra || {})[weekDayISO(config.startDate, effWeek, 0)] || []; // sinalização 3 (🧩): fio aberto pela sugestão é matéria da semana — é aqui que ela marca o %
+    const targetsAll = targets.concat(exW.map(e => { const m = queue.find(x => x.id === e.id) || MODULES.find(x => x.id === e.id); return m && !targets.some(t => t.id === m.id) ? { ...m, _slot: "FIO " + e.label + " · sugestão" } : null; }).filter(Boolean));
     const pins = Array.isArray(config.catchupPins) ? config.catchupPins : [];
     const togglePin = (id) => {
         const next = pins.indexOf(id) >= 0 ? pins.filter(x => x !== id) : pins.concat([id]);
@@ -2097,16 +2124,16 @@ function CatchUp({ progress, onUpdate, effWeek, config, onSaveConfig }) {
                 React.createElement("div", { style: { color: "#94a3b8", fontSize: 11, marginTop: 4, lineHeight: 1.5 } }, onTrack
                     ? "Compare a data com a da sua prova. Sobrando margem, vale aprofundar os módulos antigos."
                     : "Suba o ritmo (3–4/sem) só se a semana comportar — o 📚 avisa — ou aceite passe leve nos módulos mais antigos.")))),
-        targets.length > 0 && (React.createElement("div", null,
+        targetsAll.length > 0 && (React.createElement("div", null,
             React.createElement("div", { style: { color: "#94a3b8", fontSize: 11, marginBottom: 4 } },
                 "MAT\u00C9RIAS DESTA SEMANA (",
-                targets.length,
+                targetsAll.length,
                 ")"),
             React.createElement("div", { style: { color: "#64748b", fontSize: 10, marginBottom: 8, lineHeight: 1.5 } },
                 "No seu ritmo de ",
                 pace,
                 "/semana, recupere estes m\u00F3dulos \u2014 cada um nos slots de desatraso (em fio de 3 toques, nos slots da fase atual):"),
-            React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 8 } }, targets.map((m, i) => (React.createElement(ModuleRow, { key: m.id, m: m, highlight: true, slot: slotFor(i) })))))),
+            React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 8 } }, targetsAll.map((m, i) => (React.createElement(ModuleRow, { key: m.id, m: m, highlight: true, slot: m._slot || slotFor(i) })))))),
         byWeek.length > 0 && (React.createElement("div", null,
             React.createElement("div", { style: { color: "#94a3b8", fontSize: 11, marginBottom: 8 } },
                 "FILA COMPLETA \u2014 por rec\u00EAncia (",
