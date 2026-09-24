@@ -77,6 +77,8 @@ Cada bloco tem sua escadinha completa, colada na própria aula:
 - **Dia 5 · Segunda:** **banco A + smartcards** (2ª recuperação espaçada, +3 dias da apostila do A — etapa de execução, sem registro de %) + Fio 2 · questões (ritmo ≥3: + Fio 3 · apostila). Em semana de simulado: + apostila do B (erros de domingo) + revisão adaptativa.
 - **Terça:** **banco B + smartcards** (+3 dias da apostila do B; fora de semana de simulado) → Fio 2 · apostila (ritmo 4: + Fio 4 · aula, que continua na QUA/QUI seguintes como "Fio 4 (sem. passada)") · faculdade 19h30–21h (até 11/10). A selagem de A e B não é mais na terça: é na manhã da quarta seguinte.
 
+- **Semanas com 3 blocos (A, B e C — 24/09):** cada grupo tem cascata própria. O **C** faz aula online 1.5x + 30 questões no **sábado**, apostila pelos erros no **domingo**, selagem na **quarta seguinte** (junto das de A e B, +3 dias) e banco na **quinta seguinte** (+4 dias, nunca no dia da selagem). O "Bônus" entra por último na ordem padrão. No cabeçalho da semana ("✎ Blocos e grupos") você decide o agrupamento a cada semana — mesma letra = estudados juntos como uma unidade (o D2 soma as questões, 30 de cada, e a marcação registra os dois) — e pode adicionar ou corrigir um bloco quando a grade real divergir da lista (nada é apagado). Se algum assunto listado ficar sem aula/questões/apostila em dia nenhum, o app avisa no topo. Três grupos custam ~3 cascatas: o aviso de capacidade propõe reduzir os fios de desatraso naquela semana — o app nunca corta etapa de bloco.
+
 *Ritmo dos fios (1–4 na aba Desatraso) = `FIO_PAT`: Fio 1 qui→sáb→dom · Fio 2 dom→seg→ter · Fio 3 sáb→dom→seg · Fio 4 ter→qua→qui (cruza a semana). Princípio (24/09): a distribuição dos dias é decidida pela estratégia de aprendizagem, não pelo equilíbrio de horas — aula → questões ≥1 dia com sono; questões → apostila ~1 dia; apostila → banco ~3 dias; apostila → selagem ~3 dias; nunca duas etapas do mesmo módulo no mesmo dia (exceto aula online → D2). Se dois intervalos conflitam: (a) nunca duas etapas no mesmo dia · (b) questões → apostila ~1 dia · (c) apostila → banco e → selagem ~3 dias · (d) aula → questões 1–2 dias; cede na ordem inversa. Nenhum dia livre nasce vazio; o dia leve é sempre resultado do cálculo da semana. Dois fios no mesmo dia são sempre módulos distintos. Fio fechado (3 checks) não volta como fio novo; fio começado (aula marcada) entra primeiro na semana seguinte. Se a semana não comportar o ritmo, o cabeçalho avisa ("⚠️ Ritmo N não cabe … Sugestão: ritmo Z") — você decide; em semana de simulado, quando nem o ritmo 1 cabe, ele diz que é a semana (prova + correção = um dia-motor) e oferece pausar os fios. Na troca de fase nenhum fio fica órfão: a 1ª semana da recuperação sela os fios fechados no fim do POST, e a 1ª da reta final sela o Fio B da recuperação.*
 
 Registre o **%** no D2 e na **selagem** — o da selagem é o que calibra o D+7 (o do D2 é a reserva). O banco (D5/D6) é execução, sem registro. Tudo se marca **no próprio bloco do dia** (1 toque; o card do módulo acompanha).
@@ -159,7 +161,9 @@ Até 09/09: regime anterior ("vale o que estava antes") · **10/09–11/10: grad
 
 ---
 
-## Apêndice · Blocos A e B por semana do curso
+## Apêndice · Blocos A, B (e C) por semana do curso
+
+*Semanas com 3 blocos (8, 38, 43): ordem padrão = principais primeiro, "Bônus" por último (C), cada um com cascata própria; o agrupamento é seu, semana a semana (24/09).*
 
 | Sem. | Bloco A | Bloco B |
 |---|---|---|
@@ -170,7 +174,7 @@ Até 09/09: regime anterior ("vale o que estava antes") · **10/09–11/10: grad
 | 5 | NEF3 — Insuficiência Renal | NEF2 — Distúrbio Ácido-Básico |
 | 6 | PRE1 — Medidas de Saúde Coletiva | PED1 — Neonatologia I |
 | 7 | — *(semana não existe no curso)* | — |
-| 8 | ANAT — Bônus Anatomia | PRE2 — Estudos Epidemiológicos · CIR2 — Urologia |
+| 8 | PRE2 — Estudos Epidemiológicos | CIR2 — Urologia · **C:** ANAT — Bônus Anatomia |
 | 9 | REU1 — Intro à Reumatologia + Artrites | PED1 — Neonatologia II |
 | 10 | REU1 — Gota; Febre Reumática | PRE2 — Epidemiologia Clínica |
 | 11 | CIR2 — Cicatrização de Feridas e Queimaduras | OBS2 — Assistência Clínica ao Parto e Parto Prematuro |
@@ -200,12 +204,12 @@ Até 09/09: regime anterior ("vale o que estava antes") · **10/09–11/10: grad
 | 35 | PNE1 — Asma e DPOC | OBS4 — Distúrbios Hipertensivos da Gestação; Diabetes Gestacional |
 | 36 | PNE1 — Câncer de Pulmão, TEP | PED5 — Nefrologia Pediátrica |
 | 37 | PNE2 — Tuberculose | PNE2 — Pneumonia e Complicações |
-| 38 | ATB — Bônus Antibioticoterapia | INF1 — AIDS · INF2 — Parasitoses Intestinais |
+| 38 | INF1 — AIDS | INF2 — Parasitoses Intestinais · **C:** ATB — Bônus Antibioticoterapia |
 | 39 | INF2 — Endocardite Infecciosa / Meningite | OBS5 — Sofrimento Fetal, Avaliação da Vitalidade Fetal, Fórcipe |
 | 40 | INF3 — Síndromes Febris | GIN6 — IST |
 | 41 | NEU1 — Neurologia I — Cefaleias, Epilepsias | NEU1 — Neurologia II — Síndromes Neurológicas e AVE |
 | 42 | NEU1 — Neurologia III — Polineuropatias, Demência, Parkinson | PED5 — Doenças Exantemáticas na Infância |
-| 43 | OFT — Bônus Oftalmologia | PSI1 — Psiquiatria I · PSI1 — Psiquiatria II |
+| 43 | PSI1 — Psiquiatria I | PSI1 — Psiquiatria II · **C:** OFT — Bônus Oftalmologia |
 | 44 | CIR4 — Especialidade Cirúrgica — Parte I | CIR4 — Especialidade Cirúrgica — Parte II |
 | 45 | DER1 — DERMATOLOGIA I ⭐ | DER1 — DERMATOLOGIA II ⭐ |
 | 46 | ORT1 — Ortopedia I | ORT1 — Ortopedia II |
