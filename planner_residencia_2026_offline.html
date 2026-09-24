@@ -389,19 +389,19 @@ const WEEK_SCHEDULE_CATCHUP = [
             { d: "GYM", color: "#1D4ED8", text: "Academia — horário livre (dia de simulado: pós-correção)", time: "1h" },
             { d: "LAZER", color: "#6B7280", text: "Lazer à noite ❤️", time: "livre" },
         ] },
-    { day: "SAB", full: "Sábado", phase1_venv: "Dia útil · Fio A fecha pela apostila · temas fracos · PLAN da semana + backup (o dia SEM Venvanse é o de menor carga, selo 🌿)", emoji: "📚",
+    { day: "SAB", full: "Sábado", phase1_venv: "Dia útil · Fio A fecha pela apostila · temas fracos · PLAN da semana + backup (semana de simulado: + selagem do Fio B deslizada da sexta) · o dia SEM Venvanse é o de menor carga, selo 🌿", emoji: "📚",
         activities: [
             { d: "ANKI", color: "#0369A1", text: "Anki + Meditação 15min", time: "35min" },
             { d: "DESAT", color: "#B91C1C", text: "Fio A · toque 3: apostila dirigida pelos erros do bloco antigo + Feynman — fecha o fio", time: "1.5h" },
+            { d: "REV", color: "#15803D", text: "Semana de simulado · Selar o Fio B da semana passada (deslizado da sexta): 10 questões + smartcards + os 4 checks — o % da selagem agenda as revisões D+7/D+30", time: "40min" },
             { d: "REV", color: "#15803D", text: "Questões dos temas fracos + Smartcards", time: "1h" },
             { d: "PLAN", color: "#0F766E", text: "Implementação de intenção + RECOMPENSA por escrito · pomodoros: aba Desatraso · backup semanal", time: "15min" },
             { d: "LAZER", color: "#6B7280", text: "Noite livre ❤️", time: "livre" },
         ] },
-    { day: "DOM", full: "Domingo", phase1_venv: "Dia ATIVO · Fio B abre pela AULA (semana de simulado: + selagem do Fio B deslizada da sexta)", emoji: "🔥",
+    { day: "DOM", full: "Domingo", phase1_venv: "Dia ATIVO · Fio B abre pela AULA", emoji: "🔥",
         activities: [
             { d: "ANKI", color: "#0369A1", text: "Anki + Meditação 15min", time: "35min" },
             { d: "DESAT", color: "#B91C1C", text: "Fio B · toque 1: aula online do bloco antigo (1.5x) + resumo — aula antes das questões, sempre", time: "1.7h" },
-            { d: "REV", color: "#15803D", text: "Semana de simulado · Selar o Fio B da semana passada (deslizado da sexta): 10 questões + smartcards + os 4 checks — o % da selagem agenda as revisões D+7/D+30", time: "40min" },
             { d: "REV", color: "#15803D", text: "Revisão D+30 adaptativa + caderno de erros", time: "1h" },
             { d: "GYM", color: "#1D4ED8", text: "Academia — horário livre", time: "1h" },
             { d: "LAZER", color: "#6B7280", text: "Noite leve — dormir bem para a segunda", time: "livre" },
@@ -414,10 +414,10 @@ const WEEK_SCHEDULE_CATCHUP = [
             { d: "GYM", color: "#1D4ED8", text: "Academia — horário livre", time: "1h" },
             { d: "LAZER", color: "#6B7280", text: "Noite livre ❤️", time: "livre" },
         ] },
-    { day: "TER", full: "Terça", phase1_venv: "Selar o Fio A da semana passada · Fio B fecha pela apostila · noite livre (âncora de descanso)", emoji: "📚",
+    { day: "TER", full: "Terça", phase1_venv: "Selar o Fio A desta semana (+3d da apostila de sábado) · Fio B fecha pela apostila · noite livre (âncora de descanso)", emoji: "📚",
         activities: [
             { d: "ANKI", color: "#0369A1", text: "Anki + Meditação 15min", time: "35min" },
-            { d: "REV", color: "#15803D", text: "Selar o Fio A da semana passada: 10 questões + smartcards + os 4 checks — o % da selagem agenda as revisões D+7/D+30", time: "40min" },
+            { d: "REV", color: "#15803D", text: "Selar Fio A: 10 questões + smartcards + os 4 checks (bloco antigo) — o % da selagem agenda as revisões D+7/D+30", time: "40min" },
             { d: "DESAT", color: "#B91C1C", text: "Fio B · toque 3: apostila dirigida pelos erros do bloco antigo + Feynman — fecha o fio", time: "1.5h" },
             { d: "REV", color: "#15803D", text: "Questões dos temas fracos + Smartcards", time: "1h" },
             { d: "GYM", color: "#1D4ED8", text: "Academia — horário livre", time: "1h" },
@@ -432,9 +432,11 @@ const WEEK_SCHEDULE_CATCHUP = [
 const G2_START = "2026-09-10";
 const G2_END = "2026-10-11"; // depois disso: mesmo template como PROVISÓRIO até a nova grade
 const WEEK_SCHEDULE_G2 = [
-    { day: "QUA", full: "Quarta", phase1_venv: "Dia 0 da cascata: priming + aula presencial (o gatilho da semana)", emoji: "⭐",
+    { day: "QUA", full: "Quarta", phase1_venv: "Dia 0 da cascata: manhã livre com selagem de A e B da semana passada (+5d e +4d das apostilas) + priming · aula presencial (o gatilho da semana)", emoji: "⭐",
         activities: [
             { d: "ANKI", color: "#0369A1", text: "Anki + Meditação 15min — ANTES de redes sociais", time: "35min" },
+            { d: "REV", color: "#15803D", text: "Selar Bloco A da semana passada: 15 questões + smartcards + os 4 checks — registre o %", time: "20min" },
+            { d: "REV", color: "#15803D", text: "Selar Bloco B da semana passada: 15 questões + smartcards + os 4 checks — registre o %", time: "20min" },
             { d: "D1", color: "#2980B9", text: "D1 · 10 questões pré-aula (priming: errar antes, com feedback, melhora retenção)", time: "30min" },
             { d: "GYM", color: "#1D4ED8", text: "Academia — horário livre (1 dos 6 da semana)", time: "1h" },
             { d: "LAZER", color: "#6B7280", text: "Descanso — chegar com energia na aula", time: "livre" },
@@ -484,20 +486,21 @@ const WEEK_SCHEDULE_G2 = [
             { d: "REV", color: "#15803D", text: "Semana de simulado · Revisão adaptativa da semana anterior (o app avisa pelo seu %)", time: "45min" },
             { d: "GYM", color: "#1D4ED8", text: "Academia — horário livre", time: "1h" },
         ] },
-    { day: "TER", full: "Terça", phase1_venv: "Dia 6 · banco B (+3d da apostila, antes da selagem) + selar A e B desta semana + fios do desatraso · noite: faculdade 19h30", emoji: "📚",
+    { day: "TER", full: "Terça", phase1_venv: "Dia 6 · banco B (+3d da apostila; em semana de simulado vai para a quinta seguinte) + fios do desatraso · noite: faculdade 19h30", emoji: "📚",
         activities: [
             { d: "ANKI", color: "#0369A1", text: "Anki + Meditação 15min", time: "35min" },
-            { d: "D6", color: "#B45309", text: "D6 · Tarde: questões por conteúdo Bloco B + Smartcards + aulas bônus", time: "2h" },
-            { d: "REV", color: "#15803D", text: "Selar A e B desta semana: 10 questões por bloco + smartcards + os 4 checks — registre o %", time: "30min" },
+            { d: "D6", color: "#B45309", text: "Sem simulado · D6 · Tarde: questões por conteúdo Bloco B + Smartcards + aulas bônus", time: "2h" },
             { d: "GYM", color: "#1D4ED8", text: "Academia — horário livre", time: "1h" },
             { d: "AULA", color: "#9F1239", text: "Aula teórica da faculdade — 19h30–21h", time: "1.5h" },
         ] },
 ];
 // PROVISÓRIO pós-11/10: tudo livre, fixo APENAS o Medcurso (quarta) + cascata D1 — trocar quando a nova grade chegar
 const WEEK_SCHEDULE_POST = [
-    { day: "QUA", full: "Quarta", phase1_venv: "Dia 0 da cascata: priming + aula presencial (o gatilho da semana)", emoji: "⭐",
+    { day: "QUA", full: "Quarta", phase1_venv: "Dia 0 da cascata: manhã livre com selagem de A e B da semana passada (+5d e +4d das apostilas) + priming · aula presencial (o gatilho da semana)", emoji: "⭐",
         activities: [
             { d: "ANKI", color: "#0369A1", text: "Anki + Meditação 15min — ANTES de redes sociais", time: "35min" },
+            { d: "REV", color: "#15803D", text: "Selar Bloco A da semana passada: 15 questões + smartcards + os 4 checks — registre o %", time: "20min" },
+            { d: "REV", color: "#15803D", text: "Selar Bloco B da semana passada: 15 questões + smartcards + os 4 checks — registre o %", time: "20min" },
             { d: "D1", color: "#2980B9", text: "D1 · 10 questões pré-aula (priming: errar antes, com feedback, melhora retenção)", time: "30min" },
             { d: "GYM", color: "#1D4ED8", text: "Academia — horário livre (1 dos 6 da semana)", time: "1h" },
             { d: "LAZER", color: "#6B7280", text: "Descanso — chegar com energia na aula", time: "livre" },
@@ -547,11 +550,10 @@ const WEEK_SCHEDULE_POST = [
             { d: "REV", color: "#15803D", text: "Semana de simulado · Revisão adaptativa da semana anterior (o app avisa pelo seu %)", time: "45min" },
             { d: "GYM", color: "#1D4ED8", text: "Academia — horário livre", time: "1h" },
         ] },
-    { day: "TER", full: "Terça", phase1_venv: "Dia 6 · banco B (+3d da apostila, antes da selagem) + selar A e B desta semana + fios do desatraso (provisório — aguardando a nova grade)", emoji: "📚",
+    { day: "TER", full: "Terça", phase1_venv: "Dia 6 · banco B (+3d da apostila; em semana de simulado vai para a quinta seguinte) + fios do desatraso (provisório — aguardando a nova grade)", emoji: "📚",
         activities: [
             { d: "ANKI", color: "#0369A1", text: "Anki + Meditação 15min", time: "35min" },
-            { d: "D6", color: "#B45309", text: "D6 · Tarde: questões por conteúdo Bloco B + Smartcards + aulas bônus", time: "2h" },
-            { d: "REV", color: "#15803D", text: "Selar A e B desta semana: 10 questões por bloco + smartcards + os 4 checks — registre o %", time: "30min" },
+            { d: "D6", color: "#B45309", text: "Sem simulado · D6 · Tarde: questões por conteúdo Bloco B + Smartcards + aulas bônus", time: "2h" },
             { d: "GYM", color: "#1D4ED8", text: "Academia — horário livre", time: "1h" },
             { d: "LAZER", color: "#6B7280", text: "Noite livre ❤️", time: "livre" },
         ] },
@@ -751,7 +753,7 @@ function TaskRow({ tasks, progress, onUpdate, showCode }) {
         const on = !!pr[t.field];
         return React.createElement("div", { key: k, style: { display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" } },
             React.createElement("button", { onClick: () => onUpdate && onUpdate(toggleProgressField(progress || {}, t.mod.id, t.field)), title: "Marca no módulo " + t.mod.code, style: { background: on ? "#166534" : "#1e293b", border: "1px solid " + (on ? "#22c55e" : "#334155"), borderRadius: 6, color: on ? "#22c55e" : "#94a3b8", padding: "4px 8px", fontSize: 10, fontWeight: 700, cursor: "pointer" } },
-                (on ? "✓ " : "") + PROGRESS_LABELS[t.field] + (showCode ? " · " + (t.tag ? t.tag + " · " : "") + t.mod.code : "")),
+                (on ? "✓ " : "") + PROGRESS_LABELS[t.field] + ((showCode || t.tag) ? " · " + (t.tag ? t.tag + " · " : "") + t.mod.code : "")), // etiqueta A/B sempre visível quando existe (selagem de A/B em blocos separados, 24/09)
             on && PCT_FIELD[t.field] && React.createElement(PctInput, { pr: pr, field: PCT_FIELD[t.field], onSet: (v) => onUpdate && onUpdate(setProgressPct(progress || {}, t.mod.id, PCT_FIELD[t.field], v)) }));
     }));
 }
@@ -800,6 +802,7 @@ const FIO_PAT = [ // decisão da paciente (24/09): nenhum dia livre nasce vazio 
 // P2 (📚 selagem ~3d após a apostila, um fio por bloco): Fio 1 (apostila DOM) → QUA · Fio 3 (SEG) → QUI · Fio 2 (TER) → SEX · Fio 4 (QUI seguinte) → DOM — todos +3d.
 const FIO4_NEXT = [[0, "quest"], [1, "apost"]];
 const FIO_SEAL_NEXT = { 0: 1, 1: 3, 2: 2, 4: 4 };
+const SEAL_AB = (L) => ({ d: "REV", color: "#15803D", text: "Selar Bloco " + L + " da semana passada: 15 questões + smartcards + os 4 checks — registre o %", time: "20min" }); // selagem de A/B na QUA de manhã (24/09): +5d da apostila do A, +4d da do B
 function fioSealBlock(n) { return { d: "REV", color: "#15803D", text: "Selar Fio " + n + " (sem. passada): 10 questões + smartcards + os 4 checks (bloco antigo) — o % da selagem agenda as revisões", time: "40min" }; }
 function fioBlock(n, st, prev) {
     const lbl = "Fio " + n + (prev ? " (sem. passada)" : "");
@@ -1142,6 +1145,7 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, onSaveSchedule
     const mods = modulesForWeek(week);
     const blockA = mods[0] || null;
     const blockB = mods[1] || null;
+    const prevMods = modulesForWeek(week - 1), prevBlockA = prevMods[0] || null, prevBlockB = prevMods[1] || null; // selagem de A/B na QUA e banco B pós-simulado apontam para a semana passada
     // Trilha B (desatraso): alvos da semana, intercalando especialidades.
     const queue = catchupQueue(reviews.progress, effWeek);
     const wkPh = weekPhase(startISO, week);
@@ -1225,10 +1229,18 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, onSaveSchedule
         if (iso >= FREE_START && weekDayISO(startISO, week, 0) < addDaysISO(FREE_START, 7))
             acts = acts.filter(a => !/\(sem\. passada\)/.test(a.text)); // 1ª semana do pipeline: nada da semana passada para fechar
         // ── FRONTEIRA DE FASE (📚 nenhuma etapa fica órfã · ⚙️ a transição de template não perde estado) ──
-        if (wkPh === "CATCHUP" && prevPh === "G2") { // 1ª semana da CATCHUP: sela os fios fechados no fim do POST (+3d) e fecha o Fio 4 cruzado; o template ainda não tem Fio A/B "da semana passada"
+        // Semana de simulado (24/09, revoga o P3): o banco B não cabe a 1d da apostila (SEG) — vai para o 1º dia a ≥3d sem outra etapa do módulo B: a QUINTA seguinte (+3d)
+        const prevFri = weekDayISO(startISO, week - 1, 2);
+        if (dayIdx === 1 && prevFri >= G2_START && simFor(prevFri) && (wkPh === "G2" || (wkPh === "CATCHUP" && prevPh === "G2"))) {
+            const bb = { d: "D6", color: "#B45309", text: "D6 · Tarde: questões por conteúdo do Bloco B da semana passada (semana de simulado: banco a +3d da apostila) + Smartcards + aulas bônus", time: "2h" };
+            const i2 = acts.findIndex(a => /D2-A/.test(a.text)); const lb = acts.map(a => a.d).lastIndexOf("LAZER");
+            acts = i2 >= 0 ? acts.slice(0, i2 + 1).concat([bb], acts.slice(i2 + 1)) : (lb >= 0 ? acts.slice(0, lb).concat([bb], acts.slice(lb)) : acts.concat([bb]));
+        }
+        if (wkPh === "CATCHUP" && prevPh === "G2") { // 1ª semana da CATCHUP: sela os fios fechados no fim do POST (+3d) e fecha o Fio 4 cruzado; o template ainda não tem Fio B "da semana passada"
             acts = acts.filter(a => !/Selar o Fio [AB] da semana passada/.test(a.text));
             const pb = fioPrevBlocksFor(dayIdx, prevIds.length, prevPlan);
             if (pb.length) { const li = acts.map(a => a.d).lastIndexOf("LAZER"); acts = li >= 0 ? acts.slice(0, li).concat(pb, acts.slice(li)) : acts.concat(pb); }
+            if (dayIdx === 0) { const ia = acts.findIndex(a => a.d === "ANKI"); acts = acts.slice(0, ia + 1).concat([SEAL_AB("A"), SEAL_AB("B")], acts.slice(ia + 1)); } // A e B da última semana do POST (+5d/+4d)
         }
         if (wkPh === "CATCHUP" || wkPh === "FREE") { // fios extras (sugestão aceita) também nas fases de template fixo
             const eb = extraBlocksFor(dayIdx, extras, prevExtras, prev2Extras, prev3Extras);
@@ -1326,6 +1338,8 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, onSaveSchedule
         onSaveSchedule(next);
     };
     const resolveBlock = (text) => {
+        const sb = text.match(/^Selar Bloco ([AB]) da semana passada/); if (sb) return sb[1] === "A" ? prevBlockA : prevBlockB;
+        if (/Bloco B da semana passada/.test(text)) return prevBlockB; // banco B da semana de simulado, na QUI seguinte
         const r = blockRef(text);
         if (r === "A")
             return blockA;
@@ -1352,7 +1366,7 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, onSaveSchedule
     const blockTasks = (text, mod) => {
         const t = text;
         if (/^Resumo rápido/.test(t)) return [];
-        if (/Selar A e B desta semana/.test(t)) return [blockA, blockB].filter(Boolean).map((m, i) => ({ mod: m, field: "smartcard", tag: ["A", "B"][i] })); // P6: A e B DESTA semana (+4d da apostila do A, +2d da do B)
+        const sbt = t.match(/^Selar Bloco ([AB]) da semana passada/); if (sbt) return mod ? [{ mod, field: "smartcard", tag: sbt[1] }] : []; // selagem de A/B na QUA de manhã, blocos separados (24/09)
         if (/^(Semana de simulado · )?Selar (o )?Fio/.test(t)) return mod ? [{ mod, field: "smartcard" }] : [];
         if (blockRef(t) === "DESAT") {
             if (!mod) return [];
@@ -1549,14 +1563,14 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, onSaveSchedule
                 { d: "🌿", label: "Sem remédio", desc: "Dia de menor carga da semana (selo 🌿), sábado por padrão", color: "#15803D" },
             ] : dayDate >= CATCHUP_START ? [
                 { d: "—", label: "Curso", desc: "Aulas presenciais encerradas — fase de recuperação", color: "#6B7280" },
-                { d: "DESAT", label: "Fio A qua→qui→sáb · Fio B dom→seg→ter", desc: "Aula → questões → apostila em dias diferentes · selagem: A na terça, B na sexta (domingo em semana de simulado) · sáb = dia útil (apostila do A + temas fracos + PLAN) · selo 🌿 = dia de menor carga (provisório até a nova grade)", color: "#B91C1C" },
+                { d: "DESAT", label: "Fio A qua→qui→sáb · Fio B dom→seg→ter", desc: "Aula → questões → apostila em dias diferentes · selagem +3d da apostila: A na terça (desta semana), B na sexta seguinte (sábado em semana de simulado) · sáb = dia útil (apostila do A + temas fracos + PLAN) · selo 🌿 = dia de menor carga (provisório até a nova grade)", color: "#B91C1C" },
                 { d: "REV", label: "Espaçada", desc: "D+7/D+30 do que já foi visto", color: "#15803D" },
                 { d: "D7", label: "Sexta", desc: "Simulado quinzenal mantido", color: "#0F766E" },
             ] : dayDate >= G2_START ? [
-                { d: "D1", label: "Quarta", desc: "Dia 0: 10q pré-aula (priming) + presencial A e B", color: "#2980B9" },
+                { d: "D1", label: "Quarta", desc: "Dia 0: manhã com selagem de A e B da semana passada (blocos separados, +5d/+4d das apostilas) + 10q pré-aula (priming) · presencial A e B", color: "#2980B9" },
                 { d: "D3→D2", label: "Qui / Sex", desc: "Aula online do bloco → 30q no MESMO dia (A qui · B sex) — registre o %", color: "#C2410C" },
                 { d: "D4", label: "Sex+Sáb", desc: "Apostila pelos erros (A sex, de quinta · B sáb, de sexta) + Feynman", color: "#7E22CE" },
-                { d: "D5/D6", label: "Seg / Ter", desc: "Banco A na segunda, banco B na terça (+3d das apostilas, banco antes da selagem) · TER: selar A e B desta semana (+4d do A, +3d do B) · fios da semana passada selados em blocos próprios (QUA/QUI/SEX/DOM) · SÁB e DOM = dias úteis com fios · selo 🌿 = dia sem Venvanse (o de menor carga, calculado a cada semana) · fios: ritmo 1–4 (o ⚠️ da semana avisa quando não cabe)", color: "#B45309" },
+                { d: "D5/D6", label: "Seg / Ter", desc: "Banco A na segunda, banco B na terça (+3d das apostilas; em semana de simulado o banco B vai para a quinta seguinte, +3d) · selagem de A e B na QUA de manhã (semana seguinte) · fios da semana passada selados em blocos próprios (QUA/QUI/SEX/DOM) · SÁB e DOM = dias úteis com fios · selo 🌿 = dia sem Venvanse (o de menor carga, calculado a cada semana) · fios: ritmo 1–4 (o ⚠️ da semana avisa quando não cabe)", color: "#B45309" },
             ] : dayDate >= AMB_START && dayDate <= AMB_END ? [
                 { d: "D1", label: "Quarta", desc: "10q pré-aula (priming) + presencial A e B", color: "#2980B9" },
                 { d: "D3", label: "Qui+Sex", desc: "Aulas online: áudio no plantão (A) + vídeo sexta (B) — aula ANTES das questões", color: "#7E22CE" },
