@@ -3,8 +3,8 @@
 Rodar a partir desta pasta, com o Chromium pré-instalado (`PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers`). `PLANNER_FILE` aponta para o arquivo a testar (padrão: `planner_residencia_2026_offline.html` do repositório). Todo script sai com código ≠ 0 em qualquer falha.
 
 ```bash
-node audit.js            # S0–S20, adaptados à Trilha em 20/10 (392 checks) · audit.js NOME[,NOME…] roda só os cenários listados
-node trilha.js           # Trilha autônoma: TR0–TR14 + invariantes (138 checks) · trilha.js TR1,TR5 roda só esses
+node audit.js            # S0–S20, adaptados à Trilha em 20/10 (393 checks) · audit.js NOME[,NOME…] roda só os cenários listados
+node trilha.js           # Trilha autônoma: TR0–TR14 (+TR13b) + invariantes (144 checks) · trilha.js TR1,TR5 roda só esses
 node historico.js        # histórico intacto: app de antes da Trilha (git 11c65b8, ou PLANNER_BASE/HIST_REF) × novo, semanas 1–41 dia a dia, modos A e B (82 checks) · historico.js 40,41 A
 node coverage41.js       # semanas 1–41 com módulos: todo módulo listado tem aula+questões+apostila (80 checks)
 node coverageTrilha.js   # Trilha: prévia = congelado, cobertura até 01/01, dia editado + "↺ Voltar ao padrão" (7 checks)

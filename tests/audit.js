@@ -368,7 +368,7 @@ async function scenario(browser, name, dateISO, seeds, fn) {
 
     // S7-sim-2310 APOSENTADO (Trilha, 20/10): a semana 21–27/10 é a T1 da Trilha (TER→SEG); o simulado de 23/10 cai em plantão e fica desligado pela regra — coberto por trilha.js TR1 (sexta sem prova, botão religa) e TRsim (simulados da janela = 06/11 e 18/12).
 
-    // ── S8 (Trilha, 20/10 — antes: CATCHUP 28/11): T6 = 24–30/11, bloco 04h30, 1º acesso num sábado ──
+    // ── S8 (Trilha, 20/10 — antes: CATCHUP 28/11): T6 = 24–30/11, bloco 04h30, 1º acesso num sábado (cota proporcional, decisão de 20/10) ──
     await scenario(browser, 'S8-trilha-2811', '2026-11-28', {}, async (page) => {
         const tabs = await listDayTabs(page); const hw = await headerWeek(page);
         check('Sem.47 = T6 · 24/11–30/11: 7 abas TER→SEG', hw.week === 47 && hw.range === '24/11–30/11' && tabs.map(t => t.code).join() === 'TER,QUA,QUI,SEX,SAB,DOM,SEG', JSON.stringify([hw, tabs.map(t => t.code)]));
@@ -381,12 +381,13 @@ async function scenario(browser, name, dateISO, seeds, fn) {
         check('academia livre nos outros 6 dias, nenhum horário fixo', ['TER', 'QUA', 'QUI', 'SEX', 'DOM', 'SEG'].every(d => w[d].blocks.some(b => b.tag === 'GYM' && /horário livre/.test(b.text))));
         check('A4 card ACADEMIA na Trilha: dias TER→SEG, sábado "sem treino" (não "descanso")', await page.evaluate(() => { const el = [...document.querySelectorAll('div')].find(d => /^ACADEMIA — /.test(d.textContent.trim()) && d.children.length === 0); const t = el ? el.parentElement.innerText.replace(/\n/g, ' ') : ''; return /^ACADEMIA — .* Ter 🏋️ livre .* Sab 😴 sem treino Dom 🏋️ livre Seg 🏋️ livre$/.test(t) && !/descanso/.test(t); }));
         const cfg = await getLS(page, CFG); const W = (cfg.trilhaWeeks || {})['2026-11-24'];
-        check('1º acesso 28/11: trilhaFirstOpen = 28/11; a T6 congela com a cota da rampa (4) e nenhuma aula antes de hoje; nada da Trilha em semanas anteriores; nenhum fioWeek', cfg.trilhaFirstOpen === '2026-11-28' && W && W.q === 4 && W.mods.length === 4 && W.mods.every(id => cfg.trilhaPlan[id].aula >= '2026-11-28') && Object.keys(cfg.trilhaWeeks).join() === '2026-11-24' && !cfg.fioWeek, JSON.stringify(W));
-        const tot = w.SEG.blocks.reduce((s, b) => s + H.parseH(b.time), 0);
-        check('(info) 1º acesso num sábado do bloco 04h30: as 4 aulas só cabem em DOM e SEG — SEG 30/11 soma ' + fmtH(tot) + ' (conflito do 1º acesso tardio, no relatório)', true, w.SEG.warn.join(' · '));
+        check('1º acesso 28/11 (decisão de 20/10): trilhaFirstOpen = 28/11; a T6 congela com a cota proporcional aos 3 de 7 dias que restam — round(4 × 3/7) = 2 (prop { full 4, days 3, len 7 }); nenhuma aula antes de hoje; nada da Trilha em semanas anteriores; nenhum fioWeek', cfg.trilhaFirstOpen === '2026-11-28' && W && W.q === 2 && W.base === 4 && !W.held && JSON.stringify(W.prop) === '{"full":4,"days":3,"len":7}' && W.mods.length === 2 && W.mods.every(id => cfg.trilhaPlan[id].aula >= '2026-11-28') && Object.keys(cfg.trilhaWeeks).join() === '2026-11-24' && !cfg.fioWeek, JSON.stringify(W));
+        const tot = (d) => d.blocks.reduce((s, b) => s + H.parseH(b.time), 0);
+        check('nenhum dia da semana acima do tempo hábil (antes da cota proporcional, a SEG 30/11 somava 15,0h) — SEG 30/11 = ' + fmtH(tot(w.SEG)), Object.values(w).every(d => tot(d) <= 14.5 + 1e-9) && !w.SEG.warn.some(t => /tempo hábil/.test(t)), Object.keys(w).map(d => d + '=' + fmtH(tot(w[d]))).join(' '));
         await clickTab(page, 'TRILHA');
         const ramp = await page.evaluate(() => [...document.querySelectorAll('[data-tue]')].map(e => e.innerText.replace(/\n/g, ' ')));
-        check('aba Trilha: T1–T5 "antes do seu 1º acesso", T6 "congelada: 4 novo(s)"', ramp.length === 11 && ramp.slice(0, 5).every(r => /antes do seu 1º acesso/.test(r)) && /congelada: 4 novo\(s\)/.test(ramp[5]), ramp.slice(0, 7).join(' | '));
+        check('aba Trilha: T1–T5 "antes do seu 1º acesso", T6 "congelada: 2 novo(s) (1º acesso: 3 de 7 dias)", T7 (bloco 04h30) "prévia: 4 novo(s)" sem "segura" — a semana proporcional não trava a seguinte', ramp.length === 11 && ramp.slice(0, 5).every(r => /antes do seu 1º acesso/.test(r)) && /congelada: 2 novo\(s\) \(1º acesso: 3 de 7 dias\)$/.test(ramp[5]) && /prévia: 4 novo\(s\)$/.test(ramp[6]), ramp.slice(0, 7).join(' | '));
+        check('aba Trilha: "Esta semana (24/11–30/11): 2 módulos novos — semana do seu 1º acesso: cota proporcional aos 3 de 7 dias que restavam (a rampa previa 4)"', /Esta semana \(24\/11–30\/11\): 2 módulos novos — semana do seu 1º acesso: cota proporcional aos 3 de 7 dias que restavam \(a rampa previa 4\)/.test(await bodyText(page)));
     });
 
     // S8b-catchup-sim-0412 APOSENTADO (Trilha, 20/10): fase CATCHUP (fios A/B, selagem deslizada da sexta) não existe mais na Trilha; 04/12 cai no bloco 04:30 (sem simulado pela regra) — coberto por trilha.js TR3/TRsim.

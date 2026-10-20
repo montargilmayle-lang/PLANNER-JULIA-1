@@ -402,7 +402,12 @@ const DEFAULT12 = [5, 6, 14, 19, 24, 32, 34, 85, 86, 1, 2, 3];
         [SCH]: { '2026-10-26': [{ id: 'o1', d: 'ANKI', color: '#0369A1', text: 'Anki + Meditação 15min', time: '35min' }, { id: 'o2', d: 'DESAT', color: '#B91C1C', text: 'Fio 1 · toque 3: apostila dirigida pelos erros (bloco antigo) + Feynman — fecha o fio', time: '1.5h' }, { id: 'o3', d: 'LAZER', color: '#6B7280', text: 'Lazer à noite ❤️', time: 'livre' }] },
     }, async (S) => {
         const page = S.page; const cfg = await getLS(page, CFG); const p = cfg.trilhaPlan || {};
-        check('1º acesso em 22/10: trilhaFirstOpen = 22/10 e a T1 congela a partir de hoje (nenhuma aula antes de 22/10)', cfg.trilhaFirstOpen === '2026-10-22' && cfg.trilhaWeeks['2026-10-20'] && cfg.trilhaWeeks['2026-10-20'].q === 3 && Object.values(p).every(x => x.aula >= '2026-10-22'), JSON.stringify(cfg.trilhaWeeks['2026-10-20']));
+        const W1 = cfg.trilhaWeeks['2026-10-20'] || {};
+        check('1º acesso em 22/10 (decisão de 20/10): trilhaFirstOpen = 22/10 e a T1 congela com a cota proporcional aos 5 de 7 dias que restam — round(3 × 5/7) = 2 (prop { full 3, days 5, len 7 }), nenhuma aula antes de 22/10', cfg.trilhaFirstOpen === '2026-10-22' && W1.q === 2 && W1.base === 3 && !W1.held && JSON.stringify(W1.prop) === '{"full":3,"days":5,"len":7}' && W1.mods.length === 2 && Object.values(p).every(x => x.aula >= '2026-10-22'), JSON.stringify(W1));
+        const hdr = await page.evaluate(() => (document.querySelector('[data-t="trilha-panel"]') || {}).innerText || '');
+        check('painel da semana: "ritmo 2 — 1º acesso: proporcional aos 5 de 7 dias que restavam (a rampa previa 3)"', /ritmo 2 — 1º acesso: proporcional aos 5 de 7 dias que restavam \(a rampa previa 3\)/.test(hdr), hdr.split('\n')[0]);
+        await navWeek(page, 1); const nT2 = await page.evaluate(() => [...document.querySelectorAll('[data-t="trilha-panel"] [data-mod]')].filter(e => e.getAttribute('data-kind') === 'novo').length); await navWeek(page, -1);
+        check('a semana proporcional não segura a seguinte: prévia da T2 com 4 novos (a subida usa a cota cheia, 3 → 4)', nT2 === 4, 'T2 novos=' + nT2);
         check('o histórico do curso fica: fioWeek, weekGroups, progress_v1 e schedule_v1 intactos', JSON.stringify(cfg.fioWeek) === JSON.stringify({ '2026-10-07': [75, 76], '2026-10-14': [77, 78] }) && cfg.weekGroups[38] && (await getLS(page, PRG))[77].aula === true && !!(await getLS(page, SCH))['2026-10-26']);
         await clickDate(page, '26/10'); const sg = await readDay(page); console.log(fmt(sg));
         const old = sg.blocks.find(b => /^Fio 1 · toque 3/.test(b.text));
@@ -415,6 +420,20 @@ const DEFAULT12 = [5, 6, 14, 19, 24, 32, 34, 85, 86, 1, 2, 3];
         check('"↺ Voltar ao padrão" guarda a edição em medplanner_schedule_archive_v1 e traz a Trilha', arc['2026-10-26'] && arc['2026-10-26'][0].list.length === 3 && !(await getLS(page, SCH))['2026-10-26'] && !(await banner(page, 'trilha-coverage')), JSON.stringify(arc).slice(0, 120));
         await navWeek(page, -1); const w41 = await readDay(page);
         check('Sem.41: lightDayOverrides["2026-10-14"] = 6 apontava para a TER 20/10 → ignorado (Auto)', w41.light && w41.light.value === 'auto', JSON.stringify(w41.light));
+        // semana seguinte à proporcional, sem a T1 fechada: a regra de subida conta a cota cheia (3) e a tela explica
+        await page.evaluate(() => { const c = JSON.parse(localStorage.getItem('medplanner_config_v1')); c.manualWeek = null; localStorage.setItem('medplanner_config_v1', JSON.stringify(c)); }); // volta a semana visível para "auto" (o ◀ acima a deixou manual)
+        const p27 = await S.reopen('2026-10-27'); const W2 = (await getLS(p27, CFG)).trilhaWeeks['2026-10-27'] || {};
+        const hdr2 = await p27.evaluate(() => ((document.querySelector('[data-t="trilha-panel"]') || {}).innerText || '').split('\n')[0]);
+        check('T1 aberta ⇒ T2 segura na cota cheia da T1: { q 3, base 4, held, why "fechamento" } e o painel explica "a semana do 1º acesso teve 2 módulos em 5 dias; para subir ou segurar, conta a cota cheia dela (3)"', W2.q === 3 && W2.base === 4 && W2.held === true && W2.why === 'fechamento' && /ritmo 3 · a semana do 1º acesso teve 2 módulos em 5 dias; para subir ou segurar, conta a cota cheia dela \(3\) — semana de manutenção do ritmo/.test(hdr2), JSON.stringify(W2) + ' | ' + hdr2);
+    });
+    // ── TR13b · 1º acesso numa segunda (26/10): cota proporcional 0 — nenhum ⏩ numa semana sem etapa, texto no singular ──
+    await scenario(browser, 'TR13b-primeiro-acesso-segunda-2610', '2026-10-26', {}, async (S) => {
+        const page = S.page; const W1 = (await getLS(page, CFG)).trilhaWeeks['2026-10-20'] || {};
+        const hdr = await page.evaluate(() => ((document.querySelector('[data-t="trilha-panel"]') || {}).innerText || '').split('\n')[0]);
+        check('1º acesso SEG 26/10: T1 = { q 0, prop { full 3, days 1, len 7 } }; painel "proporcional ao único dia que restava (1 de 7)"', W1.q === 0 && JSON.stringify(W1.prop) === '{"full":3,"days":1,"len":7}' && /ritmo 0 — 1º acesso: proporcional ao único dia que restava \(1 de 7\) \(a rampa previa 3\)/.test(hdr), JSON.stringify(W1) + ' | ' + hdr);
+        check('semana sem etapa não diz "Todas as etapas desta semana estão marcadas" nem oferece ⏩', !(await banner(page, 'trilha-adv')));
+        await navWeek(page, 1); const n2 = await page.evaluate(() => [...document.querySelectorAll('[data-t="trilha-panel"] [data-mod]')].filter(e => e.getAttribute('data-kind') === 'novo').length);
+        check('a T2 volta à rampa: prévia com 4 novos', n2 === 4, 'T2 novos=' + n2);
     });
 
     // ── TR14 · registro em 1 toque no bloco e "Revisei" no registro da Trilha ──

@@ -2,14 +2,39 @@
 
 Entregue antes do merge, como pedido ("bateria completa verde, `cmp` do `index.html`, PR sem merge e relatório antes"). Plano aprovado: *TRILHA AUTÔNOMA — substitui o cronograma do cursinho a partir de 20/10/2026*. Data do relatório: 20/10/2026.
 
+## 0 · Decisões da paciente e aval (20/10/2026)
+
+1. **Ordem do agendador — confirmada:** tempo hábil antes dos intervalos ideais. "Dezenove vírgula sete horas num dia é inviável, não é 'intervalo subótimo' — nenhum plano com um dia assim se cumpre, e um módulo que não acontece tem espaçamento zero." (decisão 69)
+2. **11/11 e 13/11 (~10,3h de estudo) — mantidos, sem reduzir o ritmo:** trocar seis módulos de alcance por dois dias mais leves não se paga; o selo 📚 avisa e ela move o que não couber. (decisão 70)
+3. **1ª semana proporcional aos dias restantes — aprovada e implementada,** inclusive quando o 1º acesso cai num sábado do bloco 04h30. (decisão 71)
+4. **Semana 15–21/12 — mantém o ritmo 5:** 0,7h acima em um único dia não justifica perder um módulo. (decisão 72)
+5. **Aval dado para o merge do PR #15.**
+
+**Como a decisão 3 ficou no código:** a semana do 1º acesso recebe `round(rampa × dias restantes ÷ dias da semana)`, contando o dia do 1º acesso (ex.: quinta-feira = 5 de 7 dias; T1 com rampa 3 → 2 módulos). Não é semana "segurada": a regra de subida da semana seguinte compara com a cota cheia, então a seguinte volta à rampa normal (testado: 1º acesso em 22/10 → T1 = 2 e T2 = 4; em 28/11 → T6 = 2 e T7 = 4). O motivo aparece no painel da semana ("1º acesso: proporcional aos 5 de 7 dias que restavam (a rampa previa 3)"), na aba Trilha e na linha da rampa.
+
+**Verificação (varredura do motor em todos os 70 dias possíveis de 1º acesso, 20/10 → 28/12):**
+
+| Regra da 1ª semana | Datas de 1º acesso com algum dia acima de 14,5h | Pior dia |
+|---|---|---|
+| cota cheia (antes) | **15 de 70** — 31/10, 01/11, 02/11, 14–16/11, 21–23/11, 28–30/11, 05–07/12 | 18,3h (1º acesso em 02/11 → 04 e 05/11) |
+| **proporcional (adotada)** | **0 de 70** | 14,5h (o mesmo teto do plano padrão) |
+
+Simulação progressiva (ela abre o app todo dia, faz cada etapa no dia planejado e as revisões quando vencem — com as revisões, que a prévia não tem): regra antiga **15 de 70** datas com algum dia acima de 14,5h; regra nova **2 de 70** (1º acesso em 06 ou 07/11 → SEG 23/11 com 15,1h, só por causa de uma revisão de 45min — ver §10, item 4).
+
+O caso que motivou a regra: 1º acesso em 28/11 → T6 com 2 módulos, SEG 30/11 com 13,0h (antes 15,0h). Para os dias em que ela pode abrir agora: 20/10 e 21/10 → 3 módulos (alcance 40); 22/10 e 23/10 → 2 (alcance 39); 24 e 25/10 → 1 (38); 26/10 → 0 (37). **Na semana seguinte** a regra de subida conta a cota cheia da semana proporcional (sem isso, abrir num sábado do bloco 04h30 seguraria o bloco inteiro em 2); a tela explica: "a semana do 1º acesso teve 2 módulos em 5 dias; para subir ou segurar, conta a cota cheia dela (3)". **Semana sem etapa** (1º acesso numa segunda → cota 0) não oferece ⏩.
+
+**Revisão adversarial antes do merge (4 lentes: motor, carga, interface, testes):** corrigidos (1) o ⏩ "todas as etapas marcadas" numa semana vazia, (2) a falta de explicação do ritmo da semana seguinte, (3) a concordância "ao único dia que restava"; registrados (4) 1º acesso em 11 ou 12/11 acrescenta um dia 04h30 a 5,2h de 5h (marginal) e (5) o resíduo das revisões fora da capacidade (§10, item 4).
+
+*(Arredondar para cima também daria zero dias acima de 14,5h e manteria um módulo a mais em alguns desses dias — ex.: 22/10 → 3; adotei o arredondamento comum, que é o "proporcional" literal.)*
+
 ## 1 · Em uma página
 
 - **O que mudou:** a partir de 20/10 o app é uma trilha única — fila de 93 módulos (cirurgia primeiro, depois a ordem do curso), cadeia completa por módulo (aula → questões → apostila → selagem), rampa 3·4·4·4·4·4·4·4·5·4·0, semanas TER→SEG, plantões novos, dia leve previsto antes de distribuir, ⏳ recolocar / 🔓 subir / ⏩ adiantar (só gravam com "Aplicar"), 📦 a partir de 15/12, recolocação automática na semana final, encerramento em 01/01 e balanço depois. Registro próprio (`medplanner_trail_v1`); nada antigo é apagado.
-- **Bateria (todas verdes, código de saída 0):** audit 392/392 · trilha 138/138 · historico 82/82 · coverage41 80/80 · coverageTrilha 7/7 · intervalsTrilha 10/10 · intervals16 7/7 · loads16 12/12 → **728 checks**. `cmp planner_residencia_2026_offline.html index.html`: idênticos.
+- **Bateria (todas verdes, código de saída 0):** audit 393/393 · trilha 144/144 · historico 82/82 · coverage41 80/80 · coverageTrilha 7/7 · intervalsTrilha 10/10 · intervals16 7/7 · loads16 12/12 → **735 checks**. `cmp planner_residencia_2026_offline.html index.html`: idênticos.
 - **Alcance:** cabem **40 módulos até 01/01** (as 4 etapas datadas até 01/01); **53 ficam fora**; 0 fechados ainda.
 - **Simulados na janela:** exatamente **06/11 e 18/12** (teste TRsim). 23/10, 20/11 e 04/12 caem em plantão (sem prova pela regra; o botão religa); 01/01 fica fora.
 - **Semana 15–21/12 (ritmo 5 + simulado):** só **QUI 17/12** passa do 📚 (8,7h / 8h). Não há "vários dias muito acima" → **não proponho ritmo 4**; se ela quiser, T9 = 4 deixa 17/12 em 7,0h ao custo de 1 módulo (alcance 39).
-- **Para a paciente decidir (§10):** (1) ordem do agendador — tempo hábil antes dos intervalos ideais (veto 😴), já implementada, aguardando confirmação; (2) QUA 11/11 e SEX 13/11 com ~10,3h de estudo; (3) 1º acesso tardio comprime a semana.
+- **Decidido em 20/10 (§0):** (1) ordem do agendador confirmada; (2) 11/11 e 13/11 ficam como estão; (3) 1ª semana proporcional, implementada; (4) T9 no ritmo 5.
 - **Nota CIR3 (§11):** o Preparo Pré-operatório (#6) apoia-se em cardiologia (#52); fica na posição atual, ela pode movê-lo com ↑↓.
 
 ## 2 · Alcance (N) e fora
@@ -73,42 +98,54 @@ Prévia de 19/10, sem revisões vencidas (que entram por cima, "só se vencer").
 
 | Dia | Estudo | Limiar | Total | Etapas (a=aula · Q=questões · P=apostila · S=selagem) |
 |---|---|---|---|---|
-| TER 20/10 | 0,33h | 8h | 13,83h | QUA 21/10  estudo 2,03h / 8h · total 8,03h  | aCIR1 |
+| TER 20/10 | 0,33h | 8h | 13,83h | — |
+| QUA 21/10 | 2,03h | 8h | 8,03h | aCIR1 |
 | QUI 22/10 | 2,33h | 8h | 9,33h | QCIR1 |
 | SEX 23/10 | 1,83h | 8h | 14,33h | PCIR1 |
-| SÁB 24/10 | 0,83h 🌿 | 8h | 0,83h | DOM 25/10  estudo 0,58h / 8h · total 1,58h  | |
+| SÁB 24/10 | 0,83h 🌿 | 8h | 0,83h | — |
+| DOM 25/10 | 0,58h | 8h | 1,58h | — |
 | SEG 26/10 | 4,40h | 8h | 11,40h | aCIR1 aCIR2 SCIR1 |
-| TER 27/10 | 0,33h | 8h | 13,83h | QUA 28/10  estudo 4,58h / 8h · total 5,58h  | QCIR1 QCIR2 |
+| TER 27/10 | 0,33h | 8h | 13,83h | — |
+| QUA 28/10 | 4,58h | 8h | 5,58h | QCIR1 QCIR2 |
 | QUI 29/10 | 3,33h | 8h | 13,33h | PCIR1 PCIR2 |
 | SEX 30/10 | 5,68h | 8h | 6,68h | aCIR2 aCIR3 aCIR3 |
-| SÁB 31/10 | 0,83h 🌿 | 8h | 0,83h | DOM 01/11  estudo 7,92h / 8h · total 8,92h  | QCIR2 QCIR3 QCIR3 SCIR1 SCIR2 |
+| SÁB 31/10 | 0,83h 🌿 | 8h | 0,83h | — |
+| DOM 01/11 | 7,92h | 8h | 8,92h | QCIR2 QCIR3 QCIR3 SCIR1 SCIR2 |
 | SEG 02/11 | 6,78h | 8h | 7,78h | aCIR2 PCIR2 PCIR3 PCIR3 |
-| TER 03/11 | 0,33h | 8h | 13,83h | QUA 04/11  estudo 3,67h / 8h · total 13,67h  | QCIR2 SCIR3 SCIR3 |
+| TER 03/11 | 0,33h | 8h | 13,83h | — |
+| QUA 04/11 | 3,67h | 8h | 13,67h | QCIR2 SCIR3 SCIR3 |
 | QUI 05/11 | 2,50h | 8h | 14,50h | PCIR2 SCIR2 |
-| SEX 06/11 | 8,58h (simulado) | 8h | 9,58h | SÁB 07/11  estudo 0,83h / 8h · total 0,83h 🌿  | |
+| SEX 06/11 | 8,58h (simulado) | 8h | 9,58h | — |
+| SÁB 07/11 | 0,83h 🌿 | 8h | 0,83h | — |
 | DOM 08/11 | 1,25h | 8h | 2,25h | SCIR2 |
 | SEG 09/11 | 7,13h | 8h | 11,63h | aCIR4 aCIR4 aNEF1 aGIN1 |
-| TER 10/11 | 0,33h | 8h | 13,83h | QUA 11/11  estudo 10,28h / 8h · total 11,28h 📚  | aNEF2 QCIR4 QCIR4 QNEF1 QGIN1 |
-| QUI 12/11 | 0,33h | 8h | 13,83h | SEX 13/11  estudo 10,28h / 8h · total 11,28h 📚  | aOBS1 QNEF2 PCIR4 PCIR4 PNEF1 PGIN1 |
-| SÁB 14/11 | 0,83h 🌿 | 8h | 0,83h | DOM 15/11  estudo 7,48h / 8h · total 8,48h  | aNEF1 aGIN1 QOBS1 PNEF2 |
+| TER 10/11 | 0,33h | 8h | 13,83h | — |
+| QUA 11/11 | 10,28h 📚 | 8h | 11,28h | aNEF2 QCIR4 QCIR4 QNEF1 QGIN1 |
+| QUI 12/11 | 0,33h | 8h | 13,83h | — |
+| SEX 13/11 | 10,28h 📚 | 8h | 11,28h | aOBS1 QNEF2 PCIR4 PCIR4 PNEF1 PGIN1 |
+| SÁB 14/11 | 0,83h 🌿 | 8h | 0,83h | — |
+| DOM 15/11 | 7,48h | 8h | 8,48h | aNEF1 aGIN1 QOBS1 PNEF2 |
 | SEG 16/11 | 5,00h | 5h | 14,00h | QNEF1 SCIR4 SCIR4 SNEF1 SGIN1 |
 | TER 17/11 | 5,33h 📚 | 5h | 14,33h | QGIN1 PNEF1 POBS1 |
 | QUA 18/11 | 4,20h | 5h | 13,20h | aNEF3 PGIN1 SNEF2 |
 | QUI 19/11 | 2,33h | 5h | 11,33h | QNEF3 |
 | SEX 20/11 | 4,87h | 5h | 13,87h | aNEF2 PNEF3 SNEF1 SOBS1 |
-| SÁB 21/11 | 0,83h 🌿 | 8h | 0,83h | DOM 22/11  estudo 6,65h / 8h · total 7,65h  | aPRE1 aPED1 QNEF2 SGIN1 |
+| SÁB 21/11 | 0,83h 🌿 | 8h | 0,83h | — |
+| DOM 22/11 | 6,65h | 8h | 7,65h | aPRE1 aPED1 QNEF2 SGIN1 |
 | SEG 23/11 | 4,50h | 5h | 13,50h | QPRE1 PNEF2 SNEF3 |
 | TER 24/11 | 3,83h | 5h | 12,83h | QPED1 PPRE1 |
 | QUA 25/11 | 3,53h | 5h | 12,53h | aPRE2 PPED1 |
 | QUI 26/11 | 3,00h | 5h | 12,00h | QPRE2 SNEF2 |
 | SEX 27/11 | 4,20h | 5h | 13,20h | aANAT PPRE2 SPRE1 |
-| SÁB 28/11 | 0,83h 🌿 | 8h | 0,83h | DOM 29/11  estudo 6,65h / 8h · total 7,65h  | aREU1 aPED1 QANAT SPED1 |
+| SÁB 28/11 | 0,83h 🌿 | 8h | 0,83h | — |
+| DOM 29/11 | 6,65h | 8h | 7,65h | aREU1 aPED1 QANAT SPED1 |
 | SEG 30/11 | 4,50h | 5h | 13,50h | QREU1 PANAT SPRE2 |
 | TER 01/12 | 3,83h | 5h | 12,83h | QPED1 PREU1 |
 | QUA 02/12 | 3,53h | 5h | 12,53h | aREU1 PPED1 |
 | QUI 03/12 | 3,00h | 5h | 12,00h | QREU1 SANAT |
 | SEX 04/12 | 4,20h | 5h | 13,20h | aPRE2 PREU1 SREU1 |
-| SÁB 05/12 | 0,83h 🌿 | 8h | 0,83h | DOM 06/12  estudo 6,65h / 8h · total 7,65h  | aOBS2 aPRE3 QPRE2 SPED1 |
+| SÁB 05/12 | 0,83h 🌿 | 8h | 0,83h | — |
+| DOM 06/12 | 6,65h | 8h | 7,65h | aOBS2 aPRE3 QPRE2 SPED1 |
 | SEG 07/12 | 4,50h | 5h | 13,50h | QOBS2 PPRE2 SREU1 |
 | TER 08/12 | 3,83h | 5h | 12,83h | QPRE3 POBS2 |
 | QUA 09/12 | 3,53h | 5h | 12,53h | aREU2 PPRE3 |
@@ -116,19 +153,25 @@ Prévia de 19/10, sem revisões vencidas (que entram por cima, "só se vencer").
 | SEX 11/12 | 4,70h | 5h | 13,70h | aPED2 QREU2 SOBS2 |
 | SÁB 12/12 | 7,00h | 8h | 7,00h | QPRE3 QPED2 PREU2 SPRE3 |
 | DOM 13/12 | 5,28h | 8h | 6,28h | aREU2 PPRE3 PPED2 |
-| SEG 14/12 | 0,58h 🌿 | 8h | 1,58h | TER 15/12  estudo 6,65h / 8h · total 7,65h  | aHEM1 aHEM1 QREU2 SREU2 |
+| SEG 14/12 | 0,58h 🌿 | 8h | 1,58h | — |
+| TER 15/12 | 6,65h | 8h | 7,65h | aHEM1 aHEM1 QREU2 SREU2 |
 | QUA 16/12 | 7,42h | 8h | 8,42h | QHEM1 QHEM1 PREU2 SPRE3 SPED2 |
 | QUI 17/12 | 8,68h 📚 | 8h | 9,68h | aPED2 aHEM2 aHEM2 PHEM1 PHEM1 |
-| SEX 18/12 | 8,58h (simulado) | 8h | 9,58h | SÁB 19/12  estudo 7,50h / 8h · total 7,50h  | QPED2 QHEM2 QHEM2 SREU2 |
+| SEX 18/12 | 8,58h (simulado) | 8h | 9,58h | — |
+| SÁB 19/12 | 7,50h | 8h | 7,50h | QPED2 QHEM2 QHEM2 SREU2 |
 | DOM 20/12 | 6,42h | 8h | 7,42h | PPED2 PHEM2 PHEM2 SHEM1 SHEM1 |
-| SEG 21/12 | 0,58h 🌿 | 8h | 1,58h | TER 22/12  estudo 3,98h / 8h · total 4,98h  | aHEM2 aGAS1 |
+| SEG 21/12 | 0,58h 🌿 | 8h | 1,58h | — |
+| TER 22/12 | 3,98h | 8h | 4,98h | aHEM2 aGAS1 |
 | QUA 23/12 | 6,58h | 8h | 7,58h | QHEM2 QGAS1 SPED2 SHEM2 SHEM2 |
 | QUI 24/12 | 2,08h | 3h | 3,08h | PHEM2 |
 | SEX 25/12 | 2,08h | 3h | 3,08h | PGAS1 |
-| SÁB 26/12 | 0,83h 🌿 | 8h | 0,83h | DOM 27/12  estudo 4,65h / 8h · total 5,65h  | aGIN2 aGAS1 SHEM2 |
+| SÁB 26/12 | 0,83h 🌿 | 8h | 0,83h | — |
+| DOM 27/12 | 4,65h | 8h | 5,65h | aGIN2 aGAS1 SHEM2 |
 | SEG 28/12 | 5,25h | 8h | 6,25h | QGIN2 QGAS1 SGAS1 |
-| TER 29/12 | 0,58h 🌿 | 8h | 1,58h | QUA 30/12  estudo 3,58h / 8h · total 4,58h  | PGIN2 PGAS1 |
-| QUI 31/12 | 0,58h | 3h | 1,58h | SEX 01/01  estudo 1,92h / 8h · total 2,92h  | SGIN2 SGAS1 |
+| TER 29/12 | 0,58h 🌿 | 8h | 1,58h | — |
+| QUA 30/12 | 3,58h | 8h | 4,58h | PGIN2 PGAS1 |
+| QUI 31/12 | 0,58h | 3h | 1,58h | — |
+| SEX 01/01 | 1,92h | 8h | 2,92h | SGIN2 SGAS1 |
 
 Dias acima do 📚 (fora a sexta de simulado): **QUA 11/11 10,3h/8 · SEX 13/11 10,3h/8 · TER 17/11 5,3h/5 · QUI 17/12 8,7h/8** (todos abaixo do tempo hábil; o app mostra o 📚 no dia).
 
@@ -172,14 +215,15 @@ Confirmado em teste (trilha.js TRsim): na janela 20/10–01/01 os simulados liga
 | 😴 Médico do sono | plantão longo sem etapa de mesa; 04h30 com 📚 a 5h; véspera ~20h30/~21h45; **nenhum dia acima do tempo hábil** na prévia | **vetaria a ordem aprovada do score** (4 dias acima do tempo hábil, pior 19,7h) — por isso a ordem foi trocada (conflito 1); vigia 11 e 13/11 |
 | 🏃 Educador físico | academia livre em 6 dias, sábado sem treino, opcional no plantão longo | não |
 | 💬 Psicóloga TCC | nada grava sem "Aplicar"; textos sem culpa ("sem culpa: posso propor novos dias"); "e se esta semana virar manutenção?" sob demanda, tom neutro | não |
-| ⚙️ Engenheiro | histórico intacto (82/82), nada apagado, projeção honesta, 728 checks, `cmp` | não |
+| ⚙️ Engenheiro | histórico intacto (82/82), nada apagado, projeção honesta, 735 checks, `cmp` | não |
 
-## 10 · Conflitos e bordas achados rodando — decisão da paciente
+## 10 · Conflitos e bordas achados rodando — decididos em 20/10 (ver §0)
 
-1. **Ordem do agendador (😴 × 📚).** O plano aprovado ordenava: dia protegido → intervalos ideais (questões→apostila ~1d, apostila→selagem ~3d) → **tempo hábil** → 📚 … Rodando, essa ordem dava **4 dias acima do tempo hábil**: QUI 29/10 17,3h · **SEG 16/11 19,7h (10,7h de estudo num dia de 04h30)** · SEG 23/11 15,7h · SEG 30/11 15,2h. Implementei **tempo hábil antes dos intervalos**: 0 dias acima do tempo hábil; todos os intervalos continuam dentro das faixas; o custo é ficar menos vezes no ideal — questões→apostila em 1 dia: 31/40 (era 33/40) · apostila→selagem em 3 dias: 33/40 (era 38/40) · aula→questões em 1 dia: 15/40 (era 19/40). **Ela confirma ou reverte.**
-2. **QUA 11/11 e SEX 13/11 com ~10,3h de estudo** (entre os plantões longos de 10 e 12/11; total do dia 11,3h, abaixo do tempo hábil). Saída sem custo: mover blocos. O − da T3 resolve (11/11 → 6,6h, 13/11 → 8,5h) mas **custa 6 módulos** (alcance 40 → 34), porque o bloco 04h30 não deixa o ritmo voltar a subir até 15/12; T4 = 3 → alcance 35 e só 13/11 melhora (8,6h). Recomendação: mover blocos se pesar; decisão dela.
-3. **1º acesso tardio.** A regra aprovada dá à semana do 1º acesso a cota inteira "a partir daquele dia". Se a Trilha fosse aberta pela 1ª vez num sábado do bloco 04h30 (ex.: 28/11), as 4 aulas só caberiam em DOM e SEG e a **SEG 30/11 somaria 15,0h** (com ⚠️). Na prática não acontece (ela abre em 20/10; aberturas de 20 a 26/10 testadas sem excesso), mas a proposta é **cota proporcional aos dias que restam** — decisão dela.
-4. **Interpretação (⚙️), para registro:** "dia protegido aceita etapa leve" foi aplicada com capacidade — uma etapa em dia protegido também respeita o 📚 daquele dia (sem isso, quatro apostilas caíam no 24/12).
+1. **Ordem do agendador (😴 × 📚).** O plano aprovado ordenava: dia protegido → intervalos ideais (questões→apostila ~1d, apostila→selagem ~3d) → **tempo hábil** → 📚 … Rodando, essa ordem dava **4 dias acima do tempo hábil**: QUI 29/10 17,3h · **SEG 16/11 19,7h (10,7h de estudo num dia de 04h30)** · SEG 23/11 15,7h · SEG 30/11 15,2h. Implementei **tempo hábil antes dos intervalos**: 0 dias acima do tempo hábil; todos os intervalos continuam dentro das faixas; o custo é ficar menos vezes no ideal — questões→apostila em 1 dia: 31/40 (era 33/40) · apostila→selagem em 3 dias: 33/40 (era 38/40) · aula→questões em 1 dia: 15/40 (era 19/40). **Confirmado em 20/10.**
+2. **QUA 11/11 e SEX 13/11 com ~10,3h de estudo** (entre os plantões longos de 10 e 12/11; total do dia 11,3h, abaixo do tempo hábil). Saída sem custo: mover blocos. O − da T3 resolve (11/11 → 6,6h, 13/11 → 8,5h) mas **custa 6 módulos** (alcance 40 → 34), porque o bloco 04h30 não deixa o ritmo voltar a subir até 15/12; T4 = 3 → alcance 35 e só 13/11 melhora (8,6h). **Decidido em 20/10: ficam assim; ela move blocos se pesar.**
+3. **1º acesso tardio.** A regra aprovada dá à semana do 1º acesso a cota inteira "a partir daquele dia". Se a Trilha fosse aberta pela 1ª vez num sábado do bloco 04h30 (ex.: 28/11), as 4 aulas só caberiam em DOM e SEG e a **SEG 30/11 somaria 15,0h** (com ⚠️). Na prática não acontece (ela abre em 20/10; aberturas de 20 a 26/10 testadas sem excesso), → **aprovada em 20/10 a cota proporcional aos dias que restam**, implementada (§0).
+4. **Revisão vencida em dia cheio (pré-existente — proposta para ela decidir).** A capacidade do agendador não conta a revisão adaptativa (45min), que só existe depois do % da selagem. Com o 1º acesso hoje (20/10), se a selagem de CIR1 (26/10) for registrada com % < 60 ou ≥ 80, a revisão D+7 cai na QUI 05/11 e o dia vai a **15,25h** (era assim antes da cota proporcional também); com % < 60, a SEX 20/11 vai a 14,6h. O app mostra ⚠️ no dia e a revisão pode ser feita no dia seguinte. **Proposta:** revisão vencida que levaria o dia acima do tempo hábil vira opcional e desliza para o próximo dia com folga, como já acontece no plantão longo (decisão 66). Não mexi sem a decisão dela.
+5. **Interpretação (⚙️), para registro:** "dia protegido aceita etapa leve" foi aplicada com capacidade — uma etapa em dia protegido também respeita o 📚 daquele dia (sem isso, quatro apostilas caíam no 24/12).
 
 ## 11 · Nota do briefing — CIR3 Preparo Pré-operatório
 
@@ -188,9 +232,9 @@ O **CIR3 Preparo Pré-operatório e Risco Cirúrgico** (#6 na fila, aula previst
 ## 12 · A bateria de testes
 
 - **Novos:** `trilha.js` (TR0–TR14 + invariantes), `historico.js`, `coverageTrilha.js`, `intervalsTrilha.js`; `coverage41.js` (era `coverage45.js`: semanas 1–41); `intervals16.js`/`loads16.js` só com a Sem.38/39 (tabelas idênticas às do app antigo).
-- **audit.js (392 checks):** aposentados S7, S8b, S15, S16b, S16g2, S19d2 (cada um com o motivo no código e a cobertura equivalente); reescritos na Trilha S8, S8c, S9, S9b, S12, S16e, S18f2, S19d; re-datados para antes de 20/10, com a premissa conferida no app antigo, S10 (→ 23–29/09), S16a/S16d/S16g (→ Sem.39/40), S16f (−14 dias), S18b/S18g (→ Sem.41 com bloco adicionado), S18d/S18d2/S18h (→ Sem.38), S19b/S19b2 (→ Sem.39), S19h (→ 25/09), S20a/S20g (→ Sem.40); S6, S10b, S10c, S16, S16c recortados para a Sem.41 de 6 dias.
+- **audit.js (393 checks):** aposentados S7, S8b, S15, S16b, S16g2, S19d2 (cada um com o motivo no código e a cobertura equivalente); reescritos na Trilha S8, S8c, S9, S9b, S12, S16e, S18f2, S19d; re-datados para antes de 20/10, com a premissa conferida no app antigo, S10 (→ 23–29/09), S16a/S16d/S16g (→ Sem.39/40), S16f (−14 dias), S18b/S18g (→ Sem.41 com bloco adicionado), S18d/S18d2/S18h (→ Sem.38), S19b/S19b2 (→ Sem.39), S19h (→ 25/09), S20a/S20g (→ Sem.40); S6, S10b, S10c, S16, S16c recortados para a Sem.41 de 6 dias.
 - **harness.js:** abas por data, `reopen`, `markUntil`, `banner`/`clickIn`; `pageerror` vira ❌; todo script sai com código ≠ 0 em falha.
 
 ## 13 · Próximo passo
 
-PR aberto **sem merge**. Merge só com o aval dela — de preferência junto com as respostas aos itens 1–3 do §10.
+Aval dado em 20/10 com as decisões do §0; a decisão 3 entrou no mesmo PR (#15), com a bateria completa rodada de novo antes do merge.

@@ -1224,6 +1224,9 @@ function trilhaQueue(cfg) { // planejados (na ordem em que abriram) → fixados 
 }
 // ── Rampa e regra de subida (🧠 😴 🩺): igual ou menor que a anterior vale sempre; maior só se a anterior fechou E a semana não toca o bloco 04h30 ──
 function rampBase(cfg, tue) { const r = (cfg && cfg.trilhaRamp) || {}; const v = r[tue] !== undefined ? r[tue] : TRILHA_RAMP_DEFAULT[tue]; return Math.max(0, Math.min(9, Number(v) || 0)); }
+function trilhaPropTxt(p) { return p.days === 1 ? "ao único dia que restava (1 de " + p.len + ")" : "aos " + p.days + " de " + p.len + " dias que restavam"; }
+function trilhaAfterPropTxt(a) { return "a semana do 1º acesso teve " + a.q + (a.q === 1 ? " módulo" : " módulos") + " em " + a.days + (a.days === 1 ? " dia" : " dias") + "; para subir ou segurar, conta a cota cheia dela (" + a.full + ")"; }
+function trilhaPropQ(q, rem, len) { return Math.round(q * rem / len); } // 1º acesso no meio da semana (paciente, 20/10): cota proporcional aos dias que restam (inclusive o de hoje)
 function touchesBand(tue, w) { for (let i = 0; i < weekLen(w); i++) { const sh = shiftFor(addDaysISO(tue, i)); if (sh && sh.kind === "madrugada") return true; } return false; }
 function trilhaWeekDone(plan, trail, tue, wEnd, withAdv) { // semana fecha = todas as etapas planejadas para os dias dela (data original OU atual) marcadas; as do Adiantar não contam (bônus não trava a rampa)
     const inW = (d) => !!d && d >= tue && d <= wEnd;
@@ -1299,7 +1302,7 @@ function buildTrilhaPlan(cfg, trail, hoje, opts) { // → semanas (congeladas e 
         const light = (ov !== undefined && ov !== null && ov !== "" && Number(ov) >= 0 && Number(ov) < weekLen(w)) ? addDaysISO(tue, Number(ov)) : pred;
         lightInfo[tue] = { pred, light }; if (light && !prot[light]) prot[light] = "leve";
     }
-    const weeks = {}; let prevQ = null, prevClosed = true, started = false, stNow = null;
+    const weeks = {}; let prevQ = null, prevClosed = true, started = false, stNow = null, lastProp = null;
     for (let w = L + 1; w <= LW; w++) {
         const tue = weekStartISO(w), wEnd = weekEndISO(w);
         const snap = (cfg.trilhaWeeks || {})[tue];
@@ -1315,6 +1318,8 @@ function buildTrilhaPlan(cfg, trail, hoje, opts) { // → semanas (congeladas e 
             else if (!prevClosed) R = { q: prevQ, held: true, why: "fechamento" };
             else R = { q: base, held: false, why: null };
             if (opts.alt && w === curW + 1 && base > prevQ) R = { q: prevQ, held: true, why: touchesBand(tue, w) ? "madrugada" : "fechamento" }; // conta "se esta semana virar manutenção" (sob demanda)
+            let prop = null; // 😴 (paciente, 20/10): a semana do 1º acesso recebe a cota proporcional aos dias que restam — não é semana segurada e não trava a subida da seguinte
+            if (!started && firstOpen && firstOpen > tue && firstOpen <= wEnd) { const len = weekLen(w), rem = diffDays(firstOpen, wEnd) + 1, qp = trilhaPropQ(R.q, rem, len); if (qp < R.q) { prop = { full: R.q, days: rem, len }; R = { ...R, q: qp }; } }
             let from = tue; if (firstOpen && firstOpen > from) from = firstOpen; if (w === curW && hoje > from) from = hoje;
             const mods = []; let short = 0;
             for (let k = 0; k < R.q; k++) {
@@ -1330,11 +1335,11 @@ function buildTrilhaPlan(cfg, trail, hoje, opts) { // → semanas (congeladas e 
                 rem.forEach(ts => stAdd(st, ch[ts], ts));
                 mods.push(id);
             }
-            W = { q: R.q, base, held: R.held, why: R.why, mods, adv: [], rise: [], short, light: pred, preview: true };
+            W = { q: R.q, base, held: R.held, why: R.why, mods, adv: [], rise: [], short, light: pred, preview: true }; if (prop) W.prop = prop;
         }
         W.tue = tue; W.w = w; W.end = wEnd; W.lightEff = light;
         weeks[tue] = W;
-        if (!W.pre) { started = true; prevQ = W.q; prevClosed = w < curW ? trilhaWeekDone(plan, trail, tue, wEnd) : true; }
+        if (!W.pre) { if (lastProp) W.afterProp = lastProp; lastProp = W.prop ? { ...W.prop, q: W.q } : null; started = true; prevQ = W.prop ? W.prop.full : W.q; prevClosed = w < curW ? trilhaWeekDone(plan, trail, tue, wEnd) : true; }
         if (w === curW) stNow = cloneSt(st);
     }
     if (!stNow) stNow = cloneSt(st);
@@ -1410,7 +1415,7 @@ function trilhaFreezePatch(cfg, trail, hoje, P, scheduleOv) { // o que o App gra
     for (let w = P.L + 1; w <= P.curW; w++) { // semana corrente + semanas sem app aberto (congelam como estavam planejadas; as etapas viram pendentes ⏳)
         const tue = weekStartISO(w); const W = P.weeks[tue];
         if (!W || W.frozen || W.pre) continue;
-        weeksAll[tue] = { q: W.q, base: W.base, held: !!W.held, why: W.why || null, mods: W.mods.slice(), adv: [], rise: [], short: W.short || 0, light: W.light || null, at: hoje };
+        weeksAll[tue] = { q: W.q, base: W.base, held: !!W.held, why: W.why || null, mods: W.mods.slice(), adv: [], rise: [], short: W.short || 0, light: W.light || null, at: hoje }; if (W.prop) weeksAll[tue].prop = { ...W.prop };
         W.mods.forEach(id => { const p = P.plan[id]; const d = { aula: p.aula, quest: p.quest, apost: p.apost, seal: p.seal }; planAll[id] = { wk: tue, via: "ramp", ...d, orig: { ...d }, hist: [] }; });
         froze = true;
     }
@@ -2268,7 +2273,8 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, trail, P, onSa
     const pendT = isCurTW ? P.pending : [];
     const prevTueT = isCurTW && week - 1 > LCW ? weekStartISO(week - 1, startISO) : null;
     const riseOk = isCurTW && !pendT.length && !!Wcur && !!Wcur.frozen && !!Wcur.held && Wcur.why === "fechamento" && Wcur.base > Wcur.q && !!prevTueT && trilhaWeekDone(P.plan, trail, prevTueT, weekEndISO(week - 1, startISO)) && !(((config && config.trilhaDismiss) || {})[dateFor(0) + "|rise"]);
-    const weekAllMarked = isCurTW && Object.keys(P.plan).every(id => { const p = P.plan[id]; return STAGES_T.every(x => { const d = p[x]; return !(d && d >= dateFor(0) && d <= dateFor(WL - 1)) || !!((trail || {})[id] || {})[TS_FIELD[x]]; }); }); // TODAS as etapas planejadas nos dias desta semana marcadas (inclusive as adiantadas)
+    const inWeekT = (d) => d && d >= dateFor(0) && d <= dateFor(WL - 1);
+    const weekAllMarked = isCurTW && Object.keys(P.plan).some(id => STAGES_T.some(x => inWeekT(P.plan[id][x]))) && Object.keys(P.plan).every(id => { const p = P.plan[id]; return STAGES_T.every(x => { const d = p[x]; return !inWeekT(d) || !!((trail || {})[id] || {})[TS_FIELD[x]]; }); }); // TODAS as etapas planejadas nos dias desta semana marcadas (inclusive as adiantadas) — e a semana tem alguma: semana vazia (ex.: 1º acesso numa segunda, cota proporcional 0) não oferece ⏩, como na aba Trilha
     const advOk = isCurTW && !!Wcur && !!Wcur.frozen && weekAllMarked && !pendT.length && !riseOk;
     const tProp = !isCurTW || !tView ? null : tView === "pend" ? { kind: "pend", jobs: trilhaProposeRecolocar(P, config, trail, hojeT) } : tView === "rise" ? { kind: "rise", items: trilhaProposeRise(P, config, trail, hojeT, Math.max(0, (Wcur.base || 0) - (Wcur.q || 0))) } : { kind: "adv", ...trilhaProposeAdvance(P, config, trail, hojeT) };
     const modTxt = (id) => { const m = modById(id); return m ? m.code + " " + m.title : "módulo " + id; };
@@ -2329,7 +2335,7 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, trail, P, onSa
     const KIND_LBL = { novo: ["NOVO", "#7E22CE"], adiantado: ["ADIANTADO", "#0369A1"], subida: ["SUBIDA", "#15803D"], continua: ["CONTINUA", "#475569"] };
     const trailPanelEl = () => React.createElement("div", { "data-t": "trilha-panel", style: { background: "#0f172a", borderRadius: 8, padding: "10px 12px", marginBottom: 14 } },
         React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, marginBottom: 6 } },
-            React.createElement("div", { style: { color: "#64748b", fontSize: 10, lineHeight: 1.5 } }, "MÓDULOS DESTA SEMANA DA TRILHA" + (Wcur && !Wcur.pre ? " · ritmo " + Wcur.q + (Wcur.held ? " — semana de manutenção do ritmo (" + (Wcur.why === "madrugada" ? "segura: bloco 04h30" : "segura: semana passada aberta") + ")" : "") : "") + (Wcur && Wcur.preview && !Wcur.pre ? " · prévia" : "")),
+            React.createElement("div", { style: { color: "#64748b", fontSize: 10, lineHeight: 1.5 } }, "MÓDULOS DESTA SEMANA DA TRILHA" + (Wcur && !Wcur.pre ? " · ritmo " + Wcur.q + (Wcur.prop ? " — 1º acesso: proporcional " + trilhaPropTxt(Wcur.prop) + " (a rampa previa " + Wcur.prop.full + ")" : "") + (Wcur.afterProp ? " · " + trilhaAfterPropTxt(Wcur.afterProp) : "") + (Wcur.held ? " — semana de manutenção do ritmo (" + (Wcur.why === "madrugada" ? "segura: bloco 04h30" : "segura: semana passada aberta") + ")" : "") : "") + (Wcur && Wcur.preview && !Wcur.pre ? " · prévia" : "")),
             onGoTrilha && React.createElement("button", { onClick: onGoTrilha, style: { background: "#1e293b", border: "1px solid #334155", borderRadius: 6, color: "#94a3b8", fontSize: 10, fontWeight: 700, padding: "3px 8px", cursor: "pointer" } }, "🛤️ Fila e rampa")),
         weekModsT.length ? React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6 } }, weekModsT.map(({ id, mod, p, kind }) => { const t = (trail || {})[id] || {};
             return React.createElement("div", { key: id, "data-mod": mod.code + " · " + mod.title, "data-kind": kind, style: { display: "flex", flexDirection: "column", gap: 2 } },
@@ -2350,7 +2356,7 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, trail, P, onSa
             React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 6 } }, (dayDate >= TRILHA_START ? [
                 { d: "🛤️", label: "Trilha", desc: "Fila única (cirurgia primeiro, depois a ordem do curso) · cada módulo refaz a cadeia COMPLETA: aula 1,7h → questões 2h → apostila 1,5h → selagem 40min · registro próprio da Trilha", color: "#7E22CE" },
                 { d: "⏱️", label: "Intervalos", desc: "aula→questões 1–2 dias · questões→apostila 1–2 (ideal 1) · apostila→selagem 2–5 (ideal 3) · nunca duas etapas do módulo no mesmo dia", color: "#C2410C" },
-                { d: "📈", label: "Rampa", desc: "3 · 4 · 4 · 4 · 4 · 4 · 4 · 4 · 5 · 4 · 0 módulos novos por semana (terça) — sobe só se a semana passada fechou e fora do bloco 04h30 · ⏩ Adiantar quando a semana fecha", color: "#B45309" },
+                { d: "📈", label: "Rampa", desc: "3 · 4 · 4 · 4 · 4 · 4 · 4 · 4 · 5 · 4 · 0 módulos novos por semana (terça) — sobe só se a semana passada fechou e fora do bloco 04h30 (a semana do 1º acesso conta pela cota cheia) · ⏩ Adiantar quando a semana fecha", color: "#B45309" },
                 { d: "🚑", label: "Plantões", desc: "Longo 06h–19h: só Anki + áudio · curto: etapas antes ou depois · 04h30 (16/11–11/12): estudo à tarde, 📚 a 5h · 🌿 dia leve previsto antes de distribuir (nunca aula nova) · 🎄 24, 25 e 31/12 mais leves", color: "#6B7280" },
             ] : dayDate >= FREE_START ? [
                 { d: "—", label: "Reta final", desc: "Sem ambulatório — dias 100% livres", color: "#6B7280" },
@@ -3200,21 +3206,21 @@ function TrilhaTab({ config, trail, progress, P, onSaveConfig, onUpdateTrail, on
             React.createElement("div", { style: small }, "Conta = módulos com as 4 etapas datadas até 01/01 (ou já feitas). A prévia supõe que as próximas semanas fecham; não é promessa — muda quando você marca, recoloca ou adianta."),
             curW && curW < P.LW && React.createElement("div", { style: { display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginTop: 6 } },
                 React.createElement("button", { onClick: () => setAltN(buildTrilhaPlan(config, trail, hoje, { alt: true }).N), style: btnS(false) }, "E se esta semana virar manutenção?"),
-                altN != null && React.createElement("span", { "data-t": "trilha-alt", style: { color: "#94a3b8", fontSize: 11, lineHeight: 1.4 } }, "Se esta semana não fechar, a próxima fica no mesmo ritmo: cabem " + altN + " até 01/01. É só uma conta — muda quando as etapas forem marcadas."))),
+                altN != null && React.createElement("span", { "data-t": "trilha-alt", style: { color: "#94a3b8", fontSize: 11, lineHeight: 1.4 } }, "Se esta semana não fechar, a próxima fica no mesmo ritmo" + (W && W.prop ? " da sua cota cheia (" + W.prop.full + ")" : "") + ": cabem " + altN + " até 01/01. É só uma conta — muda quando as etapas forem marcadas."))),
         showExport && React.createElement("div", { "data-t": "trilha-export", style: { background: "#1a1430", border: "1px solid #7c3aed", borderRadius: 10, padding: "8px 12px", display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" } },
             React.createElement("span", { style: { color: "#c4b5fd", fontSize: 11, fontWeight: 800, lineHeight: 1.4 } }, "📦 O acesso à plataforma termina em 01/01/2027: exporte o que é seu (apostilas, resumos, cadernos de erros) e faça o 💾 backup do app."),
             React.createElement("button", { onClick: () => doExportBackup(), style: { background: "#2e1065", border: "1px solid #7c3aed", borderRadius: 8, color: "#ddd6fe", fontSize: 11, fontWeight: 700, padding: "5px 10px", cursor: "pointer" } }, "💾 Baixar backup do app")),
         hoje >= TRILHA_END && React.createElement(TrilhaBalanco, { P, trail, closing: hoje > TRILHA_END }),
         React.createElement("div", { "data-t": "trilha-ramp", style: card },
             React.createElement("div", { style: { color: "#94a3b8", fontSize: 11, marginBottom: 8 } }, "RITMO DA SEMANA E RAMPA"),
-            W && !W.pre && React.createElement("div", { style: { color: "#f1f5f9", fontSize: 12, marginBottom: 8, lineHeight: 1.5 } }, "Esta semana (" + fmtBR(curTue) + "–" + fmtBR(curEnd) + "): " + W.q + (W.q === 1 ? " módulo novo" : " módulos novos") + (W.held ? " — semana de manutenção do ritmo (" + (W.why === "madrugada" ? "travado: bloco 04h30" : "segura: semana passada aberta") + "; a rampa previa " + W.base + ")" : "") + ((W.adv || []).length ? " · +" + W.adv.length + " adiantado(s)" : "") + ((W.rise || []).length ? " · +" + W.rise.length + " pela subida" : "")),
+            W && !W.pre && React.createElement("div", { style: { color: "#f1f5f9", fontSize: 12, marginBottom: 8, lineHeight: 1.5 } }, "Esta semana (" + fmtBR(curTue) + "–" + fmtBR(curEnd) + "): " + W.q + (W.q === 1 ? " módulo novo" : " módulos novos") + (W.prop ? " — semana do seu 1º acesso: cota proporcional " + trilhaPropTxt(W.prop) + " (a rampa previa " + W.prop.full + ")" : "") + (W.afterProp ? " · " + trilhaAfterPropTxt(W.afterProp) : "") + (W.held ? " — semana de manutenção do ritmo (" + (W.why === "madrugada" ? "travado: bloco 04h30" : "segura: semana passada aberta") + "; a rampa previa " + W.base + ")" : "") + ((W.adv || []).length ? " · +" + W.adv.length + " adiantado(s)" : "") + ((W.rise || []).length ? " · +" + W.rise.length + " pela subida" : "")),
             React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 4 } }, tueList.map((tue, k) => { const Wk = P.weeks[tue] || {}; const edit = !Wk.frozen && !Wk.pre; return React.createElement("div", { key: tue, "data-tue": tue, style: { display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", background: tue === curTue ? "#0b1f33" : "#0f172a", borderRadius: 8, padding: "5px 8px" } },
                 React.createElement("span", { style: { color: "#cbd5e1", fontSize: 11, minWidth: 110 } }, "T" + (k + 1) + " · " + fmtBR(tue) + "–" + fmtBR(weekEndISO(P.L + 1 + k))),
                 edit && React.createElement("button", { onClick: () => setRamp(tue, rampBase(config, tue) - 1), style: btnS(false) }, "−"),
                 React.createElement("span", { style: { color: "#f5c518", fontSize: 12, fontWeight: 800, minWidth: 16, textAlign: "center" } }, rampBase(config, tue)),
                 edit && React.createElement("button", { onClick: () => setRamp(tue, rampBase(config, tue) + 1), style: btnS(false) }, "+"),
-                React.createElement("span", { style: small }, Wk.pre ? "antes do seu 1º acesso" : Wk.frozen ? "congelada: " + Wk.q + " novo(s)" + (Wk.held ? " (segura: " + (Wk.why === "madrugada" ? "bloco 04h30" : "semana anterior aberta") + ")" : "") : "prévia: " + (Wk.mods || []).length + " novo(s)" + (Wk.held ? " (segura: " + (Wk.why === "madrugada" ? "bloco 04h30" : "semana anterior aberta") + ")" : "") + (Wk.short ? " · " + Wk.short + " não coube" : ""))); })),
-            React.createElement("div", { style: { ...small, marginTop: 6 } }, "Igual ou menor que a semana anterior vale sempre; maior só se a semana anterior fechou E fora do bloco 04h30 (16/11–11/12). − / + só nas semanas que ainda não começaram.")),
+                React.createElement("span", { style: small }, Wk.pre ? "antes do seu 1º acesso" : Wk.frozen ? "congelada: " + Wk.q + " novo(s)" + (Wk.prop ? " (1º acesso: " + Wk.prop.days + " de " + Wk.prop.len + " dias)" : "") + (Wk.held ? " (segura: " + (Wk.why === "madrugada" ? "bloco 04h30" : "semana anterior aberta") + ")" : "") : "prévia: " + (Wk.mods || []).length + " novo(s)" + (Wk.prop ? " (1º acesso: " + Wk.prop.days + " de " + Wk.prop.len + " dias)" : "") + (Wk.held ? " (segura: " + (Wk.why === "madrugada" ? "bloco 04h30" : "semana anterior aberta") + ")" : "") + (Wk.short ? " · " + Wk.short + " não coube" : ""))); })),
+            React.createElement("div", { style: { ...small, marginTop: 6 } }, "Igual ou menor que a semana anterior vale sempre; maior só se a semana anterior fechou E fora do bloco 04h30 (16/11–11/12). A semana do seu 1º acesso, proporcional aos dias que restavam, conta pela cota cheia. − / + só nas semanas que ainda não começaram.")),
         curTue && React.createElement("div", { "data-t": "trilha-week", style: card },
             React.createElement("div", { style: { color: "#94a3b8", fontSize: 11, marginBottom: 8 } }, "MÓDULOS DESTA SEMANA (" + weekIds.length + ")"),
             weekAllMarked && onGoSchedule && React.createElement("button", { onClick: onGoSchedule, style: { ...btnS(false), marginBottom: 8, padding: "6px 10px" } }, "⏩ Semana fechada — Adiantar próximo módulo no Cronograma"),
@@ -3262,7 +3268,7 @@ function TrilhaTab({ config, trail, progress, P, onSaveConfig, onUpdateTrail, on
             React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 8 } }, [
                 ["1", "Fila única", "Cirurgia primeiro (CIR1 Trauma I e II, CIR2 Urologia, Queimaduras e Cirurgia Pediátrica, CIR3 Pré-operatório e Hérnias, CIR4 I e II); depois a ordem do curso. ↑↓ reordena o que ainda não abriu; 📌 fixa o próximo a abrir."],
                 ["2", "Cadeia completa, sempre", "Aula → questões (1–2 dias) → apostila (1–2, ideal 1) → selagem (2–5, ideal 3), nunca duas etapas do módulo no mesmo dia. Nada visto antes conta como aprendido: o registro da Trilha é próprio; o do curso fica guardado."],
-                ["3", "Rampa", "3 · 4 · 4 · 4 · 4 · 4 · 4 · 4 · 5 · 4 · 0 módulos novos por semana. Sobe só se a semana passada fechou e fora do bloco 04h30. Semana segurada = semana de manutenção do ritmo, não fracasso."],
+                ["3", "Rampa", "3 · 4 · 4 · 4 · 4 · 4 · 4 · 4 · 5 · 4 · 0 módulos novos por semana. Sobe só se a semana passada fechou e fora do bloco 04h30. Semana segurada = semana de manutenção do ritmo, não fracasso. Na semana do seu 1º acesso, a cota é proporcional aos dias que restam; para subir ou segurar a seguinte, ela conta pela cota cheia."],
                 ["4", "Plantões e dia leve", "Plantão longo (06h–19h): só Anki + áudio. Curto e 04h30: etapas antes ou depois. O dia leve (sem Venvanse) é previsto antes de distribuir e nunca recebe aula nova; 24, 25 e 31/12 são mais leves (📚 a 3h)."],
                 ["5", "Ficou para trás? Adiantou?", "⏳ o app propõe novos dias (só grava com Aplicar). Semana fechada: ⏩ Adiantar próximo módulo. Na semana final (29/12–01/01) ele recoloca sozinho para selar até 01/01."],
                 ["6", "Ferramentas de foco", "Forest/Flora ligado em TODO bloco de estudo. Body double (FocusMate ou colega) nos blocos que você mais adia."],
