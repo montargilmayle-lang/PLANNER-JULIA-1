@@ -202,7 +202,7 @@ Confirmado em teste (trilha.js TRsim): na janela 20/10–01/01 os simulados liga
 
 ## 8 · Decisões superadas ou suspensas na Trilha
 
-(Valem só no histórico até 19/10; registradas no §16 do briefing.) **8** projeção de zeramento → linha de alcance até 01/01 · **13, 26, 31** CATCHUP, ritmo travado em 2 e fronteiras de fase → nunca chegam a valer · **18** reta final em pipeline · **20** P1/`fioWeek` → `trilhaWeeks`/`trilhaPlan` · **35** 🔄 redistribuição → ⏩ Adiantar e ⏳ recolocar · **47** 📌 no meio da semana → 📌 da fila da Trilha · **48** bloco de revisão fixo → revisão "só se vencer" · **15** dia leve calculado depois → **previsto antes** de distribuir · entrada adaptativa do §5/§9 → cadeia sempre completa. Novas: decisões **55–68** (briefing §16).
+(Valem só no histórico até 19/10; registradas no §16 do briefing.) **8** projeção de zeramento → linha de alcance até 01/01 · **13, 26, 31** CATCHUP, ritmo travado em 2 e fronteiras de fase → nunca chegam a valer · **18** reta final em pipeline · **20** P1/`fioWeek` → `trilhaWeeks`/`trilhaPlan` · **35** 🔄 redistribuição → ⏩ Adiantar e ⏳ recolocar · **47** 📌 no meio da semana → 📌 da fila da Trilha · **48** bloco de revisão fixo → revisão "só se vencer" · **15** dia leve calculado depois → **previsto antes** de distribuir · entrada adaptativa do §5/§9 → cadeia sempre completa. Novas: decisões **55–73** (briefing §16).
 
 ## 9 · Passagem pelos oito
 
@@ -238,3 +238,11 @@ O **CIR3 Preparo Pré-operatório e Risco Cirúrgico** (#6 na fila, aula previst
 ## 13 · Próximo passo
 
 Aval dado em 20/10 com as decisões do §0; a decisão 3 entrou no mesmo PR (#15), com a bateria completa rodada de novo antes do merge.
+
+## 14 · Depois do merge: decisão 73 (20/10) — PR próprio
+
+- **Revisão vencida em dia cheio:** aplicada a proposta do §10, item 4. Quando a revisão levaria o dia acima de 14,5h no total — ou, num dia de limiar reduzido (04h30, pós-noturno, 24/25/31/12), acima desse limiar de estudo —, ela vira opcional ("Revisão adaptativa — opcional hoje: o dia já está cheio; se não fizer, ela passa para SÁB 07/11") e desliza para o próximo dia com folga, como no plantão longo. Não entra no ⏳; o alerta conta o atraso só a partir do 1º dia que tinha folga ("passou para hoje (o dia em que venceu estava cheio)").
+- **Efeito medido (simulação progressiva, com revisões):** nenhuma data de 1º acesso (20/10 → 28/12) deixa algum dia acima de 14,5h (antes: 2 datas; antes da cota proporcional: 15). Com o 1º acesso em 20/10 e selagens a 50%, 70% ou 85%, as revisões deslizam no máximo 2 dias (a maioria não desliza).
+- **Revisão adversarial (semântica, texto, regressão):** corrigidos antes do PR (1) a linha de estado cortada com reticências no celular — agora em linha própria; (2) "opcional" no bloco e "em atraso" no alerta no mesmo dia cheio — o dia cheio sempre vence; (3) "passou para hoje" em dia futuro — agora "passa para este dia"; (4) depois de ⏳ Recolocar, o dia cheio do passado era reavaliado pelo plano novo e a revisão voltava "em atraso" — o dia cheio fica gravado (`trilhaRevFull`); (5) depois de 01/01 toda revisão dizia "o dia está cheio" — a regra para em 01/01; (6) a folga ignorava dia editado à mão — agora usa a lista real. Testes TR15, TR15b–e.
+- **Arredondamento da 1ª semana:** mantido `Math.round`, confirmado pela paciente.
+- **Bateria do PR da decisão 73:** audit 393 · trilha 155 · historico 82 · coverage41 80 · coverageTrilha 7 · intervalsTrilha 10 · intervals16 7 · loads16 12 → **746 checks**, todos verdes; `index.html` idêntico (`cmp`).
