@@ -1,5 +1,5 @@
-// Tabela de intervalos — semanas com 3 blocos (A, B, C) nas duas configurações: normal (sem.43, 28/10→04/11) e simulado (sem.38, 23/09→30/09),
-// com o agrupamento padrão (3 grupos), [A+B]+[C] e [A]+[B+C]. Lida do cronograma renderizado (2 semanas seguidas).
+// Tabela de intervalos — semana com 3 blocos (A, B, C) em semana de simulado (sem.38, 23/09→30/09), com o agrupamento padrão (3 grupos),
+// [A+B]+[C] e [A]+[B+C]. Lida do cronograma renderizado (2 semanas seguidas). A Sem.43 saiu (20/10: a partir dela é a Trilha).
 const H = require('./harness.js');
 const CFG = 'medplanner_config_v1';
 const base = { startDate: '2026-01-07', manualWeek: null, catchupPace: 2 };
@@ -16,11 +16,12 @@ function chain(name, wk, stages) {
   for (const [nm, re, fromAbs] of stages) { const d = find(wk, re, fromAbs != null ? fromAbs : cur); days.push([nm, d]); if (d != null) cur = d; }
   const parts = days.map(([nm, d], i) => (i ? ' →' + (d != null && days[i - 1][1] != null ? (d - days[i - 1][1]) + 'd' : '?') + '→ ' : '') + nm + ' ' + lbl(d));
   console.log('  ' + name.padEnd(30) + parts.join(''));
+  H.check(name + ': as 5 etapas encontradas; presencial → aula+D2 → apostila em dias crescentes (em semana de simulado o banco do B/C vai para a QUI/SEX seguinte, depois da selagem de QUA — desenho de 24/09)', days.every(([, d]) => d != null) && days[0][1] < days[1][1] && days[1][1] < days[2][1], parts.join(''));
 }
 const blk = (L, sim) => [['presencial', /Aula presencial Medcurso/], ['aula 1.5x+D2', (sim && L === 'B') ? /deslocado da sexta/ : new RegExp('Aula online Bloco ' + L + ' \\(1\\.5x\\)|D2-' + L), 1], ['apostila', new RegExp('Apostila do Bloco ' + L), 1], ['banco', (sim && L === 'B') ? /Bloco B da semana passada \(semana de simulado/ : (L === 'C' ? /^D6 · Banco: questões por conteúdo do Bloco C da semana passada/ : new RegExp('questões por conteúdo Bloco ' + L)), 2], ['selagem', new RegExp('^Selar Bloco ' + L + ' da semana passada'), 7]];
 (async () => {
   const browser = await H.pw.chromium.launch();
-  for (const [phase, c1, c2, sim, wk, ids] of [['Sem.43 normal (28/10 → 04/11)', '2026-10-29', '2026-11-05', false, 43, [84, 93, 83]], ['Sem.38 simulado (23/09 → 30/09, plantões 26 e 27/09)', '2026-09-24', '2026-10-01', true, 38, [74, 92, 73]]]) {
+  for (const [phase, c1, c2, sim, wk, ids] of [['Sem.38 simulado (23/09 → 30/09, plantões 26 e 27/09)', '2026-09-24', '2026-10-01', true, 38, [74, 92, 73]]]) {
     for (const [gname, groups] of [['padrão: A, B, C', null], ['[A+B] + [C]', [[ids[0], ids[1]], [ids[2]]]], ['[A] + [B+C]', [[ids[0]], [ids[1], ids[2]]]]]) {
       const cfg = { ...base }; if (groups) cfg.weekGroups = { [wk]: groups };
       const w = await twoWeeks(browser, c1, c2, cfg);
@@ -31,4 +32,5 @@ const blk = (L, sim) => [['presencial', /Aula presencial Medcurso/], ['aula 1.5x
     }
   }
   await browser.close();
+  H.summary('intervals16');
 })();

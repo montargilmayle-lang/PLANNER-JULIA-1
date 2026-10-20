@@ -21,9 +21,11 @@
 |---|---|
 | `planner_residencia_2026_offline.html` | Entregável principal (offline) |
 | `index.html` | Cópia idêntica para Netlify |
-| `protocolo_equipe_multidisciplinar.md` | Protocolo escrito com evidências |
+| `protocolo_equipe_multidisciplinar.md` | Protocolo escrito com evidências (§7-T = Trilha) |
+| `RELATORIO_TRILHA_2026-10.md` | Relatório da Trilha autônoma (intervalos, cargas, alcance, histórico, decisões superadas, vetos, conflitos) |
+| `tests/` | Bateria Playwright (ver §15 e `tests/README.md`) |
 
-**Tecnologia:** HTML single-file · React inlined via `createElement` (sem JSX) · localStorage prefix `medplanner_` · semana começa na quarta (dia da aula presencial).
+**Tecnologia:** HTML single-file · React inlined via `createElement` (sem JSX) · localStorage prefix `medplanner_` · semana começa na quarta (dia da aula presencial) **até 19/10/2026**; **a partir de 20/10 as semanas são TER→SEG (Trilha, §11-T)** — a Sem.41 do curso vai de 14 a 19/10 (6 dias) e a Sem.52 = T11 = 29/12–01/01 (4 dias).
 
 ---
 
@@ -37,7 +39,11 @@ G2_START      = "2026-09-10"   // grade real de plantões
 G2_END        = "2026-10-11"   // fim da grade real
 CATCHUP_START = "2026-11-25"   // recuperação (fios A/B)
 FREE_START    = "2026-12-16"   // reta final em PIPELINE — QUARTA (a terça 15/12 fecha o Fio B da última semana CATCHUP)
-TOTAL_WEEKS   = 51             // piso; dynTW() cresce com a projeção
+TOTAL_WEEKS   = 51             // (histórico) — desde 20/10 o horizonte é fixo: dynTW() = lastWeek() = 52
+TRILHA_START  = "2026-10-20"   // 1º dia da Trilha autônoma (semanas TER→SEG)
+TRILHA_END    = "2027-01-01"   // último dia de acesso à plataforma (sem simulado, sem módulo novo)
+MADRUGADA     = 16/11–11/12    // bloco 04h30–12h30 seg–sex (acorda 03:30; 📚 a 5h; o ritmo não sobe)
+TRILHA_RAMP_DEFAULT            // 3·4·4·4·4·4·4·4·5·4·0 módulos novos por terça (soma 40)
 SIMULADO_ANCHOR = "2026-08-14" // 1ª sexta COM simulado (âncora quinzenal real)
 ```
 
@@ -50,8 +56,9 @@ pré-03/08  → histórico (template antigo intacto, prova sáb, aula 18h20)
 03/08–09/09 → AMB (plantão Ter/Qui/Dom 07h–17h — vale o que estava)
 10/09–11/10 → G2 (grade real com plantões DATADOS — ver §6)
 > 11/10     → POST (provisório: tudo livre, só Medcurso qua — até nova grade; SEM aula da faculdade — decisão fechada da paciente em 14/09)
-25/11–14/12 → CATCHUP (PROVISÓRIO — nova grade pendente: dias livres, Fio A qua→qui→sáb, Fio B dom→seg→ter, selagem do A na ter e do B na sex; sábado útil (apostila do A + temas fracos + PLAN), academia livre, simulados)
-16/12+      → FREE em PIPELINE: 6 fios/semana (decisão de capacidade, 24/09) — fio novo QUA·QUI·SEX·SÁB·SEG·TER (Fio 1..6); o DOMINGO não abre fio, fecha etapas dos fios em andamento (questões do Fio 4 · apostila do Fio 3 · selagem do Fio 6 anterior); cada fio: aula → questões +1d → apostila +1d → selagem +3d; congelados por semana; simulado quinzenal mantido na sexta
+(superado) 25/11–14/12 → CATCHUP (PROVISÓRIO — nova grade pendente: dias livres, Fio A qua→qui→sáb, Fio B dom→seg→ter, selagem do A na ter e do B na sex; sábado útil (apostila do A + temas fracos + PLAN), academia livre, simulados)
+20/10–01/01 → TRILHA AUTÔNOMA (§11-T) — substitui POST (a partir de 20/10), CATCHUP e FREE, que NUNCA chegam a valer; weekPhase devolve "TRILHA" e o motor antigo (fios, cascata A/B/C, banco pós-simulado, fioWeek, applyPace, ritmo 1–4) não atua em dia ≥ 20/10
+(superado) 16/12+ → FREE em PIPELINE: 6 fios/semana (decisão de capacidade, 24/09) — fio novo QUA·QUI·SEX·SÁB·SEG·TER (Fio 1..6); o DOMINGO não abre fio, fecha etapas dos fios em andamento (questões do Fio 4 · apostila do Fio 3 · selagem do Fio 6 anterior); cada fio: aula → questões +1d → apostila +1d → selagem +3d; congelados por semana; simulado quinzenal mantido na sexta
 ```
 
 **Cada fase tem seu próprio `WEEK_SCHEDULE_*`:** `WEEK_SCHEDULE_AMB`, `WEEK_SCHEDULE_G2`, `WEEK_SCHEDULE_POST`, `WEEK_SCHEDULE_CATCHUP`, `WEEK_SCHEDULE_FREE`.
@@ -236,6 +243,32 @@ const DAY_CAP_H = 14.5; // 24h − 8h sono − 1h30 refeições
 
 `moveAct` → bloco com módulo? `analyzeMove(act, fromIdx, idx, toIdx)`: `stagesOf` (etapas que o bloco representa), `familyOf` (cadeia), `stageMapFor` antes/depois (dias −7…20), `spacingIssues` (faixas `RANGES`: aq 1–2 / A-B-C 0–2 · qp 1–2 · pb 2–5 · ps 2–5; prioridade: mesmo dia 0 · qp 1 · pb/ps 2 · aq 3), `reorganize` (etapas movíveis = não feitas e d > `pastAbs`; `pick` com as 4 passadas da redistribuição; A/B/C e fios CATCHUP/FREE presos à própria semana — `isTemplFioG2`), `applyMovePlan`. Diálogo `[data-pw="move-ask"]` dentro do card do dia. Sem violação e sem carga acima do tempo hábil → move direto; bloco sem módulo → `window.confirm` de carga, como antes.
 
+## 11-T · TRILHA AUTÔNOMA (20/10/2026 → 01/01/2027) — pedido da paciente em 19–20/10
+
+**Por quê:** ela deixou a presencial e a ordem do cursinho; o acesso à plataforma termina em 01/01/2027 e em 04/01 começa outro cursinho (prova no fim de 2027). Objetivo: **aprender plenamente o máximo de módulos possível, sem cortar profundidade.** Quem pede: 🩺 fila e método · 📚 cadeia completa e intervalos (38/40/46) · 🧩 o app lembra por ela · 😴 plantão longo sem etapa de mesa, 04h30 com 📚 a 5h · 🧠 dia sem remédio protegido, nunca horário de medicação · 💬 ela decide (proposta + Aplicar) · ⚙️ histórico intacto, registros novos sem apagar os antigos, projeção honesta.
+
+**Calendário por trecho (nível do módulo):** `lcw()` (última semana do curso: 41), `weekNumOf`, `weekOfISO`, `weekStartISO`, `weekLen`, `weekEndISO`, `dayIdxOf`, `isTrilhaWeek`, `isTrilhaDay`, `trailOn`, `lastWeek()` (= 52). Rótulos de dia saem da data (`DOW_TAB/DOW_LBL/DOW_FULL`, `dowOf`). Templates antigos por `rowFor(iso)`; dias da trilha por `trilhaRow(iso)`. Sem.41 histórica: dia leve calculado com os 7 dias originais (`listLeg`); se cair na TER 20/10, nenhum 🌿 em 14–19/10.
+
+**Registro próprio:** `medplanner_trail_v1` (mesmo formato do progresso + carimbos `aulaAt/questoesD2At/apostilaAt/smartcardAt`, `aulaAudio/aulaAudioAt`). `toggleProgressField(store, id, field, opts)` carimba ao marcar (pelo bloco: `min(hoje, data do bloco)`; pelo card: hoje). Bloco com `tm` (ou dia ≥ 20/10) lê o `trail`; o resto lê `progress`. Revisões a partir de 20/10 só do `trail`. Aba Módulos na Trilha: card grava no `trail`, mostra "Curso (até 19/10, guardado): …", badges "Curso S…", "TRILHA #k", "ATÉ 01/01"/"FORA DO ALCANCE", filtros Nesta semana · No alcance · Fora.
+
+**Fila:** `TRILHA_SURGERY` (5, 6, 14, 19, 24, 32, 34, 85, 86) e depois `ALL_MODS()` por semana do curso (principais, blocos dela, bônus por último; sem semana → fim). `config.trilhaOrder` (↑↓) e `config.trilhaPins` (📌, separados de `catchupPins`) só reordenam módulos ainda não planejados. Nota (📚/🩺): o **CIR3 Preparo Pré-operatório** (#6) apoia-se em cardiologia (CAR1, #52 na fila) — fica na posição atual; ela pode movê-lo com ↑↓.
+
+**Rampa e subida:** `TRILHA_RAMP_DEFAULT` por terça; `config.trilhaRamp` edita semanas ainda não congeladas (− / +). Cota ≤ anterior vale sempre; maior só se a anterior fechou (`trilhaWeekDone`: todas as etapas com data original ou atual na semana marcadas, exceto as do Adiantar) **e** a semana não toca o bloco 04h30 (`MADRUGADA`). Semana segurada mostra o motivo.
+
+**Agendador determinístico** (`buildTrilhaPlan(config, trail, hoje)`, memo): `shiftFor` (`DATED_SHIFTS` longo/curto + `MADRUGADA`), `studyWarnFor` (3h em 24/25/31/12; 5h no 04h30 e pós-noturno; senão 8h), `simForCfg`, `dayOpenT`, `trilhaCap` (tempo hábil do dia). Dia leve **previsto antes de distribuir** (`trilhaPredictLight`, pré-passe de todas as semanas). Dias protegidos = dia leve + 24/25/31/12 + 01/01 (só selagem). `placeChain`: aula a; questões a+1|a+2; apostila q+1|q+2; selagem p+2..p+5; só `dayOpenT`, até 01/01, datas crescentes; aula nunca em dia protegido. **Score lexicográfico implementado:** etapa em dia protegido (`TS_PROT_W`, +100 se passar do 📚 no dia protegido) → **acima do tempo hábil** → desvio questões→apostila (ideal 1) → desvio apostila→selagem (ideal 3) → acima do 📚 → mesmo tipo de etapa repetido no dia → aula mais cedo → aula→questões. *O plano aprovado punha o tempo hábil depois dos intervalos ideais; trocado por veto 😴 — ver §14-L e o relatório.*
+
+**Congelamento:** um único efeito do App grava, num só `saveConfig`, `trilhaFirstOpen`, o snapshot da semana atual e das passadas sem snapshot (`trilhaWeeks[terça] = {q, base, held, why, mods, adv, rise, short, light, at}`), `trilhaPlan[id] = {wk, via, aula, quest, apost, seal, orig, hist}` e a recolocação da semana final (`trilhaFinalAutoAt`, `trilhaFinalLog`). Semanas futuras = prévia ao vivo. Semanas antes do 1º acesso não existem para as regras; a do 1º acesso recebe a cota a partir daquele dia.
+
+**Dia da trilha (`trilhaListFor`):** Anki → etapas (`{id:'t-<id>-<ts>', tm, ts}`, textos "Trilha · CODE — título: …", tag `SEL` na selagem) → "↷ recolocada para …" → revisão só se vencer → PLAN no sábado → 📦 em 29/12 → academia (sem treino no sábado) → lazer. Plantão longo: só 🚑 06h–19h, Anki no trajeto, 🎧 áudio opcional, revisão vencida como "📱 revisão no tempo morto — 10 questões + smartcards" (opcional; desliza sem ⏳). Curto e 04h30 por `buildShiftDay` com duração real; 💊 do 04h30 = "Janela do estimulante a validar com a psiquiatra (bloco de plantão de madrugada)". Véspera: 04h30 → "~20h30"; 05h30/06h → "~21h45". Feriados 🎄 24/25/31/12 (3h). 01/01: só selagens + 🏁 encerramento + balanço. Depois de 01/01: tela de encerramento (`TrilhaBalanco`).
+
+**Propostas (só gravam com Aplicar):** ⏳ recolocar (`trilhaProposeRecolocar`) · 🔓 subida (`trilhaProposeRise`) · ⏩ Adiantar (`trilhaProposeAdvance`: A cabe até segunda / B "Começar agora" / C não cabe até 01/01). Uma decisão por vez no topo: ⏳ > 🔓 > ⏩. Semana final: `trilhaFinalPlan` (capacidade dura, compressão, guloso, "segue no novo cursinho"). Mover etapa da trilha: aviso de espaçamento da família `trilha:<id>` (faixas da decisão 40), pode cruzar semanas, nunca propõe dia bloqueado, grava em `trilhaPlan` sem materializar dias.
+
+**Interface:** aba "TRILHA" (id `catchup` mantido; antes de 20/10 continua "DESATRASO") com contagem, rampa, módulos da semana, fila numerada com "— LINHA DE ALCANCE —", editor de blocos e planejador de pomodoros. Ganchos de teste: `data-t` = trilha-pending, trilha-rise, trilha-adv, trilha-export, trilha-final, trilha-coverage, trilha-weekfit, trilha-panel (`data-mod`, `data-kind` novo/adiantado/subida/continua), trilha-counts, trilha-ramp (`data-tue`), trilha-week, trilha-queue, trilha-row (`data-id/pos/planned/pinned`), trilha-line, trilha-pomo, trilha-balanco, day-type.
+
+**Motor antigo na fronteira:** `fillSuggest` nunca propõe dia ≥ 20/10 (a opção 2 só existe se aula, questões, apostila e selagem cabem antes); na Sem.41 somem as etapas que o motor antigo punha em 20/10 ou depois.
+
+---
+
 ## 12 · Backup e sincronização
 
 - Card **💾 Backup e sincronização** na aba **Sono**
@@ -246,7 +279,9 @@ const DAY_CAP_H = 14.5; // 24h − 8h sono − 1h30 refeições
 
 ---
 
-## 13 · Estado atual do arquivo (auditado em 10/09/2026)
+## 13 · Estado atual do arquivo (auditado em 10/09/2026; Trilha em 20/10 — §11-T)
+
+> **20/10/2026:** a partir de 20/10 o estado vigente é a TRILHA AUTÔNOMA (§11-T, decisões 55–68). A tabela abaixo descreve o motor do curso, que segue valendo só no histórico até 19/10.
 
 | Feature | Status |
 |---|---|
@@ -302,7 +337,7 @@ const DAY_CAP_H = 14.5; // 24h − 8h sono − 1h30 refeições
 | Rótulo "D2 (30q por bloco)" (S4) · dica véspera de plantão 06h na aba Sono (S5) · "bloco antigo" nos fios CATCHUP/FREE (S1) | ✅ |
 | Cards Estrutura ("Sex+Dom") e ACADEMIA (lista real do dia); venv SEG/TER sem "Fio A/B"; fios da TER antes da faculdade | ✅ |
 | **Aviso de espaçamento ao mover (PR #14, 24/09):** `analyzeMove` → `stageMapFor(mod, lists, familyOf)` (−7…20) → `spacingIssues` (faixas da decisão 40, prioridade) → diálogo `moveAsk` (carga + intervalos antes/depois; Mover assim mesmo · Ver como reorganizar o fio · Cancelar) → `reorganize` (só etapas não feitas/não vividas; passadas da redistribuição) → `applyMovePlan` (fioPlan/fioExtra ou dias materializados). Bloco sem módulo: só carga | ✅ |
-| **Semanas com 3+ blocos (PR #13, 24/09):** `weekGroupsFor(config, week)` (grupos A, B, C… — `config.weekGroups[semana]`, padrão 1 módulo por grupo, "Bônus" por último), cascata própria para C+ (`cascadeFor` em `genForCtx`: SÁB aula+D2 · DOM apostila · QUA' selagem · SEX' banco), grupo de N módulos (tempo × N, marcação em todos, etiqueta = letra), `blockRef`/`resolveBlock`/`blockTasks` por letra A–H, blocos adicionados/editados pela paciente (`config.customModules`, `config.moduleEdits`, `ALL_MODS()` em fila/projeção/revisões/Módulos), editor "✎ Blocos e grupos" no cabeçalho da semana, aviso de cobertura "⚠️ [código] está na lista da semana mas não tem tarefas — agrupe-o ou defina os dias.", aviso de capacidade nomeando os N blocos, teste permanente `coverage45.js` (45 semanas) | ✅ |
+| **Semanas com 3+ blocos (PR #13, 24/09):** `weekGroupsFor(config, week)` (grupos A, B, C… — `config.weekGroups[semana]`, padrão 1 módulo por grupo, "Bônus" por último), cascata própria para C+ (`cascadeFor` em `genForCtx`: SÁB aula+D2 · DOM apostila · QUA' selagem · SEX' banco), grupo de N módulos (tempo × N, marcação em todos, etiqueta = letra), `blockRef`/`resolveBlock`/`blockTasks` por letra A–H, blocos adicionados/editados pela paciente (`config.customModules`, `config.moduleEdits`, `ALL_MODS()` em fila/projeção/revisões/Módulos), editor "✎ Blocos e grupos" no cabeçalho da semana, aviso de cobertura "⚠️ [código] está na lista da semana mas não tem tarefas — agrupe-o ou defina os dias.", aviso de capacidade nomeando os N blocos, teste permanente `coverage41.js` (antes `coverage45.js`) (45 semanas) | ✅ |
 
 ---
 
@@ -353,6 +388,12 @@ O cronograma não marcava nada no progresso (o ✓ do bloco era só visual). Cor
 
 **Implementado:** decisões 41–45 (§16). **Decididas pela paciente (24/09, 2ª rodada — mesmo PR):** semana 38 com o C aceita como está (o app avisa, ela decide); banco C na SEX' (+5d) em vez de QUI'; C fica em SÁB/DOM; semana 30 recebe o D2-A na segunda 03/08 (a exceção do teste foi removida); ritmo por semana aprovado como feature, **registrado em §14 E, não neste PR**; achados da revisão geral 6–13 corrigidos (decisões 46–52).
 
+### L · TRILHA AUTÔNOMA (20/10) — implementada; conflitos e bordas achados rodando (decisão da paciente)
+- **Conflito (😴 × 📚) — ordem do score:** o plano aprovado punha os intervalos ideais (questões→apostila ~1d, apostila→selagem ~3d) antes do tempo hábil. Com essa ordem a prévia de 19/10 tinha 4 dias acima do tempo hábil (pior: 16/11, 19,7h no total / 10,7h de estudo). O 😴 veta dia acima de ~14,5h; implementado **tempo hábil antes dos intervalos** (0 dias acima; intervalos continuam dentro das faixas da decisão 40). Aguardando a paciente confirmar ou reverter (números no relatório).
+- **Dias acima do 📚 na prévia (informativo, abaixo do tempo hábil):** QUA 11/11 e SEX 13/11 (~10,3h de estudo, entre os plantões longos de 10 e 12/11), TER 17/11 (5,3h num dia de 04h30, limiar 5h), QUI 17/12 (8,7h). A semana 15–21/12 (ritmo 5 + simulado 18/12) só passa em 17/12 — **não se propõe ritmo 4** nela; para 11 e 13/11 a saída sem custo é mover blocos; o − da T3 resolve (11/11 → 6,6h, 13/11 → 8,5h) mas derruba o alcance de 40 para 34 (T4 = 3 → 35), porque o bloco 04h30 segura o ritmo até 15/12 (decisão dela). Ritmo 4 na T9 deixaria 17/12 em 7,0h ao custo de 1 módulo (N 39).
+- **Borda — 1º acesso tardio:** a semana do 1º acesso recebe a cota inteira "a partir daquele dia" (decisão aprovada). Aberto pela 1ª vez num sábado do bloco 04h30 (ex.: 28/11), as 4 aulas só cabem em DOM e SEG e a SEG 30/11 soma 15,0h (acima do tempo hábil, com ⚠️). Na prática não acontece (a Trilha é aberta em 20/10), mas a proposta é cota proporcional aos dias que restam — decisão dela.
+- **Interpretação (⚙️):** "dia protegido aceita etapa leve" foi lida com capacidade — etapa em dia protegido também respeita o 📚 do dia (sem isso, 4 apostilas caíam em 24/12).
+
 ### E · Pendências que dependem da paciente (não código)
 
 - **Reorganização entre semanas para A/B/C e fios CATCHUP/FREE** (aval do PR #14, 24/09, sem prioridade): hoje esses blocos só se reacomodam dentro da própria semana porque o texto ("Bloco A", "Fio A") é relativo à semana em que aparece; levar um banco/apostila de A/B/C para a semana seguinte exigiria gerar sob demanda um bloco "Bloco X da semana passada" (como já existe para selagem e banco). A paciente pode mover à mão para a semana seguinte.
@@ -395,16 +436,23 @@ await page.goto('file:///caminho/para/planner.html', { waitUntil: 'load' });
 await page.waitForTimeout(1200); // aguardar React renderizar
 
 // Tocar em aba por dia (código SEM acento):
-// QUA, QUI, SEX, SAB, DOM, SEG, TER
+// QUA, QUI, SEX, SAB, DOM, SEG, TER — na Trilha as abas vão de TER a SEG; use H.listDayTabs/H.clickDate (por data)
 ```
 
-**Bateria completa (obrigatória antes de qualquer ✅):**
+**Bateria completa (obrigatória antes de qualquer ✅) — 20/10/2026, Trilha:**
 ```bash
-cd tests/   # cópia da bateria no repositório (PR #13) — no scratchpad da sessão fica a versão de trabalho
-PLANNER_FILE=/caminho/planner_residencia_2026_offline.html PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers node audit.js        # cenários S0–S20 (425 checks em 24/09)
-PLANNER_FILE=... PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers node coverage45.js   # teste permanente: 45 semanas com módulos, todo módulo listado tem aula+questões+apostila (90 checks, sem exceções)
-cmp planner_residencia_2026_offline.html index.html
+cd tests/   # PLANNER_FILE=/caminho/planner_residencia_2026_offline.html (padrão: o arquivo do repositório) · PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers
+node audit.js           # S0–S20 adaptados à Trilha (392 checks): aposentados S7, S8b, S15, S16b, S16g2, S19d2; reescritos na Trilha S8, S8c, S9, S9b, S12, S16e, S18f2, S19d; re-datados para antes de 20/10 S10, S16a/S16d/S16g, S16f, S18b/d/d2/g/h, S19b/b2/h, S20a/S20g
+node trilha.js          # TR0–TR14 + invariantes da Trilha (138 checks)
+node historico.js       # app de antes da Trilha (git 11c65b8 ou PLANNER_BASE) × novo, semanas 1–41 dia a dia, relógio na quarta e em 21/10 (82 checks)
+node coverage41.js      # semanas 1–41 com módulos: todo módulo listado tem aula+questões+apostila (80 checks)
+node coverageTrilha.js  # prévia = congelado; todo módulo NOVO com as 4 etapas até 01/01; dia editado → aviso + "↺ Voltar ao padrão" (7 checks)
+node intervalsTrilha.js # tabela de intervalos dos 40 módulos planejados + carga por dia das 11 semanas + invariantes (10 checks)
+node intervals16.js     # Sem.38 (3 blocos, simulado) — tabela de intervalos (7 checks)
+node loads16.js         # Sem.38/39 — cargas por dia (12 checks)
+cmp ../planner_residencia_2026_offline.html ../index.html
 ```
+Todo script sai com código ≠ 0 em qualquer falha (`H.summary`); `pageerror` e erro do React contam como ❌.
 
 **Emojis no Python:** sempre usar literais UTF-8, NUNCA escapes `\ud83c` (lone surrogates crasham). Salvaguarda: `h.encode("utf-16","surrogatepass").decode("utf-16")` antes de escrever.
 
@@ -453,7 +501,7 @@ cmp planner_residencia_2026_offline.html index.html
 39. **Dia leve — desempate por critérios (paciente, 24/09):** cargas a ≤45min entre si são "parecidas"; ordem: (a) sem aula da faculdade/compromisso fixo · (b) não véspera de plantão nem de dia-motor (segunda) · (c) menos etapas que dependem de continuidade no dia seguinte · (d) o mais distante de um plantão; a interface avisa "🌿 Vários dias com carga parecida — escolhi [dia]; toque para trocar."
 41. **Semanas com 3+ blocos (paciente, 24/09 — PR #13):** a cascata suporta N grupos por semana; cada grupo recebe a cascata completa. Grupo C: SÁB aula 1.5x + D2 (mesmo dia) → DOM apostila (+1d) → QUA' selagem (+3d, junto das de A e B) → SEX' banco (+5d; decisão 24/09: dois bancos na QUI' após semana de simulado era repetição de formato sem ganho); D e seguintes: um dia depois. "Bônus" entra por último na ordem padrão (complementar, 🩺), mas recebe cascata própria se não for agrupado. Cascata genérica em todas as fases (inclusive o template antigo da semana 8).
 42. **Agrupamento configurável (paciente, 24/09):** `config.weekGroups[semana] = [[ids], [ids], …]`; padrão = cada módulo no seu grupo. Grupo com N módulos: tempo × N, "30q de cada", a marcação registra a etapa em TODOS os módulos do grupo (etiqueta = letra do grupo, código no botão). Blocos adicionados/editados pela paciente (`config.customModules` ids ≥ 1000, `config.moduleEdits`) convivem com os embutidos e entram em fila, projeção, revisões e Módulos — nada é apagado (remoção só de bloco dela sem registro, com confirmação).
-43. **Garantia de cobertura (paciente, 24/09):** todo módulo listado em BLOCOS DESTA SEMANA tem aula, questões e apostila marcáveis em algum dia da semana (listas reais, inclusive dias editados à mão); se faltar, aviso no topo "⚠️ [código] está na lista da semana mas não tem tarefas — agrupe-o ou defina os dias." (código repetido na semana traz o título). Teste permanente `coverage45.js` varre as 45 semanas.
+43. **Garantia de cobertura (paciente, 24/09):** todo módulo listado em BLOCOS DESTA SEMANA tem aula, questões e apostila marcáveis em algum dia da semana (listas reais, inclusive dias editados à mão); se faltar, aviso no topo "⚠️ [código] está na lista da semana mas não tem tarefas — agrupe-o ou defina os dias." (código repetido na semana traz o título). Teste permanente `coverage41.js` (antes `coverage45.js`) varre as 45 semanas.
 44. **Capacidade em semana de 3+ blocos (paciente, 24/09):** o aviso de viabilidade existente nomeia os blocos ("Semana com 3 blocos (A, B, C — 3 cascatas completas): ritmo N não cabe…") e propõe reduzir o ritmo de fios; **nunca corta etapa de bloco principal** — conteúdo da semana tem prioridade sobre o desatraso.
 45. **Etiqueta visível (24/09):** todo botão de etapa de A/B/C mostra "· letra · código" (antes só as selagens e os blocos combinados).
 46. **Fios do desatraso NÃO têm etapa de banco (paciente, 24/09 — decisão explícita):** a selagem cumpre a 2ª recuperação espaçada; acrescentar banco estouraria o tempo por módulo. Não reabrir.
@@ -464,8 +512,25 @@ cmp planner_residencia_2026_offline.html index.html
 51. **`aulaPresencialAt` (24/09):** ao marcar "Aula presencial ✓" o app grava a data; o card mostra "presencial assistida em dd/mm" (informação, fora dos 4 checks — decisão 33 mantida).
 52. **Série do % dos simulados (24/09):** `simSeriesText(config.simResults)` no bloco de correção da sexta ("📈 Evolução: 62% (14/08) · …") e no topo da aba Módulos — acompanhamento clínico, não calibra o motor.
 54. **Aviso de espaçamento ao mover tarefa (paciente, 24/09 — PR #14):** ao mover um bloco ligado a módulo (etapa de A/B/C ou toque/selagem de fio), o app recalcula os intervalos DAQUELA cadeia (`familyOf`: o próprio fio — rótulo + semana do slot — ou a cascata A/B/C — letra + semana; um módulo pode ter as duas) na posição nova e compara com a faixa vigente (decisão 40): nunca duas etapas no mesmo dia · questões→apostila 1–2d · apostila→banco e apostila→selagem 2–5d · aula→questões 1–2d (A/B/C: 0–2, aula online → D2 no mesmo dia). Avisa **sem bloquear**, no mesmo diálogo em que a carga é informada (`moveAsk`, padrão visual da redistribuição avisada), com o antes e o depois de cada intervalo afetado, na ordem de prioridade (mesmo dia → q→p → p→banco/selagem → a→q). Três opções: **Mover assim mesmo** (só o movimento), **Ver como reorganizar o fio** (`reorganize`: reacomoda só as etapas não feitas e não vividas da cadeia, mesmas exclusões da redistribuição — pós-noturno nunca, dia leve por último com aviso, ⚠️ à vista; "Aplicar" grava movimento + plano: fios G2/POST em `fioPlan`/`fioExtra`, A/B/C e fios CATCHUP/FREE só dentro da própria semana, materializando os dias) e **Cancelar**. Sem solução na faixa: "Não consigo reacomodar sem quebrar outra regra — mover assim mesmo mantém …". Bloco sem módulo: como antes (só carga). **Etapa apagada de um dia editado (aval do PR #14, 24/09):** a cascata a esperava (`genListAt`, listas geradas sem edições), ela não está feita e não aparece em dia nenhum → entra como AUSENTE: aviso "⚠️ a apostila deste módulo não está em nenhum dia desta semana (apagada de um dia editado — a cascata a esperava DOM 18/10)" e a proposta a **recoloca** ("apostila SÁB 17/10 (recolocada — estava apagada)"); nunca "na faixa" por ficção. Aceito: hoje conta como dia vivido (a etapa de hoje nunca é reacomodada). `listAt` cobre −7…27 (semana passada entra no cálculo); `resolveBlockIn`/`blockTasksIn` resolvem blocos de outra semana com os fios/grupos daquela semana (`frameAt(k)`).
-53. **Semana 30 (fronteira 29/07→04/08, paciente 24/09):** a segunda 03/08 recebe o D2-A do template antigo ("30 questões Bloco A … fronteira 03/08") — nenhuma semana histórica carrega aviso permanente; `coverage45.js` sem exceções.
+53. **Semana 30 (fronteira 29/07→04/08, paciente 24/09):** a segunda 03/08 recebe o D2-A do template antigo ("30 questões Bloco A … fronteira 03/08") — nenhuma semana histórica carrega aviso permanente; `coverage41.js` (antes `coverage45.js`) sem exceções.
 40. **Prioridade entre intervalos (paciente, 24/09):** quando dois intervalos conflitam, a ordem é (a) nunca duas etapas do mesmo módulo no mesmo dia; (b) questões → apostila em ~1 dia; (c) apostila → banco e apostila → selagem em ~3 dias; (d) aula → questões entre 1 e 2 dias. O que ceder, cede na ordem inversa. Aceitos: Fio 1 com aula → questões em 2 dias; CATCHUP Fio A com questões → apostila em 2 dias; selagem do Bloco B a 2 dias da apostila em semana de simulado (QUA fixa, antes do banco da QUI).
+
+55. **TRILHA AUTÔNOMA (paciente, 19–20/10/2026):** de 20/10/2026 a 01/01/2027 o app é uma trilha única (§11-T); semanas TER→SEG; o histórico até 19/10 fica intacto (Sem.41 = 14–19/10). Teste permanente `historico.js`.
+56. **Cadeia completa sempre, registro próprio (`medplanner_trail_v1`):** aula → questões → apostila → selagem por módulo; antigos guardados, nada apagado; revisões espaçadas só dos % da Trilha.
+57. **Simulados na Trilha:** quinzenais continuam; sexta de plantão sem simulado pela regra (23/10, 20/11, 04/12); 01/01 sem simulado; sobram **06/11 e 18/12**; o botão religa; sexta de simulado não recebe etapa de módulo.
+58. **Atraso e semana final:** ⏳ + "Ver como recolocar" (só com Aplicar); na semana de 29/12 o que estiver aberto é recolocado sozinho para selar até 01/01 (o que não couber fica listado); semana fecha = todas as etapas planejadas para os dias dela marcadas (as do Adiantar não contam).
+59. **Agrupamento só no histórico;** editor de blocos na aba Trilha; módulo adicionado entra na fila pela ordem do curso (ou no fim, sem semana).
+60. **Bloco 04h30 (16/11–11/12): o ritmo não sobe nada** — nem acima da rampa, nem para recuperar ritmo segurado.
+61. **Dia leve definido ANTES de distribuir;** nunca aula nova nele; etapa inevitável = menor demanda, sinalizada "🌿 dia leve — etapa de menor demanda". A regra 37 segue valendo para os templates.
+62. **Feriados:** 02/11, 15/11 e 20/11 só rótulo; **24, 25 e 31/12 mais leves** (📚 a partir de 3h, baixa capacidade, nunca aula nova, 🎄).
+63. **01/01 = último dia de acesso:** sem simulado, sem módulo novo; só selagens + 🏁 encerramento (conferir selagens · exportar materiais · 💾 backup final) + balanço; depois de 01/01, tela de encerramento.
+64. **Regra permanente (🧠): o app nunca sugere horário de medicação.** No bloco 04h30 só "Janela do estimulante a validar com a psiquiatra (bloco de plantão de madrugada)". Testes procuram horário de Venvanse/estimulante em todo texto.
+65. **Véspera (😴, orientação):** de 04h30 → "dormir ~20h30"; de 05h30/06h → "~21h45".
+66. **Revisão vencida em plantão longo:** "📱 revisão no tempo morto — 10 questões + smartcards" (opcional, com Revisei + %); se não marcada, desliza para o próximo dia aberto, fora do ⏳.
+67. **📦 a partir de 15/12** (banner no Cronograma e na aba Trilha; bloco em 29/12) com o botão do backup único.
+68. **Regras operacionais aprovadas em 20/10:** 1º acesso (`trilhaFirstOpen`) — semanas anteriores não contam; semana sem app congela retroativamente (etapas viram ⏳); Adiantar não conta para fechar; 🔓 desbloqueio fora do 04h30; uma decisão por vez (⏳ > 🔓 > ⏩); projeção = módulos com as 4 etapas datadas até 01/01 ("e se esta semana virar manutenção?" sob demanda); dias editados antes da Trilha continuam valendo, com aviso e "↺ Voltar ao padrão" que guarda a edição em `medplanner_schedule_archive_v1`; 🔄 e 📌 antigos desligados na Trilha.
+
+**Superadas ou suspensas na Trilha (valem só no histórico até 19/10):** 8 (projeção de zeramento → linha de alcance até 01/01) · 13, 26 e 31 (CATCHUP e fronteiras de fase — nunca chegam a valer) · 18 (FREE em pipeline) · 20 (P1/fioWeek → `trilhaWeeks`/`trilhaPlan`) · 35 (🔄 redistribuição → ⏩ Adiantar e ⏳ recolocar) · 47 (📌 no meio da semana → 📌 da fila da Trilha, `trilhaPins`) · 48 (bloco REV fixo → revisão "só se vencer") · 15 (dia leve calculado depois → **previsto antes** de distribuir) · entrada adaptativa do §5/§9 (na Trilha a cadeia é sempre completa). **Provisório até a paciente decidir:** ordem do score com o tempo hábil antes dos intervalos ideais (§14-L).
 
 ---
 

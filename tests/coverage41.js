@@ -1,9 +1,9 @@
-// Teste permanente de cobertura: em TODAS as semanas com módulos (1–46, a 7 não existe), todo módulo listado em
-// "BLOCOS DESTA SEMANA" tem ao menos aula (toque 1), questões (toque 2) e apostila (toque 3) marcáveis em algum dia da semana.
+// Teste permanente de cobertura do CURSO: em todas as semanas com módulos até a última do curso (1–41, a 7 não existe; a Sem.41 vai de
+// 14 a 19/10 — a partir de 20/10 é a Trilha, coberta por coverageTrilha.js), todo módulo listado em "BLOCOS DESTA SEMANA" tem ao menos
+// aula (toque 1), questões (toque 2) e apostila (toque 3) marcáveis em algum dia da semana (abas lidas pela data).
 // Oráculo independente (lê ↳ módulo + botões de cada bloco) e, no arquivo corrigido, o aviso ⚠️ do app tem de estar ausente.
 const H = require('./harness.js');
-const { openPlanner, clickDay, readDay, check } = H;
-const DAYS = ['QUA', 'QUI', 'SEX', 'SAB', 'DOM', 'SEG', 'TER'];
+const { openPlanner, readDay, check, listDayTabs, clickDate } = H;
 const CFG = 'medplanner_config_v1';
 function addDays(iso, k) { const d = new Date(iso + 'T00:00:00'); d.setDate(d.getDate() + k); return d.toISOString().slice(0, 10); }
 async function weekInfo(page) {
@@ -41,7 +41,7 @@ async function dayTasks(page, weekMods) { // [{ mod: 'CODE · título', st }]
 }
 (async () => {
     const browser = await H.pw.chromium.launch();
-    const weeks = process.argv[2] ? process.argv[2].split(',').map(Number) : Array.from({ length: 46 }, (_, i) => i + 1).filter(w => w !== 7);
+    const weeks = process.argv[2] ? process.argv[2].split(',').map(Number) : Array.from({ length: 41 }, (_, i) => i + 1).filter(w => w !== 7);
     // Sem exceções (decisão da paciente, 24/09): a semana 30 (fronteira template antigo → AMB) recebeu o D2-A na segunda 03/08.
     const KNOWN = {};
     let failing = 0; const failed = [];
@@ -50,7 +50,7 @@ async function dayTasks(page, weekMods) { // [{ mod: 'CODE · título', st }]
         const { ctx, page } = await openPlanner(browser, wed, { [CFG]: { startDate: '2026-01-07', manualWeek: null } });
         const info = await weekInfo(page);
         const seen = {};
-        for (const d of DAYS) { await clickDay(page, d); (await dayTasks(page, info.mods)).forEach(t => { (seen[t.mod] = seen[t.mod] || new Set()).add(t.st); }); }
+        for (const t of await listDayTabs(page)) { await clickDate(page, t.date); (await dayTasks(page, info.mods)).forEach(x => { (seen[x.mod] = seen[x.mod] || new Set()).add(x.st); }); }
         const missing = info.mods.filter(m => !(seen[m] && seen[m].has('1') && seen[m].has('2') && seen[m].has('3')));
         const missTxt = missing.map(m => m + ' [' + [...(seen[m] || [])].sort().join('') + ']').join(' | ');
         const known = KNOWN[w] != null && missTxt === KNOWN[w];

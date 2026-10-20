@@ -1,6 +1,6 @@
 // Bateria de auditoria — roda todas as datas-chave e imprime blocos + checks.
 const H = require('./harness.js');
-const { openPlanner, clickDay, clickTab, readDay, fmt, check, idx, has, setLight, hoursOf, expectedLight, fmtH, LBL7, DAYS7, clickTask, typeBlockPct, readCard, clickCardBtn, typeCardPct, getLS, bodyText } = H;
+const { openPlanner, clickDay, clickTab, readDay, fmt, check, idx, has, setLight, hoursOf, expectedLight, fmtH, LBL7, DAYS7, clickTask, typeBlockPct, readCard, clickCardBtn, typeCardPct, getLS, bodyText, listDayTabs, clickDate, navWeek, headerWeek, banner } = H;
 // Checagem padrão do dia sem Venvanse (decisão 15) numa semana inteira lida da tela
 function checkLight(tag, w, wedISO) {
     const exp = expectedLight(w, wedISO);
@@ -17,6 +17,7 @@ function checkLight(tag, w, wedISO) {
     }
 }
 const DAYS = ['QUA', 'QUI', 'SEX', 'SAB', 'DOM', 'SEG', 'TER'];
+const DAYS41 = ['QUA', 'QUI', 'SEX', 'SAB', 'DOM', 'SEG']; // Sem.41 = 14–19/10 (a TER 20/10 é o 1º dia da Trilha)
 const CFG = 'medplanner_config_v1', PRG = 'medplanner_progress_v1';
 const baseCfg = { startDate: '2026-01-07', manualWeek: null };
 
@@ -30,8 +31,9 @@ async function scenario(browser, name, dateISO, seeds, fn) {
     if (onlyShowDays && !onlyShowDays.includes(name)) return;
     console.log(`\n══════════ ${name} · relógio=${dateISO} ══════════`);
     const { ctx, page } = await openPlanner(browser, dateISO, seeds);
-    try { await fn(page); } catch (e) { console.log('   💥 ERRO no cenário:', e.message); H.results.push({ id: name + ' (erro)', ok: false, evidence: e.message }); }
-    await ctx.close();
+    const S = { ctx, page, async reopen(date) { const r = await H.reopen(browser, S.ctx, S.page, date); S.ctx = r.ctx; S.page = r.page; return S.page; } }; // troca o relógio mantendo o localStorage (cenários da Trilha)
+    try { await fn(page, S); } catch (e) { console.log('   💥 ERRO no cenário:', e.message); H.results.push({ id: name + ' (erro)', ok: false, evidence: e.message }); }
+    await S.ctx.close();
 }
 
 (async () => {
@@ -147,7 +149,7 @@ async function scenario(browser, name, dateISO, seeds, fn) {
         const before = await readDay(page);
         const planIdx = idx(before, /Implementação de intenção/);
         page.once('dialog', async d => { check('F moveAct: window.confirm com "Manter TUDO"', /Manter TUDO nesse dia mesmo assim\?/.test(d.message()) && /acima do tempo hábil/.test(d.message()), d.message().slice(0, 120)); await d.dismiss(); });
-        await page.evaluate((i) => { const sels = [...document.querySelectorAll('select')].filter(s => /mover p\/ dia/.test(s.innerText)); const s = sels[i]; s.value = '4'; s.dispatchEvent(new Event('change', { bubbles: true })); }, planIdx);
+        await page.evaluate((i) => { const sels = [...document.querySelectorAll('select')].filter(s => /mover p\/ dia/.test(s.innerText)); const s = sels[i]; s.value = '2026-09-27'; s.dispatchEvent(new Event('change', { bubbles: true })); }, planIdx);
         await page.waitForTimeout(300);
         let after = await readDay(page);
         check('F moveAct cancelar: SÁB mantém o PLAN (nada apagado, nada movido)', has(after, /Implementação de intenção/) && after.blocks.length === before.blocks.length);
@@ -155,7 +157,7 @@ async function scenario(browser, name, dateISO, seeds, fn) {
         check('F moveAct cancelar: DOM inalterado', dom2.blocks.length === w.DOM.blocks.length);
         await clickDay(page, 'SAB');
         page.once('dialog', async d => { await d.accept(); });
-        await page.evaluate((i) => { const sels = [...document.querySelectorAll('select')].filter(s => /mover p\/ dia/.test(s.innerText)); const s = sels[i]; s.value = '4'; s.dispatchEvent(new Event('change', { bubbles: true })); }, planIdx);
+        await page.evaluate((i) => { const sels = [...document.querySelectorAll('select')].filter(s => /mover p\/ dia/.test(s.innerText)); const s = sels[i]; s.value = '2026-09-27'; s.dispatchEvent(new Event('change', { bubbles: true })); }, planIdx);
         await page.waitForTimeout(300);
         after = await readDay(page);
         check('F moveAct confirmar: PLAN saiu do SÁB', !has(after, /Implementação de intenção/));
@@ -232,34 +234,35 @@ async function scenario(browser, name, dateISO, seeds, fn) {
         [CFG]: { ...baseCfg, catchupPace: 4, catchupPins: [50], simOverrides: {} },
         [PRG]: { "1": { aula: true, questoesD2: true, apostila: true, smartcard: true, completedAt: '2026-10-01', accD2: 85 } },
     }, async (page) => {
-        const w = await dumpWeek(page);
+        const w = await dumpWeek(page, DAYS41);
         check('A QUA POST: 10q pré-aula → aula presencial 17h–22h → D+1', idx(w.QUA, /10 questões pré-aula/) < idx(w.QUA, /Aula presencial Medcurso 17h–22h/) && idx(w.QUA, /Aula presencial/) < idx(w.QUA, /D\+1: reler/));
         check('A QUI: aula A → D2-A', idx(w.QUI, /Aula online Bloco A \(1\.5x\)/) < idx(w.QUI, /D2-A/));
         check('D SEX 16/10 sem simulado (63d): botão "📚 Sexta de estudo ativo"', /📚 Sexta de estudo ativo/.test(w.SEX.simBtn || ''), w.SEX.simBtn);
         check('A SEX: aula B → D2-B → apostila A (erros de ONTEM)', idx(w.SEX, /Aula online Bloco B/) < idx(w.SEX, /D2-B/) && idx(w.SEX, /D2-B/) < idx(w.SEX, /Apostila do Bloco A dirigida pelos erros de ONTEM/));
         check('A SEX: prefixo "Sem simulado ·" removido do texto', !w.SEX.blocks.some(b => /^Sem simulado/.test(b.text)));
         check('C SÁB POST (ritmo 4): dia útil — Anki, apostila do B (erros de ONTEM), PLAN, Fio 1 · questões, Fio 3 · aula, noite livre = ANKI,D4,PLAN,DESAT,DESAT,LAZER', /^Dia 3 · apostila do B/.test(w.SAB.venv) && w.SAB.blocks.map(b => b.tag).join(',') === 'ANKI,D4,PLAN,DESAT,DESAT,LAZER' && has(w.SAB, /Apostila do Bloco B pelos erros de ONTEM/) && has(w.SAB, /^Fio 1 · toque 2/) && has(w.SAB, /^Fio 3 · toque 1/), w.SAB.blocks.map(b => b.tag).join(','));
-        checkLight('D15 semana 14–20/10 (livre):', w, '2026-10-14');
-        check('D15 15/10 (ritmo 4): SEX/SÁB/SEG/TER a ≤45min (SEG ' + fmtH(hoursOf(w.SEG)) + ' é o mínimo) → desempate por critérios: TER (0 elos de continuidade) — Auto → TER, com aviso', w.TER.light.auto === 'Auto · TER' && w.TER.lightBadge && !w.SAB.lightBadge && !w.SEG.lightBadge && /^🌿 Vários dias com carga parecida \(SEX, SÁB, SEG, TER\) — escolhi TER; toque para trocar\.$/.test(await page.evaluate(() => ([...document.querySelectorAll('span')].map(s => s.textContent.trim()).find(t => /^🌿 Vários dias com carga parecida/.test(t)) || ''))), w.TER.light.auto + ' · SEX=' + fmtH(hoursOf(w.SEX)) + ' SÁB=' + fmtH(hoursOf(w.SAB)) + ' SEG=' + fmtH(hoursOf(w.SEG)) + ' TER=' + fmtH(hoursOf(w.TER)) + ' · ' + (await page.evaluate(() => ([...document.querySelectorAll('span')].map(s => s.textContent.trim()).find(t => /^🌿 Vários dias com carga parecida/.test(t)) || ''))));
-        await clickDay(page, 'TER');
-        check('D15 selo: texto exato', await page.evaluate(() => !![...document.querySelectorAll('div')].find(d => d.children.length === 0 && d.textContent.trim() === '🌿 Hoje sem Venvanse — faça só o leve, mova o pesado (pausa variável: validar com a psiquiatra)')));
+        // Sem.41 (14–19/10): o dia leve é calculado com os 7 dias originais (QUA 14 → TER 20/10); a TER saiu da semana (1º dia da Trilha) ⇒ nenhum selo em 14–19/10
+        const tie = await page.evaluate(() => ([...document.querySelectorAll('span')].map(s => s.textContent.trim()).find(t => /^🌿 Vários dias com carga parecida/.test(t)) || ''));
+        check('D15 Sem.41 (ritmo 4, cálculo com os 7 dias originais): Auto → TER 20/10, com o aviso de empate (SEX, SÁB, SEG, TER) — e nenhum selo em 14–19/10 (a TER virou o 1º dia da Trilha)', w.SEG.light.auto === 'Auto · TER' && /^TER 20\/10 /.test(w.SEG.light.note) && /validar com a psiquiatra/.test(w.SEG.light.note) && DAYS41.every(d => !w[d].lightBadge && !w[d].breatherBadge) && /^🌿 Vários dias com carga parecida \(SEX, SÁB, SEG, TER\) — escolhi TER; toque para trocar\.$/.test(tie), w.SEG.light.auto + ' · ' + w.SEG.light.note.slice(0, 60) + ' · selos: ' + (DAYS41.filter(d => w[d].lightBadge || w[d].breatherBadge).join(',') || 'nenhum') + ' · ' + tie);
         // override manual → DOM
         await setLight(page, '4');
         let cfgL = await page.evaluate(() => JSON.parse(localStorage.getItem('medplanner_config_v1')));
-        await clickDay(page, 'DOM'); let ter = await readDay(page); await clickDay(page, 'SAB'); let sab2 = await readDay(page); await clickDay(page, 'TER'); let ter0 = await readDay(page);
+        await clickDay(page, 'DOM'); let ter = await readDay(page);
+        check('D15 selo: texto exato', await page.evaluate(() => !![...document.querySelectorAll('div')].find(d => d.children.length === 0 && d.textContent.trim() === '🌿 Hoje sem Venvanse — faça só o leve, mova o pesado (pausa variável: validar com a psiquiatra)')));
+        await clickDay(page, 'SAB'); let sab2 = await readDay(page); await clickDay(page, 'SEG'); let ter0 = await readDay(page);
         check('D15 override DOM: config.lightDayOverrides["2026-10-14"] = 4', cfgL.lightDayOverrides && cfgL.lightDayOverrides['2026-10-14'] === 4, JSON.stringify(cfgL.lightDayOverrides));
-        check('D15 override DOM: selo no domingo, não na terça nem no sábado; seletor = DOM; nota "escolha manual"', ter.lightBadge && !sab2.lightBadge && !ter0.lightBadge && ter.light.value === '4' && /escolha manual/.test(ter.light.note) && /^DOM 18\/10/.test(ter.light.note), ter.light.note);
+        check('D15 override DOM: selo no domingo, não na segunda nem no sábado; seletor = DOM; nota "escolha manual"', ter.lightBadge && !sab2.lightBadge && !ter0.lightBadge && ter.light.value === '4' && /escolha manual/.test(ter.light.note) && /^DOM 18\/10/.test(ter.light.note), ter.light.note);
         check('D15 override: opção Auto continua mostrando o cálculo (Auto · TER)', ter.light.auto === 'Auto · TER', ter.light.auto);
         check('D15 override: blocos do sábado e do domingo inalterados (selo não muda template)', sab2.blocks.map(b => b.tag).join(',') === 'ANKI,D4,PLAN,DESAT,DESAT,LAZER' && ter.blocks.length === w.DOM.blocks.length);
         // volta ao automático
         await setLight(page, 'auto');
         cfgL = await page.evaluate(() => JSON.parse(localStorage.getItem('medplanner_config_v1')));
-        await clickDay(page, 'TER'); sab2 = await readDay(page);
-        check('D15 volta a Auto: chave apagada; selo volta à terça', !('2026-10-14' in (cfgL.lightDayOverrides || {})) && sab2.lightBadge && sab2.light.value === 'auto', JSON.stringify(cfgL.lightDayOverrides));
+        const back41 = {}; for (const d of DAYS41) { await clickDay(page, d); back41[d] = await readDay(page); }
+        check('D15 volta a Auto: chave apagada; seletor Auto · TER e nenhum selo em 14–19/10', !('2026-10-14' in (cfgL.lightDayOverrides || {})) && DAYS41.every(d => !back41[d].lightBadge) && back41.SEG.light.value === 'auto' && back41.SEG.light.auto === 'Auto · TER', JSON.stringify(cfgL.lightDayOverrides));
         check('C DOM POST: "Dia 4 · fios…" · Fio 2 · aula + gym, sem apostila B (foi para o SÁB)', /^Dia 4 · fios do desatraso/.test(w.DOM.venv) && !has(w.DOM, /Apostila do Bloco B/) && has(w.DOM, /^Fio 2 · toque 1/) && w.DOM.blocks.some(b => b.tag === 'GYM'), w.DOM.blocks.map(b => b.tag).join(','));
         check('A DOM sem simulado: NÃO tem aula B deslocada nem apostila A', !has(w.DOM, /deslocado da sexta/) && !has(w.DOM, /Apostila do Bloco A pelos erros de quinta/));
         check('A SEG sem simulado: NÃO tem "Apostila do Bloco B pelos erros de domingo"', !has(w.SEG, /Apostila do Bloco B pelos erros de domingo/));
-        check('E TER POST: sem aula da faculdade', !has(w.TER, /faculdade/));
+        check('E Sem.41 POST (14–19/10): nenhuma aula da faculdade', !DAYS41.some(d => has(w[d], /faculdade/)));
         check('B pin 50 → Fio 1 = Sem.26 PED3 no QUI/SÁB/DOM', /PED3|Distúrbios do Crescimento/.test((w.QUI.blocks[idx(w.QUI, /^Fio 1/)] || {}).mod || '') && /Distúrbios do Crescimento/.test((w.SAB.blocks[idx(w.SAB, /^Fio 1 · toque 2/)] || {}).mod || '') && /Distúrbios do Crescimento/.test((w.DOM.blocks[idx(w.DOM, /^Fio 1 · toque 3/)] || {}).mod || ''), (w.QUI.blocks[idx(w.QUI, /^Fio 1/)] || {}).mod);
         check('B entrada adaptativa: módulo sem p.aula → "Toque 1: aula online"', /Toque 1: aula online/.test(w.QUI.blocks[idx(w.QUI, /^Fio 1/)].mod));
         check('F módulo 1 completo (seed) não aparece nos fios', !Object.values(w).some(d => d.blocks.some(b => b.mod && /Glomerulopatias I \(/.test(b.mod))));
@@ -302,7 +305,7 @@ async function scenario(browser, name, dateISO, seeds, fn) {
         check('A card Estrutura (G2/POST) descreve apostila B no SÁB ("Sex+Sáb · A sex, de quinta · B sáb, de sexta") — decisão 24/09', !!estr && /B sáb, de sexta/.test(estr), estr);
         const gymCard = await page.evaluate(() => { const el = [...document.querySelectorAll('div')].find(d => /^ACADEMIA — /.test(d.textContent.trim()) && d.children.length === 0); return el ? el.parentElement.innerText.replace(/\n/g, ' ') : null; });
         check('A4 card ACADEMIA: título "1 treino em 6 dos 7 dias · sem treino no dia pós-noturno"; sábado = "sem treino" (não "descanso"/"dia leve"); DOM com treino', gymCard && /ACADEMIA — 1 treino em 6 dos 7 dias · sem treino no dia pós-noturno/.test(gymCard) && /Sab 😴 sem treino/.test(gymCard) && !/descanso|dia leve/.test(gymCard) && /Dom 🏋️ livre/.test(gymCard), gymCard);
-        check('A venv SEG/TER não descrevem mais "Fio A/B" fixos', !/Fio A abre|\+ Fio B/.test(w.SEG.venv + ' ' + w.TER.venv), w.SEG.venv + ' || ' + w.TER.venv);
+        check('A venv SEG não descreve mais "Fio A/B" fixos', !/Fio A abre|\+ Fio B/.test(w.SEG.venv), w.SEG.venv);
         // Desatraso
         await clickTab(page, 'DESATRASO');
         const txt = await page.evaluate(() => document.body.innerText);
@@ -363,104 +366,78 @@ async function scenario(browser, name, dateISO, seeds, fn) {
         check('F (info) duas projeções na aba Desatraso', true, `card RITMO: "${eta.slice(0, 90)}" · planejador: "${proj.slice(0, 70)}"`);
     });
 
-    // ── S7: semana de simulado 23/10 ──
-    await scenario(browser, 'S7-sim-2310', '2026-10-22', {}, async (page) => {
-        const w = await dumpWeek(page);
-        checkLight('D15 semana 21–27/10 (simulado):', w, '2026-10-21');
-        check('D 23/10 SEX: simulado volta por paridade (70d)', has(w.SEX, /SIMULADO NA ÍNTEGRA/) && has(w.SEX, /CORREÇÃO DO SIMULADO/) && /🎯/.test(w.SEX.simBtn || ''));
-        check('G simulado: correção detalhada no mesmo dia (erro → entender → caderno → tema fraco)', has(w.SEX, /CORREÇÃO DO SIMULADO: cada erro → entender → caderno → tema fraco/) && w.SEX.blocks[idx(w.SEX, /SIMULADO NA ÍNTEGRA/)].time === '5h' && w.SEX.blocks[idx(w.SEX, /CORREÇÃO/)].time === '3h');
-        check('A semana de simulado: SEX sem aula B/D2-B/apostila A', !has(w.SEX, /Aula online Bloco B/) && !has(w.SEX, /D2-B/) && !has(w.SEX, /Apostila do Bloco A/));
-        check('A DOM: aula B + D2-B deslocados; apostila A (erros de quinta) no SÁB; DOM sem apostila', has(w.DOM, /deslocado da sexta: aula online Bloco B \(1\.5x\) \+ resumo \+ D2-B \(30q \+ caderno \+ Anki dos erros\) — registre o %/) && !has(w.DOM, /Apostila/) && has(w.SAB, /Apostila do Bloco A pelos erros de quinta/) && !has(w.SAB, /Apostila do Bloco B/));
-        check('A SEG: apostila B (erros de domingo) após o D5; TER sem banco B e sem selagem (banco B na QUI 29/10, +3d; selagem A/B na QUA 28/10)', idx(w.SEG, /Apostila do Bloco B pelos erros de domingo/) === idx(w.SEG, /D5 · Manhã/) + 1 && !has(w.SEG, /D6 · Tarde/) && !has(w.TER, /D6 · Tarde/) && !has(w.TER, /Selar/), 'TER: ' + w.TER.blocks.map(b => b.tag).join(','));
-        check('C SÁB semana de simulado (ritmo 2): apostila do A + PLAN + Fio 1 · questões (ANKI,D4,PLAN,DESAT,LAZER); a TER (' + fmtH(hoursOf(w.TER)) + ', sem banco nem selagem) é o mínimo estrito → selo na TER, sem aviso de empate', w.SAB.blocks.map(b => b.tag).join(',') === 'ANKI,D4,PLAN,DESAT,LAZER' && !w.SAB.lightBadge && w.TER.lightBadge && hoursOf(w.TER) + 0.75 < hoursOf(w.SAB), w.SAB.blocks.map(b => b.tag).join(',') + ' · SÁB=' + fmtH(hoursOf(w.SAB)) + ' TER=' + fmtH(hoursOf(w.TER)));
+    // S7-sim-2310 APOSENTADO (Trilha, 20/10): a semana 21–27/10 é a T1 da Trilha (TER→SEG); o simulado de 23/10 cai em plantão e fica desligado pela regra — coberto por trilha.js TR1 (sexta sem prova, botão religa) e TRsim (simulados da janela = 06/11 e 18/12).
+
+    // ── S8 (Trilha, 20/10 — antes: CATCHUP 28/11): T6 = 24–30/11, bloco 04h30, 1º acesso num sábado ──
+    await scenario(browser, 'S8-trilha-2811', '2026-11-28', {}, async (page) => {
+        const tabs = await listDayTabs(page); const hw = await headerWeek(page);
+        check('Sem.47 = T6 · 24/11–30/11: 7 abas TER→SEG', hw.week === 47 && hw.range === '24/11–30/11' && tabs.map(t => t.code).join() === 'TER,QUA,QUI,SEX,SAB,DOM,SEG', JSON.stringify([hw, tabs.map(t => t.code)]));
+        const w = {}; for (const t of tabs) { await clickDate(page, t.date); w[t.code] = await readDay(page); }
+        check('nenhum resto do motor antigo na semana (Ambulatório, faculdade, presencial, Fio N, Bloco X, Selar, toque N, DESAT)', !Object.values(w).some(d => d.blocks.some(b => /Ambulatório|faculdade|presencial|Fio \d|Bloco [A-H]\b|^Selar|toque \d|bloco antigo/.test(b.text) || b.tag === 'DESAT')));
+        const M = ['TER', 'QUA', 'QUI', 'SEX', 'SEG'];
+        check('bloco 04h30 (TER–SEX e SEG 30/11): 🚑 Plantão 04h30–12h30 {8h} + Anki no trajeto; 💊 só "janela do estimulante a validar com a psiquiatra"', M.every(d => w[d].blocks.some(b => /^🚑 Plantão 04h30–12h30/.test(b.text) && b.time === '8h') && has(w[d], /^Anki no trajeto/) && w[d].venv === 'Janela do estimulante a validar com a psiquiatra (bloco de plantão de madrugada)'), M.map(d => d + ':' + w[d].venv.slice(0, 24)).join(' | '));
+        check('SEX 27/11 (fora da paridade do simulado e no bloco 04h30): "Sexta de plantão: sem simulado pela regra", sem SIMULADO', /Sexta de plantão: sem simulado pela regra/.test(w.SEX.simBtn || '') && !has(w.SEX, /SIMULADO NA ÍNTEGRA/), w.SEX.simBtn);
+        check('🌿 previsto = SÁB 28/11 (selo só nele), sem aula nova; SÁB com PLAN e sem academia', w.SAB.lightBadge && Object.keys(w).filter(d => d !== 'SAB').every(d => !w[d].lightBadge && !w[d].breatherBadge) && w.SAB.light.auto === 'Auto · SÁB' && !w.SAB.blocks.some(b => b.ts === 'aula') && has(w.SAB, /^Implementação de intenção/) && !w.SAB.blocks.some(b => b.tag === 'GYM'), w.SAB.light.auto + ' · ' + w.SAB.blocks.map(b => b.tag).join(','));
+        check('academia livre nos outros 6 dias, nenhum horário fixo', ['TER', 'QUA', 'QUI', 'SEX', 'DOM', 'SEG'].every(d => w[d].blocks.some(b => b.tag === 'GYM' && /horário livre/.test(b.text))));
+        check('A4 card ACADEMIA na Trilha: dias TER→SEG, sábado "sem treino" (não "descanso")', await page.evaluate(() => { const el = [...document.querySelectorAll('div')].find(d => /^ACADEMIA — /.test(d.textContent.trim()) && d.children.length === 0); const t = el ? el.parentElement.innerText.replace(/\n/g, ' ') : ''; return /^ACADEMIA — .* Ter 🏋️ livre .* Sab 😴 sem treino Dom 🏋️ livre Seg 🏋️ livre$/.test(t) && !/descanso/.test(t); }));
+        const cfg = await getLS(page, CFG); const W = (cfg.trilhaWeeks || {})['2026-11-24'];
+        check('1º acesso 28/11: trilhaFirstOpen = 28/11; a T6 congela com a cota da rampa (4) e nenhuma aula antes de hoje; nada da Trilha em semanas anteriores; nenhum fioWeek', cfg.trilhaFirstOpen === '2026-11-28' && W && W.q === 4 && W.mods.length === 4 && W.mods.every(id => cfg.trilhaPlan[id].aula >= '2026-11-28') && Object.keys(cfg.trilhaWeeks).join() === '2026-11-24' && !cfg.fioWeek, JSON.stringify(W));
+        const tot = w.SEG.blocks.reduce((s, b) => s + H.parseH(b.time), 0);
+        check('(info) 1º acesso num sábado do bloco 04h30: as 4 aulas só cabem em DOM e SEG — SEG 30/11 soma ' + fmtH(tot) + ' (conflito do 1º acesso tardio, no relatório)', true, w.SEG.warn.join(' · '));
+        await clickTab(page, 'TRILHA');
+        const ramp = await page.evaluate(() => [...document.querySelectorAll('[data-tue]')].map(e => e.innerText.replace(/\n/g, ' ')));
+        check('aba Trilha: T1–T5 "antes do seu 1º acesso", T6 "congelada: 4 novo(s)"', ramp.length === 11 && ramp.slice(0, 5).every(r => /antes do seu 1º acesso/.test(r)) && /congelada: 4 novo\(s\)/.test(ramp[5]), ramp.slice(0, 7).join(' | '));
     });
 
-    // ── S8: recuperação 28/11 (CATCHUP provisório: sáb leve · Fio A qua→qui→sex · Fio B dom→seg→ter · selagens) ──
-    await scenario(browser, 'S8-catchup-2811', '2026-11-28', {}, async (page) => {
-        const w = await dumpWeek(page);
-        const all = Object.values(w);
-        check('C4 CATCHUP: nenhum "Ambulatório" e nenhuma "Aula da faculdade" na semana', !all.some(d => d.blocks.some(b => /Ambulatório|faculdade/.test(b.text))));
-        check('C4 CATCHUP: sem motor dinâmico (nenhum "Fio N ·")', !all.some(d => d.blocks.some(b => /^Fio \d/.test(b.text))));
-        check('C4 Fio A: QUA aula → QUI questões → SÁB apostila (24/09); SEX sem toque de fio', has(w.QUA, /^Fio A · toque 1: aula online do bloco antigo/) && has(w.QUI, /^Fio A · toque 2: 30 questões do bloco antigo/) && has(w.SAB, /^Fio A · toque 3: apostila dirigida pelos erros do bloco antigo/) && !has(w.SEX, /^Fio A/));
-        check('SÁB CATCHUP útil (24/09): Anki, Fio A · apostila, temas fracos, PLAN, noite livre = ANKI,DESAT,REV,PLAN,LAZER; sem gym', w.SAB.blocks.map(b => b.tag).join(',') === 'ANKI,DESAT,REV,PLAN,LAZER' && /^Dia útil · Fio A fecha pela apostila/.test(w.SAB.venv), w.SAB.blocks.map(b => b.tag).join(','));
-        check('D15 Fio B: DOM aula → SEG questões → TER apostila', has(w.DOM, /^Fio B · toque 1: aula online do bloco antigo/) && has(w.SEG, /^Fio B · toque 2: 30 questões do bloco antigo/) && has(w.TER, /^Fio B · toque 3: apostila dirigida pelos erros do bloco antigo/));
-        check('Fronteira POST→CATCHUP (1ª semana 25/11): sem "Selar o Fio A/B da semana passada" (o template ainda não tem fio A/B anterior); selagens do POST em blocos próprios: QUA Fio 1 · SEX Fio 2 (ritmo 2 legado)', !DAYS.some(d => w[d].blocks.some(b => /Selar o Fio [AB] da semana passada/.test(b.text))) && has(w.QUA, /^Selar Fio 1 \(sem\. passada\)/) && has(w.SEX, /^Selar Fio 2 \(sem\. passada\)/) && !has(w.QUI, /^Selar Fio 3/) && !has(w.DOM, /^Selar Fio 4/), DAYS.map(d => d + ':' + w[d].blocks.filter(b => /^Selar/.test(b.text)).map(b => b.text.slice(0, 22)).join('/')).join(' '));
-        check('Fronteira POST→CATCHUP: as selagens do POST mostram o módulo (fios da semana 18–24/11) e oferecem "Selagem ✓"', !!w.QUA.blocks[idx(w.QUA, /^Selar Fio 1/)].mod && !!w.SEX.blocks[idx(w.SEX, /^Selar Fio 2/)].mod && w.QUA.blocks[idx(w.QUA, /^Selar Fio 1/)].tasks.join() === 'Selagem ✓', (w.QUA.blocks[idx(w.QUA, /^Selar Fio 1/)].mod || '').split('|')[0].trim() + ' | ' + (w.SEX.blocks[idx(w.SEX, /^Selar Fio 2/)].mod || '').split('|')[0].trim());
-        const modA = [(w.QUA.blocks[idx(w.QUA, /Fio A/)] || {}).mod, (w.QUI.blocks[idx(w.QUI, /Fio A/)] || {}).mod, (w.SAB.blocks[idx(w.SAB, /Fio A ·/)] || {}).mod];
-        const modB = [w.DOM.blocks[idx(w.DOM, /Fio B ·/)].mod, w.SEG.blocks[idx(w.SEG, /Fio B ·/)].mod, w.TER.blocks[idx(w.TER, /Fio B ·/)].mod];
-        check('S1 CATCHUP: os 6 toques recebem o card da matéria', modA.every(Boolean) && modB.every(Boolean), modA.concat(modB).map(m => String(m).slice(0, 30)).join(' | '));
-        check('C4 Fio A = mesmo módulo nos 3 toques; Fio B idem; A ≠ B', modA[0] === modA[1] && modA[1] === modA[2] && modB[0] === modB[1] && modB[1] === modB[2] && modA[0] !== modB[0], `A=${String(modA[0]).slice(0, 40)} · B=${String(modB[0]).slice(0, 40)}`);
-        check('C4 academia livre em 6 dias (sábado sem), nenhum horário fixo', ['QUA', 'QUI', 'SEX', 'DOM', 'SEG', 'TER'].every(d => w[d].blocks.some(b => b.tag === 'GYM' && /horário livre/.test(b.text))) && !w.SAB.blocks.some(b => b.tag === 'GYM'));
-        check('A4 card ACADEMIA na CATCHUP: sábado "sem treino" (não "descanso")', await page.evaluate(() => { const el = [...document.querySelectorAll('div')].find(d => /^ACADEMIA — /.test(d.textContent.trim()) && d.children.length === 0); const t = el ? el.parentElement.innerText.replace(/\n/g, ' ') : ''; return /Sab 😴 sem treino/.test(t) && !/descanso/.test(t); }));
-        check('D 27/11 SEX sem simulado (105d): temas fracos (2h) + selagem do Fio B; Fio A apostila no SÁB', !has(w.SEX, /SIMULADO NA ÍNTEGRA/) && has(w.SEX, /questões dos temas fracos do caderno de erros \+ Smartcards/) && (w.SEX.blocks[idx(w.SEX, /questões dos temas fracos/)] || {}).time === '2h' && !has(w.SEX, /Fio A · toque 3/) && has(w.SAB, /Fio A · toque 3/), w.SEX.blocks.map(b => b.tag + '(' + b.time + ')').join(','));
-        checkLight('D15 semana 25/11–01/12 (CATCHUP):', w, '2026-11-25');
-        await clickTab(page, 'DESATRASO');
-        const t = await page.evaluate(() => document.body.innerText);
-        check('C4 slot labels: "FIO A · Qua/Qui/Sáb" e "FIO B · Dom/Seg/Ter"', /FIO A · Qua\/Qui\/Sáb/.test(t) && /FIO B · Dom\/Seg\/Ter/.test(t));
+    // S8b-catchup-sim-0412 APOSENTADO (Trilha, 20/10): fase CATCHUP (fios A/B, selagem deslizada da sexta) não existe mais na Trilha; 04/12 cai no bloco 04:30 (sem simulado pela regra) — coberto por trilha.js TR3/TRsim.
+
+    // ── S8c (Trilha, 20/10 — antes: fronteira CATCHUP→FREE de 15/12): 1º acesso na TER 15/12 = semana inteira da T9 ──
+    await scenario(browser, 'S8c-trilha-1512', '2026-12-15', {}, async (page) => {
+        const cfg = await getLS(page, CFG); const W = (cfg.trilhaWeeks || {})['2026-12-15'];
+        check('TER 15/12 abre a T9 (sem fronteira de fase): trilhaWeeks[15/12] = { q 5, base 5, held false, 5 módulos, dia leve SEG 21/12 }', W && W.q === 5 && W.base === 5 && W.held === false && W.mods.length === 5 && W.light === '2026-12-21', JSON.stringify(W));
+        check('motor antigo desligado: nenhum fioWeek/fioExtra/fioPlan gravado', !cfg.fioWeek && !cfg.fioExtra && !cfg.fioPlan, Object.keys(cfg).join(','));
+        const ter = await readDay(page);
+        check('TER 15/12: aulas da Trilha (etiquetas tm/ts), sem "Selar Fio", "Fio A/B" nem "(sem. passada)"', ter.blocks.some(b => b.tm != null && b.ts === 'aula') && !ter.blocks.some(b => /Selar|Fio [A-Z\d]|\(sem\. passada\)/.test(b.text)), ter.blocks.map(b => b.text.slice(0, 24)).join(' | '));
+        check('📦 no Cronograma a partir de 15/12', !!(await banner(page, 'trilha-export')));
+        await clickTab(page, 'TRILHA');
+        const pomo = await page.evaluate(() => { const el = document.querySelector('[data-t="trilha-pomo"]'); return el ? { n: (el.innerText.match(/Duração da aula \(min\):/g) || []).length, t: el.innerText } : null; });
+        check('aba Trilha: planejador de pomodoros com os 5 módulos da T9 (60/10/35 + duração da aula), sem ritmo 1–4', !!pomo && pomo.n === 5 && /⏱️ Planejador da semana — pomodoros das aulas da Trilha/.test(pomo.t) && /60min de foco · 10min de pausa · 35min a cada 2 focos/.test(pomo.t) && !/Ritmo do desatraso/.test(pomo.t), pomo && pomo.n + ' linhas');
+        await clickTab(page, 'CRONOGRAMA');
+        await navWeek(page, -1); const prev = []; for (const t of await listDayTabs(page)) { await clickDate(page, t.date); prev.push(await readDay(page)); }
+        check('T8 (08–14/12, antes do 1º acesso): nenhuma etapa da Trilha, nenhum bloco do motor antigo, nenhum ⏳', prev.length === 7 && prev.every(d => !d.blocks.some(b => b.tm != null || /Fio \d|Bloco [A-H]\b|^Selar/.test(b.text) || b.tag === 'DESAT')) && !(await banner(page, 'trilha-pending')), prev.map(d => d.date + ':' + d.blocks.map(b => b.tag).join(',')).join(' '));
     });
 
-    // ── S8b: semana de simulado na CATCHUP (04/12): selagem do Fio B desliza para o domingo ──
-    await scenario(browser, 'S8b-catchup-sim-0412', '2026-12-05', {}, async (page) => {
-        const w = await dumpWeek(page);
-        check('D 04/12 SEX simulado (112d): prova + correção (📚 avisa); SEM selagem do Fio B nem temas fracos na sexta; Fio A apostila no SÁB 05/12', has(w.SEX, /SIMULADO NA ÍNTEGRA/) && has(w.SEX, /CORREÇÃO DO SIMULADO/) && !has(w.SEX, /Fio A · toque 3/) && !has(w.SEX, /Selar o Fio B/) && !has(w.SEX, /questões dos temas fracos do caderno/) && has(w.SAB, /Fio A · toque 3/) && w.SEX.warn.some(t => /📚/.test(t)), w.SEX.warn.join(' · '));
-        check('Item 5 (24/09): SÁB 05/12 recebe "Semana de simulado · Selar o Fio B da semana passada (deslizado da sexta)" (+4d da apostila de TER, não +5d no DOM); DOM só com Fio B aula', has(w.SAB, /^Semana de simulado · Selar o Fio B da semana passada \(deslizado da sexta\)/) && !has(w.DOM, /Selar o Fio B/) && has(w.DOM, /^Fio B · toque 1/), w.SAB.blocks.map(b => b.tag).join(',') + ' | DOM: ' + w.DOM.blocks.map(b => b.tag).join(','));
-        check('CATCHUP 2ª semana: "Selar Fio A" (TER, +3d da apostila de SÁB) mostra o módulo do Fio A DESTA semana (o mesmo da aula de QUA) e "Selar o Fio B da semana passada" (SÁB) o da semana anterior; ambos oferecem "Selagem ✓"', (() => { const a = w.TER.blocks[idx(w.TER, /^Selar Fio A:/)], b = w.SAB.blocks[idx(w.SAB, /Selar o Fio B da semana passada/)], qa = w.QUA.blocks[idx(w.QUA, /^Fio A · toque 1/)]; return !!a && !!b && !!qa && !!a.mod && a.mod === qa.mod && !!b.mod && b.mod !== a.mod && a.tasks.join() === 'Selagem ✓' && b.tasks.join() === 'Selagem ✓'; })(), String((w.TER.blocks[idx(w.TER, /^Selar Fio A:/)] || {}).mod).slice(0, 30) + ' | ' + String((w.SAB.blocks[idx(w.SAB, /Selar o Fio B/)] || {}).mod).slice(0, 30));
-        check('C4 SEG 07/12: Fio B questões + Noite livre, sem AULA', has(w.SEG, /^Fio B · toque 2/) && has(w.SEG, /^Noite livre/) && !w.SEG.blocks.some(b => b.tag === 'AULA'));
-        checkLight('D15 semana 02–08/12 (simulado, CATCHUP):', w, '2026-12-02');
+    // ── S9 (Trilha, 20/10 — antes: 1ª semana do PIPELINE 16–22/12): T9 15–21/12 aberta em 15/12, tudo feito até 18/12, relógio 19/12 ──
+    await scenario(browser, 'S9-trilha-1912', '2026-12-15', {}, async (page, S) => {
+        const W0 = (await getLS(page, CFG)).trilhaWeeks['2026-12-15'];
+        await H.markUntil(page, '2026-12-18'); page = await S.reopen('2026-12-19');
+        const cfg = await getLS(page, CFG); const W = cfg.trilhaWeeks['2026-12-15'];
+        check('reaberto em 19/12 com tudo feito até 18/12: o snapshot da T9 não muda (5 módulos) e não há ⏳', W && JSON.stringify(W.mods) === JSON.stringify(W0.mods) && W.q === 5 && !(await banner(page, 'trilha-pending')), JSON.stringify(W));
+        const w = {}; for (const t of await listDayTabs(page)) { await clickDate(page, t.date); w[t.date] = await readDay(page); }
+        const sx = w['18/12'];
+        check('SEX 18/12: SIMULADO (5h) + CORREÇÃO (3h), nenhuma etapa de módulo; 📚 avisa', has(sx, /SIMULADO NA ÍNTEGRA/) && sx.blocks[idx(sx, /SIMULADO NA ÍNTEGRA/)].time === '5h' && sx.blocks[idx(sx, /CORREÇÃO DO SIMULADO/)].time === '3h' && !sx.blocks.some(b => b.tm != null) && sx.warn.some(t => /📚/.test(t)), sx.warn.join(' · '));
+        check('academia livre em 6 dias (sábado sem)', Object.values(w).every(d => /^Sábado/.test(d.title) ? !d.blocks.some(b => b.tag === 'GYM') : d.blocks.some(b => b.tag === 'GYM' && /horário livre/.test(b.text))));
+        check('🌿 = SEG 21/12 (previsto antes de distribuir): selo só nele, nenhuma aula nele', w['21/12'].lightBadge && Object.keys(w).filter(d => d !== '21/12').every(d => !w[d].lightBadge) && !w['21/12'].blocks.some(b => b.ts === 'aula') && W.light === '2026-12-21', w['21/12'].light.auto);
+        check('cadeia completa dos 5 módulos da T9 em dias distintos e crescentes até 01/01', W.mods.every(id => { const p = cfg.trilhaPlan[id]; return p.aula < p.quest && p.quest < p.apost && p.apost < p.seal && p.seal <= '2027-01-01'; }), JSON.stringify(W.mods.map(id => cfg.trilhaPlan[id])));
+        const tot = (d) => d.blocks.reduce((s, b) => s + H.parseH(b.time), 0);
+        check('nenhum dia acima do tempo hábil (14,5h) · (info) estudo por dia: ' + Object.entries(w).map(([d, x]) => d + ' ' + fmtH(hoursOf(x))).join(' · '), Object.values(w).every(d => tot(d) <= 14.5 + 1e-9));
+        await clickTab(page, 'TRILHA');
+        const wk = await page.evaluate(() => (document.querySelector('[data-t="trilha-week"]') || {}).innerText || '');
+        const pomo = await page.evaluate(() => { const el = document.querySelector('[data-t="trilha-pomo"]'); return el ? { n: (el.innerText.match(/Duração da aula \(min\):/g) || []).length, t: el.innerText } : null; });
+        check('aba Trilha: "MÓDULOS DESTA SEMANA (5)" com as datas de cada etapa', /MÓDULOS DESTA SEMANA \(5\)/.test(wk) && (wk.match(/aula [A-ZÁ]{3} \d\d\/\d\d( ✓)? · questões [A-ZÁ]{3} \d\d\/\d\d( ✓)? · apostila [A-ZÁ]{3} \d\d\/\d\d( ✓)? · selagem [A-ZÁ]{3} \d\d\/\d\d/g) || []).length === 5, wk.replace(/\n/g, ' ').slice(0, 220));
+        check('planejador de pomodoros some quando as aulas da semana já estão feitas (só aulas abertas entram)', !pomo, pomo && pomo.n + ' linhas');
     });
 
-    // ── S8c: 15/12 (terça) ainda é CATCHUP — FREE começa na quarta 16/12 ──
-    await scenario(browser, 'S8c-fronteira-1512', '2026-12-15', {}, async (page) => {
-        const w = await dumpWeek(page, ['SEG', 'TER']);
-        check('FREE_START=16/12: TER 15/12 é CATCHUP (Selar o Fio A + Fio B apostila), não pipeline', has(w.TER, /^Selar Fio A:/) && has(w.TER, /^Fio B · toque 3/) && !w.TER.blocks.some(b => /\(sem\. passada\)|^Fio \d · toque 1: AULA/.test(b.text)), w.TER.blocks.map(b => b.text.slice(0, 20)).join(' | '));
-        const cfg = await page.evaluate(() => JSON.parse(localStorage.getItem('medplanner_config_v1') || '{}'));
-        check('P1/P2: a semana CATCHUP 09–15/12 também congela seus 2 fios (config.fioWeek[2026-12-09] com 2 ids)', cfg.fioWeek && Array.isArray(cfg.fioWeek['2026-12-09']) && cfg.fioWeek['2026-12-09'].length === 2, JSON.stringify(cfg.fioWeek || null));
-    });
-
-    // ── S9: reta final 19/12 — 1ª semana do PIPELINE (16–22/12): sem blocos "(sem. passada)" ──
-    await scenario(browser, 'S9-free-1912', '2026-12-19', {}, async (page) => {
-        const w = await dumpWeek(page);
-        const P = { QUA: 1, QUI: 2, SEX: 3, SAB: 4, SEG: 5, TER: 6 }; // 6 fios: o DOM não abre fio
-        check('PIPE 1ª semana: nenhum bloco "(sem. passada)" do pipeline — só a selagem de fronteira "Selar Fio B (sem. passada)" na SEX (Fio B da última semana da CATCHUP, +3d da apostila de terça)', Object.values(w).every(d => d.blocks.every(b => !/\(sem\. passada\)/.test(b.text) || /^Selar Fio B \(sem\. passada\)/.test(b.text))) && has(w.SEX, /^Selar Fio B \(sem\. passada\)/) && !!w.SEX.blocks[idx(w.SEX, /^Selar Fio B/)].mod && w.SEX.blocks[idx(w.SEX, /^Selar Fio B/)].tasks.join() === 'Selagem ✓', (w.SEX.blocks[idx(w.SEX, /^Selar Fio B/)] || { mod: '' }).mod.split('|')[0].trim());
-        check('PIPE 1ª semana: cabeçalho 💊 não anuncia bloco ausente (sem "semana passada", "(ter)", "(seg)"; SEG mantém "Fio 1 desta semana", TER "Fio 2 desta semana")', !Object.values(w).some(d => /semana passada|\((ter|seg)\)/.test(d.venv)) && /aula do Fio 1$/.test(w.QUA.venv) && /questões do Fio 1$/.test(w.QUI.venv) && /selagem do Fio 1 desta semana/.test(w.SEG.venv) && /selagem do Fio 2 desta semana/.test(w.TER.venv), w.QUA.venv + ' | ' + w.QUI.venv + ' | ' + w.SAB.venv);
-        check('PIPE aula do fio de hoje em QUA·QUI·SEX·SÁB·SEG·TER (Fio 1..6); DOM sem fio novo (6 fios/semana)', Object.keys(P).every(d => has(w[d], new RegExp('^Fio ' + P[d] + ' · toque 1: AULA'))) && !w.DOM.blocks.some(b => /toque 1: AULA/.test(b.text)));
-        check('PIPE questões do fio de ontem (QUI←1 · SEX←2 · SÁB←3 · DOM←4 · TER←5); SEG sem questões (ninguém abriu fio no DOM); QUA sem questões na 1ª semana', [['QUI', 1], ['SEX', 2], ['SAB', 3], ['DOM', 4], ['TER', 5]].every(([d, n]) => has(w[d], new RegExp('^Fio ' + n + ' · toque 2'))) && !w.SEG.blocks.some(b => /toque 2/.test(b.text)) && !w.QUA.blocks.some(b => /toque 2/.test(b.text)));
-        check('PIPE apostila do fio de anteontem (SEX←1 · SÁB←2 · DOM←3 · SEG←4); TER sem apostila; QUA/QUI sem apostila na 1ª semana', [['SEX', 1], ['SAB', 2], ['DOM', 3], ['SEG', 4]].every(([d, n]) => has(w[d], new RegExp('^Fio ' + n + ' · toque 3'))) && !w.TER.blocks.some(b => /toque 3/.test(b.text)) && !w.QUA.blocks.some(b => /toque 3/.test(b.text)) && !w.QUI.blocks.some(b => /toque 3/.test(b.text)));
-        check('PIPE selagem em bloco próprio (+3d): SEG sela o Fio 1 (apostila SEX), TER sela o Fio 2 (apostila SÁB); QUA/QUI/SÁB/DOM sem selagem na 1ª semana; SEX só a de fronteira (Fio B da CATCHUP)', has(w.SEG, /^Selar Fio 1: 10 questões \+ smartcards \+ os 4 checks/) && has(w.TER, /^Selar Fio 2: 10 questões \+ smartcards \+ os 4 checks/) && ['QUA', 'QUI', 'SAB', 'DOM'].every(d => !w[d].blocks.some(b => /^Selar/.test(b.text))) && w.SEX.blocks.filter(b => /^Selar/.test(b.text)).length === 1, DAYS.map(d => d + ':' + w[d].blocks.filter(b => /^Selar/.test(b.text)).map(b => b.text.slice(0, 14)).join('/')).join(' '));
-        const modOf = (d, re) => (w[d].blocks[idx(w[d], re)] || {}).mod;
-        check('PIPE Fio 1 = mesmo módulo na aula (QUA), questões (QUI), apostila (SEX) e selagem (SEG)', modOf('QUA', /^Fio 1 · toque 1/) && modOf('QUA', /^Fio 1 · toque 1/) === modOf('QUI', /^Fio 1 · toque 2/) && modOf('QUI', /^Fio 1 · toque 2/) === modOf('SEX', /^Fio 1 · toque 3/) && modOf('SEX', /^Fio 1 · toque 3/) === modOf('SEG', /^Selar Fio 1:/), String(modOf('QUA', /^Fio 1 · toque 1/)).slice(0, 40));
-        check('PIPE 6 fios da semana = 6 módulos distintos', new Set(Object.keys(P).map(d => modOf(d, new RegExp('^Fio ' + P[d] + ' · toque 1')))).size === 6);
-        check('PIPE aula sempre antes das questões e apostila do mesmo fio (dias crescentes: QUA→QUI→SEX, …)', true, 'estrutural: toque 1 no dia k, toque 2 no dia k+1, toque 3 no dia k+2, selagem no dia k+5');
-        check('SÁB FREE útil (24/09): pipeline completo (aula Fio 4 · questões Fio 3 · apostila Fio 2) + revisão + PLAN, sem gym; 1ª semana sem a selagem do Fio 6', w.SAB.blocks.map(b => b.tag).join(',') === 'ANKI,DESAT,DESAT,DESAT,REV,PLAN,LAZER' && /^Reta final · pipeline: aula do Fio 4/.test(w.SAB.venv) && has(w.SAB, /Implementação de intenção/), w.SAB.blocks.map(b => b.tag).join(','));
-        check('D 18/12 SEX simulado (126d): prova + correção coexistem com o pipeline; 📚 avisa', has(w.SEX, /SIMULADO NA ÍNTEGRA/) && has(w.SEX, /^Fio 3 · toque 1/) && has(w.SEX, /^Fio 2 · toque 2/) && has(w.SEX, /^Fio 1 · toque 3/) && w.SEX.warn.some(t => /de estudo/.test(t)), w.SEX.warn.join(' · '));
-        check('PIPE carga por dia livre ≤ 8h fora do simulado (QUA ' + hoursOf(w.QUA).toFixed(1) + 'h · TER ' + hoursOf(w.TER).toFixed(1) + 'h)', ['QUA', 'QUI', 'SAB', 'DOM', 'SEG', 'TER'].every(d => hoursOf(w[d]) <= 8));
-        check('PIPE academia livre em 6 dias (sábado sem)', ['QUA', 'QUI', 'SEX', 'DOM', 'SEG', 'TER'].every(d => w[d].blocks.some(b => b.tag === 'GYM' && /horário livre/.test(b.text))) && !w.SAB.blocks.some(b => b.tag === 'GYM'));
-        checkLight('D15 semana 16–22/12 (FREE):', w, '2026-12-16');
-        const cfg = await page.evaluate(() => JSON.parse(localStorage.getItem('medplanner_config_v1') || '{}'));
-        const snap = (cfg.fioWeek || {})['2026-12-16'];
-        check('SNAP semana corrente 16/12 congelada em config.fioWeek (6 ids)', Array.isArray(snap) && snap.length === 6 && new Set(snap).size === 6, JSON.stringify(snap));
-        await clickTab(page, 'DESATRASO');
-        const t = await page.evaluate(() => document.body.innerText);
-        check('PIPE aba Desatraso: MATÉRIAS DESTA SEMANA (6) com slots QUA · QUI · SEX · SÁB · SEG · TER', /MATÉRIAS DESTA SEMANA \(6\)/.test(t) && ['QUA', 'QUI', 'SEX', 'SÁB', 'SEG', 'TER'].every(s => t.indexOf(s) > -1), (t.match(/MATÉRIAS DESTA SEMANA \(\d\)/) || [''])[0]);
-        check('PIPE planejador: 6 linhas (fios da semana)', await page.evaluate(() => { const hdr = [...document.querySelectorAll('div')].find(d => d.children.length === 0 && /Planejador da semana/.test(d.textContent)); const card = hdr && hdr.parentElement; return card ? [...card.querySelectorAll('div')].filter(d => d.style && d.style.background === 'rgb(15, 23, 42)' && d.style.borderRadius === '8px' && d.style.padding === '10px' && /Duração da aula/.test(d.textContent)).length === 6 : false; }));
-        check('PIPE rodapé da projeção: 6/sem na reta final', /6\/sem na reta final/.test(t));
-    });
-
-    // ── S9b: reta final 26/12 — semana 23–29/12 com a semana anterior congelada (config.fioWeek) ──
-    await scenario(browser, 'S9b-free-2612', '2026-12-26', { [CFG]: { ...baseCfg, fioWeek: { '2026-12-16': [1, 2, 3, 4, 5, 6] } } }, async (page) => {
-        const w = await dumpWeek(page);
-        const modOf = (d, re) => (w[d].blocks[idx(w[d], re)] || {}).mod || '';
-        const MODS9 = eval(require('fs').readFileSync(H.FILE, 'utf8').match(/const MODULES = (\[[\s\S]*?\n\]);/)[1]); const titleOf = (id) => (MODS9.find(m => m.id === id) || {}).title || ('#' + id);
-        check('PIPE QUA 23/12: questões do Fio 6 da semana passada (id 6 · Trauma II) + apostila do Fio 5 (id 5 · Trauma I) + selagem do Fio 3 (id 3 · Glomerulopatias II)', /Trauma II/.test(modOf('QUA', /^Fio 6 \(sem\. passada\) · toque 2/)) && /Trauma I —/.test(modOf('QUA', /^Fio 5 \(sem\. passada\) · toque 3/)) && /Glomerulopatias II/.test(modOf('QUA', /^Selar Fio 3 \(sem\. passada\)/)), [modOf('QUA', /^Fio 6 \(sem/), modOf('QUA', /^Fio 5 \(sem/), modOf('QUA', /^Selar Fio 3/)].map(x => String(x).slice(0, 24)).join(' | '));
-        check('PIPE 2ª semana: cabeçalho 💊 volta a anunciar a semana passada (QUA: questões do Fio 6 (ter) · apostila do Fio 5 (seg) · selagem do Fio 3 da semana passada)', /questões do Fio 6 \(ter\) · apostila do Fio 5 \(seg\) · selagem do Fio 3 da semana passada/.test(w.QUA.venv), w.QUA.venv);
-        check('PIPE QUI 23–29/12: apostila do Fio 6 da semana passada (Trauma II) + selagem do Fio 4 (Amenorreia)', /Trauma II/.test(modOf('QUI', /^Fio 6 \(sem\. passada\) · toque 3/)) && /Amenorreia/.test(modOf('QUI', /^Selar Fio 4 \(sem\. passada\)/)));
-        check('PIPE selagens da semana passada em SÁB (Fio 5 · Trauma I) e DOM (Fio 6 · Trauma II); SEX sem selagem (+3d das apostilas de QUA\'/QUI\')', /Trauma I —/.test(modOf('SAB', /^Selar Fio 5 \(sem/)) && /Trauma II/.test(modOf('DOM', /^Selar Fio 6 \(sem/)) && !w.SEX.blocks.some(b => /^Selar/.test(b.text)), ['SEX', 'SAB', 'DOM'].map(d => d + ':' + w[d].blocks.filter(b => /^Selar/.test(b.text)).map(b => b.text.slice(0, 14)).join('/')).join(' '));
-        check('PIPE fios desta semana (Fio 1..6) ≠ fios da semana passada e distintos entre si', new Set(['QUA', 'QUI', 'SEX', 'SAB', 'SEG', 'TER'].map((d, i) => modOf(d, new RegExp('^Fio ' + (i + 1) + ' · toque 1')))).size === 6 && !/Glomerulopatias I \(|Ciclo Menstrual|Trauma/.test(modOf('QUA', /^Fio 1 · toque 1/)));
-        check('PIPE Fio 1 desta semana: aula QUA = questões QUI = apostila SEX = selagem SEG', modOf('QUA', /^Fio 1 · toque 1/) && modOf('QUA', /^Fio 1 · toque 1/) === modOf('QUI', /^Fio 1 · toque 2/) && modOf('QUI', /^Fio 1 · toque 2/) === modOf('SEX', /^Fio 1 · toque 3/) && modOf('SEX', /^Fio 1 · toque 3/) === modOf('SEG', /^Selar Fio 1:/), String(modOf('QUA', /^Fio 1 · toque 1/)).slice(0, 40));
-        const cfg = await page.evaluate(() => JSON.parse(localStorage.getItem('medplanner_config_v1') || '{}'));
-        check('SNAP: semana 23/12 congelada (6 ids) e semana 16/12 preservada', Array.isArray((cfg.fioWeek || {})['2026-12-23']) && cfg.fioWeek['2026-12-23'].length === 6 && JSON.stringify(cfg.fioWeek['2026-12-16']) === '[1,2,3,4,5,6]', JSON.stringify(cfg.fioWeek));
-        check('D 25/12 SEX sem simulado (133d): pipeline sem prova; caderno dos simulados anteriores', !has(w.SEX, /SIMULADO NA ÍNTEGRA/) && has(w.SEX, /caderno de erros dos simulados anteriores/));
-        checkLight('D15 semana 23–29/12 (FREE):', w, '2026-12-23');
+    // ── S9b (Trilha, 20/10 — antes: 2ª semana do PIPELINE 23–29/12): T10 22–28/12 aberta em 22/12, tudo feito até 25/12, relógio 26/12 ──
+    await scenario(browser, 'S9b-trilha-2612', '2026-12-22', {}, async (page, S) => {
+        await H.markUntil(page, '2026-12-25'); page = await S.reopen('2026-12-26');
+        const cfg = await getLS(page, CFG); const W = cfg.trilhaWeeks['2026-12-22'];
+        check('T10: { q 4 (rampa), held false, 4 módulos }; nenhum módulo novo na T11 (29/12–01/01)', W && W.q === 4 && W.held === false && W.mods.length === 4 && !Object.values(cfg.trilhaPlan).some(p => p.aula >= '2026-12-29'), JSON.stringify(W));
+        const w = {}; for (const t of await listDayTabs(page)) { await clickDate(page, t.date); w[t.date] = await readDay(page); }
+        check('QUI 24/12 e SEX 25/12: 🎄 feriado mais leve (📚 a partir de 3h), nenhuma aula nova', ['24/12', '25/12'].every(d => /🎄 Feriado/.test(w[d].dayType) && /📚 a partir de 3h/.test(w[d].dayType) && !w[d].blocks.some(b => b.ts === 'aula' && !b.au)), w['24/12'].dayType + ' | ' + w['25/12'].dayType);
+        check('SEX 25/12 sem simulado pela paridade (quinzenal: 18/12 → 01/01): botão "📚 Sexta de estudo ativo"', !has(w['25/12'], /SIMULADO NA ÍNTEGRA/) && /📚 Sexta de estudo ativo/.test(w['25/12'].simBtn || ''), w['25/12'].simBtn);
+        check('cadeia completa dos 4 módulos da T10 até 01/01, datas crescentes; 01/01 só selagem', W.mods.every(id => { const p = cfg.trilhaPlan[id]; return p.aula < p.quest && p.quest < p.apost && p.apost < p.seal && p.seal <= '2027-01-01' && [p.aula, p.quest, p.apost].every(d => d < '2027-01-01'); }), JSON.stringify(W.mods.map(id => cfg.trilhaPlan[id])));
+        check('📦 visível (a partir de 15/12) e nenhum ⏳ (tudo feito até 25/12)', !!(await banner(page, 'trilha-export')) && !(await banner(page, 'trilha-pending')));
     });
 
 
@@ -474,29 +451,31 @@ async function scenario(browser, name, dateISO, seeds, fn) {
     const wk40 = MODS.filter(m => m.week === 40).map(m => m.id);
     const wk41 = MODS.filter(m => m.week === 41).map(m => m.id);
     const wk42 = MODS.filter(m => m.week === 42).map(m => m.id);
+    const wk37 = MODS.filter(m => m.week === 37).map(m => m.id);
 
-    // ── S10: P1/P2/P5a/P5b/T7 — semana 21–27/10 (simulado 23/10) após 14–20/10 executada no ritmo 4 ──
-    await scenario(browser, 'S10-continuidade-2210', '2026-10-22', { [CFG]: { ...baseCfg, catchupPace: 4, fioWeek: { '2026-10-14': [77, 78, 75, 76] } }, [PRG]: { 77: { aula: true, questoesD2: true, apostila: true }, 78: { aula: true, questoesD2: true, apostila: true }, 75: { aula: true, questoesD2: true, apostila: true }, 76: { aula: true }, 70: { aula: true } } }, async (page) => {
+    // ── S10: P1/P2/P5a/P5b/T7 — semana 23–29/09 (simulado 25/09) após 16–22/09 executada no ritmo 4 ──
+    // (re-datado na Trilha, 20/10: a semana original 21–27/10 é a T1; mesma estrutura 4 semanas antes — fios da semana passada 69/70/67/68, P1 = 65 com aula vista; a Sem.38 tem 3 blocos e 2 plantões)
+    await scenario(browser, 'S10-continuidade-2409', '2026-09-24', { [CFG]: { ...baseCfg, catchupPace: 4, fioWeek: { '2026-09-16': [69, 70, 67, 68] } }, [PRG]: { 69: { aula: true, questoesD2: true, apostila: true }, 70: { aula: true, questoesD2: true, apostila: true }, 67: { aula: true, questoesD2: true, apostila: true }, 68: { aula: true }, 65: { aula: true } } }, async (page) => {
         const w = await dumpWeek(page);
-        check('P5a QUA 21/10: "Fio 4 (sem. passada) · toque 2" resolve o Fio 4 da semana passada (' + titleOf(76) + ')', modOf(w.QUA, /^Fio 4 \(sem\. passada\) · toque 2/).includes(titleOf(76)), modOf(w.QUA, /^Fio 4 \(sem/).slice(0, 60));
-        check('P5a QUI 22/10: "Fio 4 (sem. passada) · toque 3" (apostila) resolve o mesmo módulo', modOf(w.QUI, /^Fio 4 \(sem\. passada\) · toque 3/).includes(titleOf(76)));
-        check('P2 selagens por fio, +3d da apostila: QUA sela Fio 1 (' + codeOf(77) + '), QUI Fio 3 (' + codeOf(75) + '), SEX Fio 2 (' + codeOf(78) + '), DOM Fio 4 (' + codeOf(76) + ')', modOf(w.QUA, /^Selar Fio 1 \(sem\. passada\)/).includes(titleOf(77)) && modOf(w.QUI, /^Selar Fio 3 \(sem\. passada\)/).includes(titleOf(75)) && modOf(w.SEX, /^Selar Fio 2 \(sem\. passada\)/).includes(titleOf(78)) && modOf(w.DOM, /^Selar Fio 4 \(sem\. passada\)/).includes(titleOf(76)), [w.QUA, w.QUI, w.SEX, w.DOM].map(d => (d.blocks.find(b => /^Selar Fio/.test(b.text)) || {}).text || '—').map(t => t.slice(0, 26)).join(' | '));
+        check('P5a QUA 23/09: "Fio 4 (sem. passada) · toque 2" resolve o Fio 4 da semana passada (' + titleOf(68) + ')', modOf(w.QUA, /^Fio 4 \(sem\. passada\) · toque 2/).includes(titleOf(68)), modOf(w.QUA, /^Fio 4 \(sem/).slice(0, 60));
+        check('P5a QUI 24/09: "Fio 4 (sem. passada) · toque 3" (apostila) resolve o mesmo módulo', modOf(w.QUI, /^Fio 4 \(sem\. passada\) · toque 3/).includes(titleOf(68)));
+        check('P2 selagens por fio, +3d da apostila: QUA sela Fio 1 (' + codeOf(69) + '), QUI Fio 3 (' + codeOf(67) + '), SEX Fio 2 (' + codeOf(70) + '), DOM Fio 4 (' + codeOf(68) + ')', modOf(w.QUA, /^Selar Fio 1 \(sem\. passada\)/).includes(titleOf(69)) && modOf(w.QUI, /^Selar Fio 3 \(sem\. passada\)/).includes(titleOf(67)) && modOf(w.SEX, /^Selar Fio 2 \(sem\. passada\)/).includes(titleOf(70)) && modOf(w.DOM, /^Selar Fio 4 \(sem\. passada\)/).includes(titleOf(68)), [w.QUA, w.QUI, w.SEX, w.DOM].map(d => (d.blocks.find(b => /^Selar Fio/.test(b.text)) || {}).text || '—').map(t => t.slice(0, 26)).join(' | '));
         check('P2 cada selagem é um bloco próprio de 40min com "% da selagem"; nenhum bloco "Selar os fios FECHADOS"', DAYS.every(d => w[d].blocks.filter(b => /^Selar Fio/.test(b.text)).every(b => b.time === '40min' && /o % da selagem agenda/.test(b.text))) && !DAYS.some(d => has(w[d], /FECHADOS/)));
-        check('P1 fio FECHADO (3 checks) não volta como fio novo; Fio 4 de ontem não vira fio novo', !DAYS.some(d => w[d].blocks.some(b => /^Fio \d · toque 1/.test(b.text) && [77, 78, 75, 76].some(id => b.mod.includes(titleOf(id))))), DAYS.map(d => w[d].blocks.filter(b => /^Fio \d · toque 1/.test(b.text)).map(b => b.mod.split('|')[0].trim().slice(0, 22))).flat().join(' / '));
-        check('P1 módulo com aula marcada e questões pendentes entra PRIMEIRO: Fio 1 = ' + titleOf(70) + ', com a dica "✍️ aula vista → questões"', modOf(w.QUI, /^Fio 1 · toque 1/).includes(titleOf(70)) && /✍️/.test(hintOf(w.QUI, /^Fio 1 · toque 1/)), modOf(w.QUI, /^Fio 1 · toque 1/).slice(0, 80));
+        check('P1 fio FECHADO (3 checks) não volta como fio novo; Fio 4 de ontem não vira fio novo', !DAYS.some(d => w[d].blocks.some(b => /^Fio \d · toque 1/.test(b.text) && [69, 70, 67, 68].some(id => b.mod.includes(titleOf(id))))), DAYS.map(d => w[d].blocks.filter(b => /^Fio \d · toque 1/.test(b.text)).map(b => b.mod.split('|')[0].trim().slice(0, 22))).flat().join(' / '));
+        check('P1 módulo com aula marcada e questões pendentes entra PRIMEIRO (antes dos mais recentes, ' + codeOf(71) + '/' + codeOf(72) + '): Fio 1 = ' + titleOf(65) + ', com a dica "✍️ aula vista → questões"', modOf(w.QUI, /^Fio 1 · toque 1/).includes(titleOf(65)) && /✍️/.test(hintOf(w.QUI, /^Fio 1 · toque 1/)), modOf(w.QUI, /^Fio 1 · toque 1/).slice(0, 80));
         const cfg = await getLS(page, CFG);
-        check('P1 snapshot da semana 21/10 gravado com 4 ids, o 1º = ' + titleOf(70), cfg.fioWeek && Array.isArray(cfg.fioWeek['2026-10-21']) && cfg.fioWeek['2026-10-21'].length === 4 && cfg.fioWeek['2026-10-21'][0] === 70 && cfg.fioWeek['2026-10-14'].join() === '77,78,75,76', JSON.stringify(cfg.fioWeek));
-        check('P6 (24/09) QUA 21/10: "Selar Bloco A/B da semana passada" (20min cada, antes do priming) com tarefa etiquetada da semana 41 (' + wk41.map(codeOf).join('/') + ')', (() => { const a = w.QUA.blocks[idx(w.QUA, /^Selar Bloco A da semana passada/)], b = w.QUA.blocks[idx(w.QUA, /^Selar Bloco B da semana passada/)]; return !!a && !!b && a.time === '20min' && a.tasks.join('|') === 'Selagem ✓ · A · ' + codeOf(wk41[0]) && b.tasks.join('|') === 'Selagem ✓ · B · ' + codeOf(wk41[1]) && idx(w.QUA, /^Selar Bloco B/) < idx(w.QUA, /10 questões pré-aula/); })(), w.QUA.blocks.filter(b => /^Selar Bloco/.test(b.text)).map(b => b.tasks.join('|')).join(' || '));
+        check('P1 snapshot da semana 23/09 gravado com 4 ids, o 1º = ' + titleOf(65), cfg.fioWeek && Array.isArray(cfg.fioWeek['2026-09-23']) && cfg.fioWeek['2026-09-23'].length === 4 && cfg.fioWeek['2026-09-23'][0] === 65 && cfg.fioWeek['2026-09-16'].join() === '69,70,67,68', JSON.stringify(cfg.fioWeek));
+        check('P6 (24/09) QUA 23/09: "Selar Bloco A/B da semana passada" (20min cada, antes do priming) com tarefa etiquetada da semana 37 (' + wk37.map(codeOf).join('/') + ')', (() => { const a = w.QUA.blocks[idx(w.QUA, /^Selar Bloco A da semana passada/)], b = w.QUA.blocks[idx(w.QUA, /^Selar Bloco B da semana passada/)]; return !!a && !!b && a.time === '20min' && a.tasks.join('|') === 'Selagem ✓ · A · ' + codeOf(wk37[0]) && b.tasks.join('|') === 'Selagem ✓ · B · ' + codeOf(wk37[1]) && idx(w.QUA, /^Selar Bloco B/) < idx(w.QUA, /10 questões pré-aula/); })(), w.QUA.blocks.filter(b => /^Selar Bloco/.test(b.text)).map(b => b.tasks.join('|')).join(' || '));
         check('P3 revogado (24/09) semana de simulado: TER sem D6 e sem selagem; SEG tem D5 + apostila B, sem D6', !has(w.TER, /D6 · Tarde/) && !has(w.TER, /Selar/) && !has(w.SEG, /D6 · Tarde/) && has(w.SEG, /Apostila do Bloco B pelos erros de domingo/), 'TER: ' + w.TER.blocks.map(b => b.tag).join(','));
         check('T4 D5/D6 sem "registre o %" (etapa de execução, não de registro)', !DAYS.some(d => w[d].blocks.some(b => /questões por conteúdo Bloco [AB].*registre o %/.test(b.text))));
         const tk = (d, re) => (d.blocks[idx(d, re)] || { tasks: ['(bloco ausente)'] }).tasks.join('+');
         check('T1/T2 tarefas: Fio 1 toque 1 → "✓ Aula 1.5x + resumo (toque 1) ✓" (já marcada: o módulo entrou como Fio 1 justamente por ter a aula vista — P1)', tk(w.QUI, /^Fio 1 · toque 1/) === '✓ Aula 1.5x + resumo (toque 1) ✓' && w.QUI.blocks[idx(w.QUI, /^Fio 1 · toque 1/)].done === true, tk(w.QUI, /^Fio 1 · toque 1/));
         check('T1 tarefas: Fio 4 (sem. passada) toque 2 → "D2 · 30q (toque 2) ✓"; toque 3 → "Apostila pelos erros (toque 3) ✓"', tk(w.QUA, /^Fio 4 \(sem/) === 'D2 · 30q (toque 2) ✓' && tk(w.QUI, /^Fio 4 \(sem/) === 'Apostila pelos erros (toque 3) ✓', tk(w.QUA, /^Fio 4 \(sem/) + ' | ' + tk(w.QUI, /^Fio 4 \(sem/));
-        check('T1 tarefas: "Selar Fio 1 (sem. passada)" → "Selagem ✓"; presencial → "Aula presencial ✓ · A · …" + "· B · …" (BUG 1)', tk(w.QUA, /^Selar Fio 1/) === 'Selagem ✓' && /^Aula presencial ✓ · A · \w+\+Aula presencial ✓ · B · \w+$/.test(tk(w.QUA, /Aula presencial/)), tk(w.QUA, /Aula presencial/));
+        check('T1 tarefas: "Selar Fio 1 (sem. passada)" → "Selagem ✓"; presencial → "Aula presencial ✓ · A · …" + "· B · …" + "· C · …" (BUG 1; a Sem.38 tem 3 blocos)', tk(w.QUA, /^Selar Fio 1/) === 'Selagem ✓' && /^Aula presencial ✓ · A · \w+\+Aula presencial ✓ · B · \w+\+Aula presencial ✓ · C · \w+$/.test(tk(w.QUA, /Aula presencial/)), tk(w.QUA, /Aula presencial/));
         check('T1 sem tarefa (✓ manual): Anki, D1 priming, D+1, D5/D6, REV adaptativa, D7 prova/correção', tk(w.QUA, /^Anki/) === '' && tk(w.QUA, /^D1 · 10 questões/) === '' && tk(w.QUA, /^D\+1/) === '' && tk(w.SEG, /D5 · Manhã/) === '' && tk(w.SEG, /Revisão adaptativa/) === '' && tk(w.SEX, /SIMULADO NA ÍNTEGRA/) === '' && tk(w.SEX, /CORREÇÃO DO SIMULADO/) === '', [w.QUA, w.SEG, w.SEX].map(d => d.blocks.map(b => b.tasks.length).join('')).join(' | '));
         // P5b aviso de viabilidade (ritmo 4, sem plantões)
-        let fit = await page.evaluate(() => ([...document.querySelectorAll('span')].map(s => s.textContent.trim()).find(t => /^⚠️ Ritmo \d não cabe/.test(t)) || ''));
-        check('P5b cabeçalho (semana de simulado 23/10): "⚠️ Ritmo 4 não cabe nesta semana (X dias acima de 8h · 0 plantões). Sugestão: ritmo Z (ainda K dias acima de 8h — mova blocos)."', /^⚠️ Ritmo 4 não cabe nesta semana \(\d dias acima de 8h · 0 plantões\)\. Sugestão: ritmo [123]( \(ainda \d dias acima de 8h — mova blocos\))?\.$/.test(fit), fit);
+        let fit = await page.evaluate(() => ([...document.querySelectorAll('span')].map(s => s.textContent.trim()).find(t => /^⚠️ (Semana com \d blocos .*: ritmo|Ritmo) \d não cabe/.test(t)) || ''));
+        check('P5b cabeçalho (semana de simulado 25/09, 3 blocos, 2 plantões): "⚠️ Semana com 3 blocos (A, B, C — 3 cascatas completas): ritmo 4 não cabe nesta semana (X dias acima de 8h · 2 plantões). Sugestão: ritmo Z (ainda K dias acima de 8h — mova blocos). Os blocos da semana têm prioridade…"', /^⚠️ Semana com 3 blocos \(A, B, C — 3 cascatas completas\): ritmo 4 não cabe nesta semana \(\d dias acima de 8h · 2 plantões\)\. Sugestão: ritmo [123]( \(ainda \d dias acima de 8h — mova blocos\))?\. Os blocos da semana têm prioridade sobre o desatraso — o app não corta etapa de bloco\.$/.test(fit), fit);
         const sug = Number((fit.match(/Sugestão: ritmo (\d)/) || [])[1]);
         const over4 = DAYS.filter(d => hoursOf(w[d]) > 8).length;
         check('P5b conta os dias > 8h da semana visível no ritmo 4 (' + over4 + ')', new RegExp('\\(' + over4 + ' dias').test(fit), DAYS.map(d => d + '=' + fmtH(hoursOf(w[d]))).join(' '));
@@ -505,35 +484,35 @@ async function scenario(browser, name, dateISO, seeds, fn) {
         await page.evaluate((s) => { const b = [...document.querySelectorAll('button')].find(b => b.innerText.trim() === 'Aplicar ritmo ' + s); if (b) b.click(); }, sug);
         await page.waitForTimeout(400);
         const cfg2 = await getLS(page, CFG);
-        const fit2 = await page.evaluate(() => ([...document.querySelectorAll('span')].map(s => s.textContent.trim()).find(t => /^⚠️ Ritmo \d não cabe/.test(t)) || ''));
+        const fit2 = await page.evaluate(() => ([...document.querySelectorAll('span')].map(s => s.textContent.trim()).find(t => /^⚠️ (Semana com \d blocos .*: ritmo|Ritmo) \d não cabe/.test(t)) || ''));
         const w2 = await dumpWeek(page);
         const over2 = DAYS.filter(d => hoursOf(w2[d]) > 8).length;
         const predicted = Number((fit.match(/ainda (\d) dias/) || [])[1] || 0);
-        check('P5b botão "Aplicar ritmo ' + sug + '" grava config.catchupPace = ' + sug + '; o novo aviso conta exatamente os dias > 8h da tela (' + over2 + ') = o que foi previsto ("ainda ' + predicted + '") — semana de simulado não cabe em ritmo nenhum, o app diz e ela decide', cfg2.catchupPace === sug && over2 === predicted && (over2 <= 1 ? fit2 === '' : new RegExp('^⚠️ Ritmo ' + sug + ' não cabe nesta semana \\(' + over2 + ' dias').test(fit2)), 'pace=' + cfg2.catchupPace + ' aviso="' + fit2 + '" ' + DAYS.map(d => d + '=' + fmtH(hoursOf(w2[d]))).join(' '));
+        check('P5b botão "Aplicar ritmo ' + sug + '" grava config.catchupPace = ' + sug + '; o novo aviso conta exatamente os dias > 8h da tela (' + over2 + ') = o que foi previsto ("ainda ' + predicted + '") — semana de simulado não cabe em ritmo nenhum, o app diz e ela decide', cfg2.catchupPace === sug && over2 === predicted && (over2 <= 1 ? fit2 === '' : new RegExp('(^⚠️ R|: r)itmo ' + sug + ' não cabe nesta semana \\(' + over2 + ' dias').test(fit2)), 'pace=' + cfg2.catchupPace + ' aviso="' + fit2 + '" ' + DAYS.map(d => d + '=' + fmtH(hoursOf(w2[d]))).join(' '));
         const cfgS = await getLS(page, CFG);
-        check('applyPace: ao baixar o ritmo, o snapshot da semana corrente encolhe para ' + sug + ' ids (fios não abertos saem do plano)', Array.isArray(cfgS.fioWeek['2026-10-21']) && cfgS.fioWeek['2026-10-21'].length === sug, JSON.stringify(cfgS.fioWeek['2026-10-21']));
-        // T7 % do simulado (SEX 23/10, bloco de correção)
+        check('applyPace: ao baixar o ritmo, o snapshot da semana corrente encolhe para ' + sug + ' ids (fios não abertos saem do plano)', Array.isArray(cfgS.fioWeek['2026-09-23']) && cfgS.fioWeek['2026-09-23'].length === sug, JSON.stringify(cfgS.fioWeek['2026-09-23']));
+        // T7 % do simulado (SEX 25/09, bloco de correção)
         await clickDay(page, 'SEX');
         const sx = await readDay(page);
         check('T7 bloco de correção do simulado tem o campo "% do simulado" com a nota "acompanhamento entre provas — não calibra o motor"', sx.blocks[idx(sx, /CORREÇÃO DO SIMULADO/)].pctInputs.length === 1 && await page.evaluate(() => /📈 % do simulado:.*acompanhamento entre provas — não calibra o motor/s.test(document.body.innerText)));
         await typeBlockPct(page, /CORREÇÃO DO SIMULADO/, 62);
         const cfg3 = await getLS(page, CFG);
-        check('T7 digitar 62 grava config.simResults["2026-10-23"] = 62', cfg3.simResults && cfg3.simResults['2026-10-23'] === 62, JSON.stringify(cfg3.simResults));
+        check('T7 digitar 62 grava config.simResults["2026-09-25"] = 62', cfg3.simResults && cfg3.simResults['2026-09-25'] === 62, JSON.stringify(cfg3.simResults));
     });
 
     // ── S10b: 14–20/10 ritmo 4 — selagens/cascata cruzada vindas de 07–13/10 (sem snapshot → ordem legada) + aviso ──
     await scenario(browser, 'S10b-post-1410-p4', '2026-10-15', { [CFG]: { ...baseCfg, catchupPace: 4 } }, async (page) => {
-        const w = await dumpWeek(page);
+        const w = await dumpWeek(page, DAYS41);
         check('P2/P5a sem snapshot da semana passada: QUA 14/10 fecha o Fio 4 de 07–13/10 (Bônus Antibioticoterapia) e sela o Fio 1 (Endocardite); QUI sela Fio 3 (AIDS); SEX Fio 2 (Sofrimento Fetal); DOM Fio 4', /Antibioticoterapia/.test(modOf(w.QUA, /^Fio 4 \(sem/)) && /Endocardite/.test(modOf(w.QUA, /^Selar Fio 1/)) && /AIDS/.test(modOf(w.QUI, /^Selar Fio 3/)) && /Sofrimento Fetal/.test(modOf(w.SEX, /^Selar Fio 2/)) && /Antibioticoterapia/.test(modOf(w.DOM, /^Selar Fio 4/)), [modOf(w.QUA, /^Fio 4 \(sem/), modOf(w.QUA, /^Selar Fio 1/), modOf(w.QUI, /^Selar Fio 3/), modOf(w.SEX, /^Selar Fio 2/), modOf(w.DOM, /^Selar Fio 4/)].map(t => t.split('|')[0].trim().slice(0, 28)).join(' | '));
-        check('Cobertura G2/POST (ritmo 4, rebalanceado 24/09): Fio 1 QUI→SÁB→DOM · Fio 2 DOM→SEG→TER · Fio 3 SÁB→DOM→SEG · Fio 4 TER (+QUA/QUI seguintes); SEX sem toque', has(w.QUI, /^Fio 1 · toque 1/) && has(w.SAB, /^Fio 1 · toque 2/) && has(w.DOM, /^Fio 1 · toque 3/) && has(w.DOM, /^Fio 2 · toque 1/) && has(w.SEG, /^Fio 2 · toque 2/) && has(w.TER, /^Fio 2 · toque 3/) && has(w.SAB, /^Fio 3 · toque 1/) && has(w.DOM, /^Fio 3 · toque 2/) && has(w.SEG, /^Fio 3 · toque 3/) && has(w.TER, /^Fio 4 · toque 1/) && !has(w.SEX, /^Fio [1-4] · toque/), DAYS.map(d => d + ':' + w[d].blocks.filter(b => /^Fio \d · /.test(b.text)).map(b => b.text.slice(0, 14)).join('/')).join(' '));
+        check('Cobertura G2/POST (ritmo 4, rebalanceado 24/09) na Sem.41 de 6 dias: Fio 1 QUI→SÁB→DOM · Fio 2 DOM→SEG · Fio 3 SÁB→DOM→SEG; SEX sem toque (o que caía na TER 20/10 — Fio 2 toque 3, Fio 4 — saiu com a TER: o motor antigo não atua na Trilha)', has(w.QUI, /^Fio 1 · toque 1/) && has(w.SAB, /^Fio 1 · toque 2/) && has(w.DOM, /^Fio 1 · toque 3/) && has(w.DOM, /^Fio 2 · toque 1/) && has(w.SEG, /^Fio 2 · toque 2/) && has(w.SAB, /^Fio 3 · toque 1/) && has(w.DOM, /^Fio 3 · toque 2/) && has(w.SEG, /^Fio 3 · toque 3/) && !has(w.SEX, /^Fio [1-4] · toque/) && !DAYS41.some(d => has(w[d], /^Fio 4 · toque 1/)), DAYS41.map(d => d + ':' + w[d].blocks.filter(b => /^Fio \d · /.test(b.text)).map(b => b.text.slice(0, 14)).join('/')).join(' '));
         check('P6 (24/09) QUA 14/10: "Selar Bloco A/B da semana passada" com tarefas A/B da semana 40 (' + wk40.map(codeOf).join(' e ') + ')', (() => { const a = w.QUA.blocks[idx(w.QUA, /^Selar Bloco A da semana passada/)], b = w.QUA.blocks[idx(w.QUA, /^Selar Bloco B da semana passada/)]; return !!a && !!b && a.tasks.join('|') === 'Selagem ✓ · A · ' + codeOf(wk40[0]) && b.tasks.join('|') === 'Selagem ✓ · B · ' + codeOf(wk40[1]); })(), w.QUA.blocks.filter(b => /^Selar Bloco/.test(b.text)).map(b => b.tasks.join('|')).join(' || '));
         const fit = await page.evaluate(() => ([...document.querySelectorAll('span')].map(s => s.textContent.trim()).find(t => /^⚠️ Ritmo \d não cabe/.test(t)) || ''));
-        check('P5b 14–20/10 no ritmo 4: aviso presente e coerente (dias > 8h na tela: ' + DAYS.filter(d => hoursOf(w[d]) > 8).length + ') · sugestão = ritmo 3 (o maior que cabe após o rebalanceamento)', new RegExp('^⚠️ Ritmo 4 não cabe nesta semana \\(' + DAYS.filter(d => hoursOf(w[d]) > 8).length + ' dias acima de 8h · 0 plantões\\)\\. Sugestão: ritmo 3\\.$').test(fit), fit + ' · ' + DAYS.map(d => d + '=' + fmtH(hoursOf(w[d]))).join(' '));
+        check('P5b 14–19/10 no ritmo 4: aviso presente e coerente (dias > 8h na tela: ' + DAYS41.filter(d => hoursOf(w[d]) > 8).length + ') · sugestão = ritmo 3 (o maior que cabe após o rebalanceamento)', new RegExp('^⚠️ Ritmo 4 não cabe nesta semana \\(' + DAYS41.filter(d => hoursOf(w[d]) > 8).length + ' dias acima de 8h · 0 plantões\\)\\. Sugestão: ritmo 3\\.$').test(fit), fit + ' · ' + DAYS41.map(d => d + '=' + fmtH(hoursOf(w[d]))).join(' '));
     });
     await scenario(browser, 'S10c-post-1410-p2', '2026-10-15', { [CFG]: { ...baseCfg, catchupPace: 2 } }, async (page) => {
-        const w = await dumpWeek(page);
+        const w = await dumpWeek(page, DAYS41);
         const fit = await page.evaluate(() => ([...document.querySelectorAll('span')].map(s => s.textContent.trim()).find(t => /^⚠️ Ritmo \d não cabe/.test(t)) || ''));
-        check('P5b 14–20/10 no ritmo 2: sem aviso de viabilidade (≤1 dia acima de 8h)', fit === '' && DAYS.filter(d => hoursOf(w[d]) > 8).length <= 1, DAYS.map(d => d + '=' + fmtH(hoursOf(w[d]))).join(' '));
+        check('P5b 14–19/10 no ritmo 2: sem aviso de viabilidade (≤1 dia acima de 8h)', fit === '' && DAYS41.filter(d => hoursOf(w[d]) > 8).length <= 1, DAYS41.map(d => d + '=' + fmtH(hoursOf(w[d]))).join(' '));
         check('P2 ritmo 2: SEX 16/10 recebe "Selar Fio 2 (sem. passada)" e, após o rebalanceamento, fica ≤ 8h (sem 📚 — a sinalização de 15/09 se resolve); QUI/DOM/QUA sem selagens de ritmo 4', has(w.SEX, /^Selar Fio 2 \(sem\. passada\)/) && hoursOf(w.SEX) <= 8 + 1e-9 && !w.SEX.warn.some(t => /📚/.test(t)) && !has(w.QUI, /^Selar Fio 3/) && !has(w.DOM, /^Selar Fio 4/) && !has(w.QUA, /^Fio 4 \(sem/), 'SEX=' + fmtH(hoursOf(w.SEX)) + ' ' + w.SEX.warn.join(' · '));
     });
 
@@ -596,16 +575,17 @@ async function scenario(browser, name, dateISO, seeds, fn) {
         check('T5 aba Desatraso: linha do módulo ' + titleOf(70).slice(0, 25) + ' (D2 marcado, 55%) mostra "% de acerto no D2"', desat.d2 && await page.evaluate(() => [...document.querySelectorAll('input[placeholder="%"]')].some(i => i.value === '55')), JSON.stringify(desat));
     });
 
-    // ── S12: P7 — CATCHUP trava o ritmo em 2 ──
-    await scenario(browser, 'S12-catchup-ritmo-2811', '2026-11-28', { [CFG]: { ...baseCfg, catchupPace: 4 } }, async (page) => {
-        await clickTab(page, 'DESATRASO');
-        const t = await bodyText(page);
-        check('P7 aba Desatraso: "esta fase agenda 2 fios (A e B)" e "Ritmo de desatraso (travado …): 2 módulos/semana"; MATÉRIAS DESTA SEMANA (2)', /esta fase agenda 2 fios \(A e B\)/.test(t) && /Ritmo de desatraso \(travado — esta fase agenda 2 fios \(A e B\)\): 2 módulos\/semana/.test(t) && /MATÉRIAS DESTA SEMANA \(2\)/.test(t) && /ritmo atual: 2\/sem/.test(t), (t.match(/MATÉRIAS DESTA SEMANA \(\d\)/) || [''])[0] + ' · ' + (t.match(/ritmo atual: \d\/sem/) || [''])[0]);
-        await page.evaluate(() => { const b = [...document.querySelectorAll('button')].find(b => b.innerText.trim() === '3/sem'); if (b) b.click(); });
-        await page.waitForTimeout(300);
-        const cfg = await getLS(page, CFG);
-        const rows = await page.evaluate(() => [...document.querySelectorAll('div')].filter(d => d.style && d.style.borderRadius === '8px' && d.style.padding === '10px' && /Sem\.\d+/.test(d.textContent) && /Duração da aula/.test(d.textContent)).length);
-        check('P7 tocar "3/sem" não muda o ritmo (config.catchupPace segue 4, ignorado na fase); planejador mostra 2 fios', cfg.catchupPace === 4 && rows === 2, 'pace=' + cfg.catchupPace + ' rows=' + rows);
+    // ── S12 (Trilha, 20/10 — antes: ritmo travado na CATCHUP): rampa editada acima no bloco 04h30 é segurada; a aba diz o motivo ──
+    await scenario(browser, 'S12-trilha-rampa-2811', '2026-11-28', { [CFG]: { ...baseCfg, trilhaRamp: { '2026-12-01': 5 } } }, async (page) => {
+        await clickTab(page, 'TRILHA');
+        const row = async (tue) => page.evaluate((t) => { const e = document.querySelector('[data-tue="' + t + '"]'); return e ? { text: e.innerText.replace(/\n/g, ' '), btns: [...e.querySelectorAll('button')].map(b => b.innerText.trim()) } : null; }, tue);
+        const r7 = await row('2026-12-01'), r6 = await row('2026-11-24');
+        check('T7 (01–07/12, bloco 04h30) com rampa 5: "prévia: 4 novo(s) (segura: bloco 04h30)" — o ritmo não sobe no 04h30', !!r7 && /T7 · 01\/12–07\/12 − 5 \+ prévia: 4 novo\(s\) \(segura: bloco 04h30\)/.test(r7.text), r7 && r7.text);
+        check('T6 congelada: sem − / +', !!r6 && !r6.btns.length && /congelada/.test(r6.text), r6 && r6.text);
+        await page.evaluate(() => { const b = [...document.querySelector('[data-tue="2026-12-01"]').querySelectorAll('button')].find(x => x.innerText.trim() === '−'); b.click(); }); await page.waitForTimeout(300);
+        const cfg = await getLS(page, CFG); const r7b = await row('2026-12-01');
+        check('"−" na T7: trilhaRamp[01/12] = 4 e a linha deixa de dizer "segura"', cfg.trilhaRamp['2026-12-01'] === 4 && /− 4 \+ prévia: 4 novo\(s\)$/.test(r7b.text), r7b.text);
+        check('nenhum ritmo do desatraso na aba (sem "1/sem…4/sem", sem "Ritmo de desatraso")', !/Ritmo de desatraso|\b[1-4]\/sem\b/.test(await bodyText(page)));
     });
 
     // ── S13: P8 — botão do simulado na sexta de plantão 09/10 ──
@@ -631,13 +611,7 @@ async function scenario(browser, name, dateISO, seeds, fn) {
     });
 
 
-    // ── S15: fronteira POST→CATCHUP no ritmo 4 (snapshot do POST com 4 fios): cascata cruzada + 4 selagens + Fio A/B da CATCHUP ──
-    await scenario(browser, 'S15-fronteira-catchup-p4', '2026-11-26', { [CFG]: { ...baseCfg, catchupPace: 4, fioWeek: { '2026-11-18': [83, 85, 87, 88] } } }, async (page) => {
-        const w = await dumpWeek(page);
-        check('Fronteira ritmo 4: QUA 25/11 fecha o Fio 4 do POST (toque 2 → ' + titleOf(88).slice(0, 20) + ') e sela o Fio 1 (' + titleOf(83).slice(0, 20) + '); QUI toque 3 + Selar Fio 3 (' + titleOf(87).slice(0, 18) + '); SEX Selar Fio 2 (' + titleOf(85).slice(0, 18) + '); DOM Selar Fio 4', modOf(w.QUA, /^Fio 4 \(sem\. passada\) · toque 2/).includes(titleOf(88)) && modOf(w.QUA, /^Selar Fio 1 \(sem/).includes(titleOf(83)) && modOf(w.QUI, /^Fio 4 \(sem\. passada\) · toque 3/).includes(titleOf(88)) && modOf(w.QUI, /^Selar Fio 3 \(sem/).includes(titleOf(87)) && modOf(w.SEX, /^Selar Fio 2 \(sem/).includes(titleOf(85)) && modOf(w.DOM, /^Selar Fio 4 \(sem/).includes(titleOf(88)), DAYS.map(d => d + ':' + w[d].blocks.filter(b => /sem\. passada/.test(b.text)).map(b => b.text.slice(0, 20)).join('/')).join(' '));
-        check('Fronteira ritmo 4: Fio A/B da CATCHUP presentes (QUA aula A, DOM aula B), sem "Selar o Fio A/B da semana passada", ritmo travado em 2', has(w.QUA, /^Fio A · toque 1/) && has(w.DOM, /^Fio B · toque 1/) && !DAYS.some(d => w[d].blocks.some(b => /Selar o Fio [AB] da semana passada/.test(b.text))) && !DAYS.some(d => w[d].blocks.some(b => /^Fio [1-4] · toque 1/.test(b.text))), DAYS.map(d => d + '=' + fmtH(hoursOf(w[d]))).join(' '));
-        check('Fronteira ritmo 4: o Fio 4 cruzado (' + titleOf(88).slice(0, 20) + ') não vira Fio A/B novo (carry)', !modOf(w.QUA, /^Fio A · toque 1/).includes(titleOf(88)) && !modOf(w.DOM, /^Fio B · toque 1/).includes(titleOf(88)), modOf(w.QUA, /^Fio A/).slice(0, 30) + ' | ' + modOf(w.DOM, /^Fio B/).slice(0, 30));
-    });
+    // S15-fronteira-catchup-p4 APOSENTADO (Trilha, 20/10): a fronteira POST→CATCHUP de 25/11 deixou de existir (motor antigo desligado a partir de 20/10; decisões 13/26/31 superadas na Trilha).
 
 
     // ══════════ PR #6 ══════════
@@ -647,87 +621,100 @@ async function scenario(browser, name, dateISO, seeds, fn) {
     const proposalOf = (page) => page.evaluate(() => ([...document.querySelectorAll('span')].map(s => s.textContent.trim()).find(t => /^💡 /.test(t)) || ''));
     const clickBtn = (page, label) => page.evaluate((l) => { const b = [...document.querySelectorAll('button')].find(b => b.innerText.trim() === l); if (!b) return false; b.click(); return true; }, label);
     await scenario(browser, 'S16-selagem-adiantada-1510', '2026-10-15', { [CFG]: { ...baseCfg, catchupPace: 2, fioWeek: { '2026-10-14': [77, 78] } }, [PRG]: SEAL77 }, async (page) => {
-        const w = await dumpWeek(page);
+        const w = await dumpWeek(page, DAYS41);
         check('BUG 2: Fio 1 (' + titleOf(77).slice(0, 18) + ') selado hoje → toque 2 (SÁB) e toque 3 (DOM) NÃO aparecem mais nos dias futuros', !has(w.SAB, /^Fio 1 · toque 2/) && !has(w.DOM, /^Fio 1 · toque 3/), 'SÁB: ' + w.SAB.blocks.map(b => b.tag).join(',') + ' | DOM: ' + w.DOM.blocks.map(b => b.tag).join(','));
         check('BUG 2: o dia de hoje (QUI) mantém "Fio 1 · toque 1" como histórico, ✓', has(w.QUI, /^Fio 1 · toque 1/) && w.QUI.blocks[idx(w.QUI, /^Fio 1 · toque 1/)].done === true);
-        check('BUG 2: Fio 2 (' + titleOf(78).slice(0, 10) + ') intacto (DOM aula · SEG questões · TER apostila); snapshot da semana preservado [77,78]', has(w.DOM, /^Fio 2 · toque 1/) && has(w.SEG, /^Fio 2 · toque 2/) && has(w.TER, /^Fio 2 · toque 3/) && (await getLS(page, CFG)).fioWeek['2026-10-14'].join() === '77,78');
+        check('BUG 2: Fio 2 (' + titleOf(78).slice(0, 10) + ') intacto (DOM aula · SEG questões; a apostila caía na TER 20/10, que saiu com a Trilha); snapshot da semana preservado [77,78]', has(w.DOM, /^Fio 2 · toque 1/) && has(w.SEG, /^Fio 2 · toque 2/) && (await getLS(page, CFG)).fioWeek['2026-10-14'].join() === '77,78');
         const banner = await bannerOf(page);
         check('FEATURE aviso: "🔄 Você adiantou as questões de Sem.40 ' + titleOf(77).slice(0, 12) + '… (+1). Sobrou espaço em SÁB 17/10, DOM 18/10. Quer preencher?" + botões', banner === '🔄 Você adiantou as questões de Sem.40 ' + titleOf(77) + ' (+1). Sobrou espaço em SÁB 17/10, DOM 18/10. Quer preencher?' && await page.evaluate(() => ['Ver sugestão', 'Manter como está'].every(l => [...document.querySelectorAll('button')].some(b => b.innerText.trim() === l))), banner);
         await clickBtn(page, 'Ver sugestão'); await page.waitForTimeout(300);
         const prop = await proposalOf(page);
-        check('FEATURE sugestão (opção 2): abrir o Fio 3 — ' + titleOf(75).slice(0, 22) + ' pela aula no DOM 18/10 (SÁB 17/10 é o dia leve → última preferência), questões SEG 19/10, apostila TER 20/10 e selagem SÁB 24/10 (+3d cai na SEX de simulado; SÁB 24/10 é dia normal — o leve daquela semana é a TER) — sem ⚠️ e sem 🌿', prop === '💡 Abrir o Fio 3 — Sem.39 ' + titleOf(75) + ': aula DOM 18/10 (4,7h) · questões SEG 19/10 (6,6h) · apostila TER 20/10 (5,6h) · selagem SÁB 24/10 (5,0h, sem. seguinte).' && !/⚠️|🌿/.test(prop), prop);
+        check('fronteira da Trilha: abrir um fio novo exigiria apostila/selagem a partir de 20/10 (a Trilha, onde o motor antigo não atua) → "Nada cabe…", sem "Aplicar" (antes: aula DOM 18/10 · questões SEG 19/10 · apostila TER 20/10 · selagem SÁB 24/10)', prop === '💡 Nada cabe sem quebrar a ordem aula→questões→apostila. Espaço protegido — descanse ou adiante o Anki.' && !(await page.evaluate(() => [...document.querySelectorAll('button')].some(b => b.innerText.trim() === 'Aplicar'))), prop);
+    });
+    // ── S16a: opção 2 aceita (re-datado na Trilha, 20/10: Sem.40, relógio 08/10) — abre o próximo fio pela aula, etapas na semana seguinte, nada a partir de 20/10 ──
+    const SEAL75 = { 75: { aula: true, questoesD2: true, apostila: true, smartcard: true, completedAt: '2026-10-08', accSelagem: 85 } };
+    await scenario(browser, 'S16a-opcao2-aplicada-0810', '2026-10-08', { [CFG]: { ...baseCfg, catchupPace: 2, fioWeek: { '2026-10-07': [75, 76] } }, [PRG]: SEAL75 }, async (page) => {
+        const banner = await bannerOf(page);
+        check('FEATURE aviso: "🔄 Você adiantou as questões de Sem.39 ' + titleOf(75).slice(0, 12) + '… (+1). Sobrou espaço em SÁB 10/10, DOM 11/10. Quer preencher?"', banner === '🔄 Você adiantou as questões de Sem.39 ' + titleOf(75) + ' (+1). Sobrou espaço em SÁB 10/10, DOM 11/10. Quer preencher?', banner);
+        await clickBtn(page, 'Ver sugestão'); await page.waitForTimeout(300);
+        const prop = await proposalOf(page);
+        check('FEATURE sugestão (opção 2): abrir o Fio 3 — ' + titleOf(74) + ' pela aula na SEG 12/10 (SÁB/DOM têm plantão), questões QUI 15/10, apostila SEX 16/10 e selagem SEG 19/10 (sem. seguinte, antes da Trilha) — sem ⚠️ e sem 🌿', prop === '💡 Abrir o Fio 3 — Sem.38 ' + titleOf(74) + ': aula SEG 12/10 (6,3h) · questões QUI 15/10 (8,0h, sem. seguinte) · apostila SEX 16/10 (8,0h, sem. seguinte) · selagem SEG 19/10 (5,3h, sem. seguinte).' && !/⚠️|🌿/.test(prop), prop);
         await clickBtn(page, 'Aplicar'); await page.waitForTimeout(400);
         const cfg = await getLS(page, CFG);
-        const w2 = await dumpWeek(page, ['DOM', 'SEG', 'TER']);
-        check('FEATURE aplicar: config.fioExtra[2026-10-14] = [{label 3, id 75, aula 4, quest 5, apost 6, seal 10}]; DOM ganha "Fio 3 · toque 1" (' + titleOf(75).slice(0, 14) + ') com tarefa "Aula 1.5x…"; SEG "toque 2", TER "toque 3"; aviso some', JSON.stringify(cfg.fioExtra) === '{"2026-10-14":[{"label":3,"id":75,"aula":4,"quest":5,"apost":6,"seal":10}]}' && modOf(w2.DOM, /^Fio 3 · toque 1/).includes(titleOf(75)) && w2.DOM.blocks[idx(w2.DOM, /^Fio 3 · toque 1/)].tasks.join() === 'Aula 1.5x + resumo (toque 1) ✓' && has(w2.SEG, /^Fio 3 · toque 2/) && has(w2.TER, /^Fio 3 · toque 3/) && (await bannerOf(page)) === '', JSON.stringify(cfg.fioExtra) + ' · ' + ['DOM', 'SEG', 'TER'].map(d => fmtH(hoursOf(w2[d]))).join('/'));
-        check('FEATURE aplicar: DOM, SEG e TER continuam ≤ 8h de estudo (nunca acima do limiar)', ['DOM', 'SEG', 'TER'].every(d => hoursOf(w2[d]) <= 8 + 1e-9), ['DOM', 'SEG', 'TER'].map(d => fmtH(hoursOf(w2[d]))).join(' / '));
-        await clickTab(page, 'DESATRASO');
+        await clickDay(page, 'SEG'); const seg = await readDay(page);
+        check('FEATURE aplicar: config.fioExtra[2026-10-07] = [{label 3, id 74, aula 5, quest 8, apost 9, seal 12}]; SEG 12/10 ganha "Fio 3 · toque 1" (' + titleOf(74) + ') com tarefa "Aula 1.5x…"; aviso some', JSON.stringify(cfg.fioExtra) === '{"2026-10-07":[{"label":3,"id":74,"aula":5,"quest":8,"apost":9,"seal":12}]}' && modOf(seg, /^Fio 3 · toque 1/).includes(titleOf(74)) && seg.blocks[idx(seg, /^Fio 3 · toque 1/)].tasks.join() === 'Aula 1.5x + resumo (toque 1) ✓' && (await bannerOf(page)) === '', JSON.stringify(cfg.fioExtra));
+        await H.navWeek(page, 1); const w41 = {}; for (const d of ['QUI', 'SEX', 'SEG']) { await clickDay(page, d); w41[d] = await readDay(page); }
+        check('semana seguinte (Sem.41): QUI 15/10 "Fio 3 (sem. passada) · toque 2", SEX 16/10 "· toque 3", SEG 19/10 "Selar Fio 3 (sem. passada)" — todos ' + titleOf(74) + ' e ≤ 8h de estudo', modOf(w41.QUI, /^Fio 3 \(sem\. passada\) · toque 2/).includes(titleOf(74)) && modOf(w41.SEX, /^Fio 3 \(sem\. passada\) · toque 3/).includes(titleOf(74)) && modOf(w41.SEG, /^Selar Fio 3 \(sem\. passada\)/).includes(titleOf(74)) && ['QUI', 'SEX', 'SEG'].every(d => hoursOf(w41[d]) <= 8 + 1e-9), ['QUI', 'SEX', 'SEG'].map(d => d + '=' + fmtH(hoursOf(w41[d]))).join(' '));
+        await H.navWeek(page, -1); await clickTab(page, 'DESATRASO');
         const td = await bodyText(page);
-        check('SINAL 3 aba Desatraso: fio extra listado em MATÉRIAS DESTA SEMANA (3) como "FIO 3 · sugestão" (' + titleOf(75).slice(0, 22) + ') — é onde ela marca o %', /MATÉRIAS DESTA SEMANA \(3\)/.test(td) && /FIO 3 · sugestão/.test(td) && td.indexOf(titleOf(75)) > -1, (td.match(/MATÉRIAS DESTA SEMANA \(\d\)/) || [''])[0] + ' · ' + (td.match(/FIO 3 · sugestão/) || ['(sem FIO 3)'])[0]);
+        check('SINAL 3 aba Desatraso: fio extra listado em MATÉRIAS DESTA SEMANA (3) como "FIO 3 · sugestão" (' + titleOf(74) + ') — é onde ela marca o %', /MATÉRIAS DESTA SEMANA \(3\)/.test(td) && /FIO 3 · sugestão/.test(td) && td.indexOf(titleOf(74)) > -1, (td.match(/MATÉRIAS DESTA SEMANA \(\d\)/) || [''])[0] + ' · ' + (td.match(/FIO 3 · sugestão/) || ['(sem FIO 3)'])[0]);
     });
-    await scenario(browser, 'S16b-fio-extra-semana-seguinte', '2026-10-22', { [CFG]: { ...baseCfg, catchupPace: 2, fioWeek: { '2026-10-14': [77, 78] }, fioExtra: { '2026-10-14': [{ label: 3, id: 75, aula: 4, quest: 5, apost: 6, seal: 10 }] } }, [PRG]: { ...SEAL77, 75: { aula: true, questoesD2: true, apostila: true } } }, async (page) => {
-        const w = await dumpWeek(page, ['QUA', 'QUI', 'SEX', 'SAB', 'DOM', 'SEG', 'TER']);
-        check('FEATURE semana seguinte: SÁB 24/10 tem "Selar Fio 3 (sem. passada)" (' + titleOf(75).slice(0, 14) + '); QUA/QUI/DOM/SEG sem o extra', modOf(w.SAB, /^Selar Fio 3 \(sem\. passada\)/).includes(titleOf(75)) && ['QUA', 'QUI', 'DOM', 'SEG'].every(d => !w[d].blocks.some(b => /Fio 3|Selar Fio 3/.test(b.text))), modOf(w.SAB, /^Selar Fio 3/).slice(0, 40));
-        check('SINAL 2 justificativa: +3d de TER 20/10 = SEX 23/10 (simulado, > 8h) → 1º dia normal que cabe = SÁB 24/10 (' + fmtH(hoursOf(w.SAB)) + ' com a selagem, ≤ 8h); o dia leve da semana é a TER', hoursOf(w.SAB) <= 8 + 1e-9 && w.TER.lightBadge, ['SEX', 'SAB', 'TER'].map(d => d + '=' + fmtH(hoursOf(w[d]))).join(' '));
-        check('FEATURE semana seguinte: o fio extra não é re-sorteado como fio novo (Fio 1/2 desta semana ≠ ' + titleOf(75).slice(0, 14) + ')', !modOf(w.QUI, /^Fio 1 · toque 1/).includes(titleOf(75)), modOf(w.QUI, /^Fio 1 · toque 1/).slice(0, 40));
-    });
+    // S16b-fio-extra-semana-seguinte APOSENTADO (Trilha, 20/10): o fio extra de 14/10 com selagem na semana seguinte (21–27/10) caía na Trilha, onde o motor antigo não atua; a mesma regra ("+3d cai na semana seguinte") segue coberta antes de 20/10 pelo S16a (Sem.40 → etapas na Sem.41) e pelo S16d (selagem "em 2 sem.").
     await scenario(browser, 'S16c-recusar-1510', '2026-10-15', { [CFG]: { ...baseCfg, catchupPace: 2, fioWeek: { '2026-10-14': [77, 78] } }, [PRG]: SEAL77 }, async (page) => {
-        const before = await dumpWeek(page, ['SEX', 'DOM', 'TER']);
+        const before = await dumpWeek(page, ['SEX', 'DOM', 'SEG']);
         const sig0 = await bannerOf(page);
         await clickBtn(page, 'Manter como está'); await page.waitForTimeout(300);
         const cfg = await getLS(page, CFG);
-        const after = await dumpWeek(page, ['SEX', 'DOM', 'TER']);
-        check('FEATURE recusar: nada muda nos dias (sem fioExtra/fioPlan), aviso registrado como recusado e some', sig0.startsWith('🔄') && (await bannerOf(page)) === '' && !cfg.fioExtra && !cfg.fioPlan && cfg.fillDismissed && cfg.fillDismissed['2026-10-14'] && ['SEX', 'DOM', 'TER'].every(d => JSON.stringify(after[d].blocks.map(b => b.text)) === JSON.stringify(before[d].blocks.map(b => b.text))), JSON.stringify(cfg.fillDismissed));
+        const after = await dumpWeek(page, ['SEX', 'DOM', 'SEG']);
+        check('FEATURE recusar: nada muda nos dias (sem fioExtra/fioPlan), aviso registrado como recusado e some', sig0.startsWith('🔄') && (await bannerOf(page)) === '' && !cfg.fioExtra && !cfg.fioPlan && cfg.fillDismissed && cfg.fillDismissed['2026-10-14'] && ['SEX', 'DOM', 'SEG'].every(d => JSON.stringify(after[d].blocks.map(b => b.text)) === JSON.stringify(before[d].blocks.map(b => b.text))), JSON.stringify(cfg.fillDismissed));
     });
     // ── S16d: SINAL 2 — semana seguinte toda > 8h: a proposta cai no 1º dia útil e avisa a carga (⚠️) ──
     const HEAVY = (iso, i) => [iso, [{ id: 'h' + i, d: 'EXTRA', color: '#0EA5E9', text: 'Bloco pesado de teste', time: '9h' }]];
-    await scenario(browser, 'S16d-aviso-carga-1510', '2026-10-15', { [CFG]: { ...baseCfg, catchupPace: 2, fioWeek: { '2026-10-14': [77, 78] } }, [PRG]: SEAL77, 'medplanner_schedule_v1': Object.fromEntries(['2026-10-21', '2026-10-22', '2026-10-23', '2026-10-25', '2026-10-26', '2026-10-27'].map(HEAVY)) }, async (page) => {
+    // (re-datado na Trilha, 20/10: Sem.39, relógio 01/10 — a semana seguinte original, 21–27/10, é a T1; premissa conferida idêntica no app de antes da Trilha)
+    const SEAL74 = { 74: { aula: true, questoesD2: true, apostila: true, smartcard: true, completedAt: '2026-10-01', accSelagem: 85 } };
+    await scenario(browser, 'S16d-aviso-carga-0110', '2026-10-01', { [CFG]: { ...baseCfg, catchupPace: 2, fioWeek: { '2026-09-30': [74, 92] } }, [PRG]: SEAL74, 'medplanner_schedule_v1': Object.fromEntries([HEAVY('2026-10-02', 0)]) }, async (page) => {
         await clickBtn(page, 'Ver sugestão'); await page.waitForTimeout(300);
         const prop = await proposalOf(page);
-        check('DECISÃO 2 (24/09): nenhum dia normal da semana seguinte cabe (todos 9h) → selagem em dia normal com ⚠️ (SEX 23/10) e não no SÁB 24/10 leve que caberia: "aula DOM 18/10 (4,7h) · questões SEG 19/10 (6,6h) · apostila TER 20/10 (6,1h) · selagem ⚠️ SEX 23/10 (9,7h, sem. seguinte)", sem 🌿', prop === '💡 Abrir o Fio 3 — Sem.39 ' + titleOf(75) + ': aula DOM 18/10 (4,7h) · questões SEG 19/10 (6,6h) · apostila TER 20/10 (5,6h) · selagem ⚠️ SEX 23/10 (9,7h, sem. seguinte).' && !/🌿/.test(prop), prop);
+        check('DECISÃO 2 (24/09): a aula vai para o dia normal com ⚠️ (SEX 02/10, editado a 9h) e NÃO para o DOM 04/10 leve que caberia; o dia leve só como último recurso (apostila 🌿 TER 13/10, com a nota) — "aula ⚠️ SEX 02/10 (10,7h) · questões SEG 12/10 · apostila 🌿 TER 13/10 · selagem SEX 16/10"', prop === '💡 Abrir o Fio 3 — Sem.38 ' + titleOf(73) + ': aula ⚠️ SEX 02/10 (10,7h) · questões SEG 12/10 (6,6h, sem. seguinte) · apostila 🌿 TER 13/10 (5,6h, sem. seguinte) · selagem SEX 16/10 (7,1h, em 2 sem.). 🌿 TER 13/10 é o dia leve da sem. seguinte (sem Venvanse)' && !/DOM 04\/10/.test(prop), prop);
         check('DECISÃO FINAL: "Aplicar" disponível mesmo com ⚠️; nada gravado antes de tocar', !(await getLS(page, CFG)).fioExtra && await page.evaluate(() => [...document.querySelectorAll('button')].some(b => b.innerText.trim() === 'Aplicar')));
         await clickBtn(page, 'Aplicar'); await page.waitForTimeout(400);
         const cfgD = await getLS(page, CFG);
-        check('DECISÃO FINAL: Aplicar grava a distribuição inteira de uma vez (aula 4 · quest 5 · apost 6 · seal 9), sem nova confirmação; aviso some', JSON.stringify(cfgD.fioExtra) === '{"2026-10-14":[{"label":3,"id":75,"aula":4,"quest":5,"apost":6,"seal":9}]}' && (await bannerOf(page)) === '', JSON.stringify(cfgD.fioExtra));
+        check('DECISÃO FINAL: Aplicar grava a distribuição inteira de uma vez (aula 2 · quest 12 · apost 13 · seal 16), sem nova confirmação; aviso some', JSON.stringify(cfgD.fioExtra) === '{"2026-09-30":[{"label":3,"id":73,"aula":2,"quest":12,"apost":13,"seal":16}]}' && (await bannerOf(page)) === '', JSON.stringify(cfgD.fioExtra));
         const schD = await page.evaluate(() => JSON.parse(localStorage.getItem('medplanner_schedule_v1') || '{}'));
-        check('SINAL 1: SEX 23/10 é dia editado à mão → a selagem entrou na lista editada ("Selar Fio 3 (sem. passada)"), sem tocar no bloco dela', (schD['2026-10-23'] || []).length === 2 && /^Selar Fio 3 \(sem\. passada\)/.test((schD['2026-10-23'][1] || {}).text || '') && schD['2026-10-23'][0].text === 'Bloco pesado de teste', JSON.stringify((schD['2026-10-23'] || []).map(b => b.text.slice(0, 26))));
+        check('SINAL 1: SEX 02/10 é dia editado à mão → a aula entrou na lista editada ("Fio 3 · toque 1"), sem tocar no bloco dela', (schD['2026-10-02'] || []).length === 2 && /^Fio 3 · toque 1/.test((schD['2026-10-02'][1] || {}).text || '') && schD['2026-10-02'][0].text === 'Bloco pesado de teste', JSON.stringify((schD['2026-10-02'] || []).map(b => b.text.slice(0, 26))));
     });
-    // ── S16e: SINAL 3 na FREE — fio extra aparece em MATÉRIAS DESTA SEMANA (7) como "FIO 7 · sugestão" ──
-    await scenario(browser, 'S16e-extra-free-1912', '2026-12-19', { [CFG]: { ...baseCfg, fioWeek: { '2026-12-16': [1, 2, 3, 4, 5, 6] }, fioExtra: { '2026-12-16': [{ label: 7, id: 7, aula: 4, quest: 5, apost: 6, seal: 9 }] } } }, async (page) => {
-        await clickTab(page, 'DESATRASO');
-        const td = await bodyText(page);
-        check('SINAL 3 FREE: MATÉRIAS DESTA SEMANA (7) — 6 do pipeline + "FIO 7 · sugestão" (' + titleOf(7).slice(0, 22) + ')', /MATÉRIAS DESTA SEMANA \(7\)/.test(td) && /FIO 7 · sugestão/.test(td) && td.indexOf(titleOf(7)) > -1, (td.match(/MATÉRIAS DESTA SEMANA \(\d\)/) || [''])[0] + ' · ' + (td.match(/FIO 7 · sugestão/) || ['(sem FIO 7)'])[0]);
+    // ── S16e (Trilha, 20/10 — antes: fio extra na FREE): semana fechada → ⏩ Adiantar → o módulo adiantado aparece no painel e na aba Trilha ──
+    await scenario(browser, 'S16e-trilha-adiantado-1912', '2026-12-15', {}, async (page, S) => {
+        await H.markUntil(page, '2026-12-21');
+        await page.evaluate(() => { const tr = JSON.parse(localStorage.getItem('medplanner_trail_v1')); Object.values(tr).forEach(r => Object.keys(r).forEach(k => { if (/At$/.test(k) && r[k] > '2026-12-19') r[k] = '2026-12-19'; })); localStorage.setItem('medplanner_trail_v1', JSON.stringify(tr)); }); // feito "adiantado" até hoje
+        page = await S.reopen('2026-12-19');
+        const adv = await banner(page, 'trilha-adv');
+        check('T9 toda marcada ⇒ "⏩ Adiantar próximo módulo"', !!adv && adv.btns.includes('⏩ Adiantar próximo módulo'), adv && adv.text);
+        await H.clickIn(page, 'trilha-adv', '⏩ Adiantar próximo módulo');
+        const pv = await banner(page, 'trilha-adv'); const go = pv.btns.find(b => b === 'Aplicar' || b === 'Começar agora');
+        check('proposta do Adiantar para o #6 (CIR3 Preparo Pré-operatório): dias de cada etapa e botão (Aplicar ou Começar agora)', /CIR3 Preparo Pré-operatório/.test(pv.text) && !!go, pv.text.replace(/\n/g, ' ').slice(0, 260));
+        await H.clickIn(page, 'trilha-adv', go);
+        const cfg = await getLS(page, CFG); const p = cfg.trilhaPlan[32] || {};
+        const panel = await page.evaluate(() => [...document.querySelectorAll('[data-t="trilha-panel"] [data-mod]')].map(e => e.getAttribute('data-kind') + ':' + e.getAttribute('data-mod')));
+        check('gravado: trilhaPlan[32].via = "adv", trilhaWeeks[15/12].adv = [32]; o painel da semana mostra "ADIANTADO" para o CIR3', p.via === 'adv' && JSON.stringify(cfg.trilhaWeeks['2026-12-15'].adv) === '[32]' && panel.some(x => /^adiantado:CIR3 · Preparo Pré-operatório/.test(x)), JSON.stringify(p) + ' | ' + panel.join(' | '));
+        await clickTab(page, 'TRILHA');
+        const wk = await page.evaluate(() => (document.querySelector('[data-t="trilha-week"]') || {}).innerText || '');
+        check('aba Trilha: MÓDULOS DESTA SEMANA (6) inclui o CIR3 adiantado', /MÓDULOS DESTA SEMANA \(6\)/.test(wk) && /Preparo Pré-operatório/.test(wk), (wk.match(/MÓDULOS DESTA SEMANA \(\d+\)/) || [''])[0]);
     });
     // ── S16f: selagem de fio extra que caiu "em 2 semanas" (dia 14) rende "Selar Fio 3 (há 2 sem.)" e não colide com o Fio 3 extra da semana passada ──
-    await scenario(browser, 'S16f-extra-ha-2-sem-2910', '2026-10-29', { [CFG]: { ...baseCfg, catchupPace: 2, fioWeek: { '2026-10-14': [77, 78], '2026-10-21': [80, 81] }, fioExtra: { '2026-10-07': [{ label: 3, id: 82, aula: 4, quest: 6, apost: 13, seal: 21 }], '2026-10-14': [{ label: 3, id: 75, aula: 4, quest: 6, apost: 11, seal: 14 }], '2026-10-21': [{ label: 3, id: 79, aula: 4, quest: 6, apost: 8, seal: 11 }] } }, [PRG]: { ...SEAL77, 75: { aula: true, questoesD2: true, apostila: true }, 79: { aula: true, questoesD2: true }, 82: { aula: true, questoesD2: true, apostila: true } } }, async (page) => {
+    // (re-datado na Trilha, 20/10: −14 dias — a semana original 28/10–03/11 é a T2; extras de 23/09 (há 3 sem.), 30/09 (há 2 sem.) e 07/10 (sem. passada) vistos na Sem.41)
+    await scenario(browser, 'S16f-extra-ha-2-sem-1510', '2026-10-15', { [CFG]: { ...baseCfg, catchupPace: 2, fioWeek: { '2026-09-30': [74, 92], '2026-10-07': [75, 76] }, fioExtra: { '2026-09-23': [{ label: 3, id: 71, aula: 4, quest: 6, apost: 13, seal: 21 }], '2026-09-30': [{ label: 3, id: 73, aula: 4, quest: 6, apost: 11, seal: 14 }], '2026-10-07': [{ label: 3, id: 72, aula: 4, quest: 6, apost: 8, seal: 11 }] } }, [PRG]: { ...SEAL74, 73: { aula: true, questoesD2: true, apostila: true }, 72: { aula: true, questoesD2: true }, 71: { aula: true, questoesD2: true, apostila: true } } }, async (page) => {
         const w = await dumpWeek(page, ['QUA', 'QUI', 'DOM']);
         const qb = w.QUA.blocks[idx(w.QUA, /^Selar Fio 3 \(há 2 sem\.\)/)] || {};
-        check('há 2 sem.: QUA 28/10 tem "Selar Fio 3 (há 2 sem.)" → ' + titleOf(75).slice(0, 22) + ' (fio extra de 14/10, selagem dia 14) com tarefa "Selagem ✓"; QUI 29/10 "Fio 3 (sem. passada) · toque 3" → ' + titleOf(79).slice(0, 18) + ' (extra de 21/10) — sem colisão de rótulo', (qb.mod || '').includes(titleOf(75)) && (qb.tasks || []).join() === 'Selagem ✓' && modOf(w.QUI, /^Fio 3 \(sem\. passada\) · toque 3/).includes(titleOf(79)) && modOf(w.DOM, /^Selar Fio 3 \(sem\. passada\)/).includes(titleOf(79)), (qb.mod || '(sem bloco)').slice(0, 30) + ' | ' + modOf(w.QUI, /^Fio 3 \(sem/).slice(0, 30) + ' | ' + modOf(w.DOM, /^Selar Fio 3/).slice(0, 30));
+        check('há 2 sem.: QUA 14/10 tem "Selar Fio 3 (há 2 sem.)" → ' + titleOf(73).slice(0, 22) + ' (fio extra de 30/09, selagem dia 14) com tarefa "Selagem ✓"; QUI 15/10 "Fio 3 (sem. passada) · toque 3" → ' + titleOf(72).slice(0, 18) + ' (extra de 07/10) — sem colisão de rótulo', (qb.mod || '').includes(titleOf(73)) && (qb.tasks || []).join() === 'Selagem ✓' && modOf(w.QUI, /^Fio 3 \(sem\. passada\) · toque 3/).includes(titleOf(72)) && modOf(w.DOM, /^Selar Fio 3 \(sem\. passada\)/).includes(titleOf(72)), (qb.mod || '(sem bloco)').slice(0, 30) + ' | ' + modOf(w.QUI, /^Fio 3 \(sem/).slice(0, 30) + ' | ' + modOf(w.DOM, /^Selar Fio 3/).slice(0, 30));
         const q3 = w.QUA.blocks[idx(w.QUA, /^Selar Fio 3 \(há 3 sem\.\)/)] || {};
-        check('há 3 sem.: QUA 28/10 também tem "Selar Fio 3 (há 3 sem.)" → ' + titleOf(82).slice(0, 22) + ' (extra de 07/10, selagem dia 21) com "Selagem ✓" — três "Fio 3" no mesmo dia/semana, cada um no seu módulo', (q3.mod || '').includes(titleOf(82)) && (q3.tasks || []).join() === 'Selagem ✓' && (qb.mod || '').includes(titleOf(75)), (q3.mod || '(sem bloco)').slice(0, 30));
-        check('há 2 sem.: os extras (75, 79) não são re-sorteados como Fio 1/2 desta semana (carry)', !['QUI', 'DOM'].some(d => w[d].blocks.some(b => /^Fio [12] · toque 1/.test(b.text) && (b.mod.includes(titleOf(75)) || b.mod.includes(titleOf(79))))), (await getLS(page, CFG)).fioWeek['2026-10-28'].join());
+        check('há 3 sem.: QUA 14/10 também tem "Selar Fio 3 (há 3 sem.)" → ' + titleOf(71).slice(0, 22) + ' (extra de 23/09, selagem dia 21) com "Selagem ✓" — três "Fio 3" no mesmo dia/semana, cada um no seu módulo', (q3.mod || '').includes(titleOf(71)) && (q3.tasks || []).join() === 'Selagem ✓' && (qb.mod || '').includes(titleOf(73)), (q3.mod || '(sem bloco)').slice(0, 30));
+        check('há 2 sem.: os extras (73, 72) não são re-sorteados como Fio 1/2 desta semana (carry)', !['QUI', 'DOM'].some(d => w[d].blocks.some(b => /^Fio [12] · toque 1/.test(b.text) && (b.mod.includes(titleOf(73)) || b.mod.includes(titleOf(72))))), ((await getLS(page, CFG)).fioWeek['2026-10-14'] || []).join());
     });
-    // ── S16g: DECISÃO FINAL — todos os dias candidatos acima de 8h (5 extras nesta semana + semana seguinte a 9h): a sugestão aparece com ⚠️ em cada etapa e "Aplicar" grava normalmente ──
-    const EX5 = [{ label: 3, id: 60, aula: 2, quest: 4, apost: 5, seal: 9 }, { label: 4, id: 61, aula: 2, quest: 4, apost: 5, seal: 9 }, { label: 5, id: 62, aula: 2, quest: 6, apost: 8, seal: 11 }, { label: 6, id: 63, aula: 2, quest: 6, apost: 8, seal: 11 }, { label: 7, id: 64, aula: 2, quest: 5, apost: 6, seal: 9 }, { label: 8, id: 65, aula: 4, quest: 5, apost: 6, seal: 9 }];
-    const NEXT9 = Object.fromEntries(['2026-10-21', '2026-10-22', '2026-10-23', '2026-10-25', '2026-10-26', '2026-10-27'].map(HEAVY));
-    await scenario(browser, 'S16g-tudo-acima-de-8h-1510', '2026-10-15', { [CFG]: { ...baseCfg, catchupPace: 2, fioWeek: { '2026-10-14': [77, 78] }, fioExtra: { '2026-10-14': EX5 } }, [PRG]: SEAL77, 'medplanner_schedule_v1': NEXT9 }, async (page) => {
-        const w0 = await dumpWeek(page, ['SEX', 'SAB', 'DOM', 'SEG', 'TER']);
-        check('setup: SEX/DOM/SEG/TER já ≥ 8h de estudo antes da proposta; SÁB 17/10 é o dia leve (' + ['SEX', 'SAB', 'DOM', 'SEG', 'TER'].map(d => d + '=' + fmtH(hoursOf(w0[d]))).join(' ') + ')', ['SEX', 'DOM', 'SEG', 'TER'].every(d => hoursOf(w0[d]) + 1.5 > 8) && w0.SAB.lightBadge && hoursOf(w0.SAB) < 6);
+    // (re-datado na Trilha, 20/10: Sem.39, relógio 01/10 — SEX 02/10 e SEG 12/10 editados a 9h deixam todo dia candidato acima do limiar; premissa conferida idêntica no app de antes da Trilha)
+    await scenario(browser, 'S16g-tudo-acima-de-8h-0110', '2026-10-01', { [CFG]: { ...baseCfg, catchupPace: 2, fioWeek: { '2026-09-30': [74, 92] } }, [PRG]: SEAL74, 'medplanner_schedule_v1': Object.fromEntries(['2026-10-02', '2026-10-12'].map(HEAVY)) }, async (page) => {
         check('DECISÃO FINAL: o aviso 🔄 aparece mesmo com tudo cheio', /^🔄 Você adiantou/.test(await bannerOf(page)));
         await clickBtn(page, 'Ver sugestão'); await page.waitForTimeout(300);
         const prop = await proposalOf(page);
-        check('DECISÃO 2 (24/09): sugestão NÃO é suprimida por carga e o dia leve (SÁB 17/10, que caberia) fica DEPOIS dos dias com ⚠️ → "aula ⚠️ SEX 16/10 (16,7h) · questões ⚠️ DOM 18/10 (10,7h) · apostila ⚠️ SEG 19/10 (13,1h) · selagem ⚠️ QUI 22/10 (9,7h, sem. seguinte)", sem 🌿', prop === '💡 Abrir o Fio 9 — Sem.39 ' + titleOf(75) + ': aula ⚠️ SEX 16/10 (16,7h) · questões ⚠️ DOM 18/10 (10,7h) · apostila ⚠️ SEG 19/10 (13,1h) · selagem ⚠️ QUI 22/10 (9,7h, sem. seguinte).' && !/🌿/.test(prop) && (prop.match(/⚠️/g) || []).length === 4, prop);
+        check('DECISÃO 2 (24/09): sugestão NÃO é suprimida por carga e o dia leve (DOM 04/10, que caberia) fica de fora → "aula ⚠️ SEX 02/10 (10,7h) · questões ⚠️ SÁB 03/10 (4,6h + plantão) · apostila ⚠️ SEG 05/10 (6,1h) · selagem ⚠️ QUI 08/10 (8,5h, sem. seguinte)", sem 🌿', prop === '💡 Abrir o Fio 3 — Sem.38 ' + titleOf(73) + ': aula ⚠️ SEX 02/10 (10,7h) · questões ⚠️ SÁB 03/10 (4,6h + plantão) · apostila ⚠️ SEG 05/10 (6,1h) · selagem ⚠️ QUI 08/10 (8,5h, sem. seguinte).' && !/🌿/.test(prop) && (prop.match(/⚠️/g) || []).length === 4, prop);
         check('DECISÃO FINAL: "Aplicar" disponível com todos os dias em ⚠️', await page.evaluate(() => [...document.querySelectorAll('button')].some(b => b.innerText.trim() === 'Aplicar')));
         await clickBtn(page, 'Aplicar'); await page.waitForTimeout(400);
-        const cfg = await getLS(page, CFG); const last = (cfg.fioExtra['2026-10-14'] || []).slice(-1)[0] || {};
-        const w = await dumpWeek(page, ['SEX', 'DOM', 'SEG']);
+        const cfg = await getLS(page, CFG); const last = (cfg.fioExtra['2026-09-30'] || []).slice(-1)[0] || {};
+        const w = await dumpWeek(page, ['SAB', 'SEG']);
         const schG = await page.evaluate(() => JSON.parse(localStorage.getItem('medplanner_schedule_v1') || '{}'));
-        check('DECISÃO FINAL: Aplicar grava de uma vez {label 9, id 75, aula 2, quest 4, apost 5, seal 8}; SEX/DOM/SEG ganham "Fio 9 · toque 1/2/3" (' + titleOf(75).slice(0, 14) + '); QUI 22/10 (editado à mão) recebe "Selar Fio 9 (sem. passada)" na lista editada; aviso some', JSON.stringify(last) === '{"label":9,"id":75,"aula":2,"quest":4,"apost":5,"seal":8}' && cfg.fioExtra['2026-10-14'].length === 7 && modOf(w.SEX, /^Fio 9 · toque 1/).includes(titleOf(75)) && modOf(w.DOM, /^Fio 9 · toque 2/).includes(titleOf(75)) && modOf(w.SEG, /^Fio 9 · toque 3/).includes(titleOf(75)) && (schG['2026-10-22'] || []).length === 2 && /^Selar Fio 9 \(sem\. passada\)/.test((schG['2026-10-22'][1] || {}).text || '') && (await bannerOf(page)) === '', JSON.stringify(last) + ' · ' + JSON.stringify((schG['2026-10-22'] || []).map(b => b.text.slice(0, 30))));
+        check('DECISÃO FINAL: Aplicar grava de uma vez {label 3, id 73, aula 2, quest 3, apost 5, seal 8}; SÁB/SEG ganham "Fio 3 · toque 2/3" (' + titleOf(73) + '); SEX 02/10 (editado à mão) recebe "Fio 3 · toque 1" na lista editada; aviso some', JSON.stringify(last) === '{"label":3,"id":73,"aula":2,"quest":3,"apost":5,"seal":8}' && cfg.fioExtra['2026-09-30'].length === 1 && modOf(w.SAB, /^Fio 3 · toque 2/).includes(titleOf(73)) && modOf(w.SEG, /^Fio 3 · toque 3/).includes(titleOf(73)) && (schG['2026-10-02'] || []).length === 2 && /^Fio 3 · toque 1/.test((schG['2026-10-02'][1] || {}).text || '') && (await bannerOf(page)) === '', JSON.stringify(last) + ' · ' + JSON.stringify((schG['2026-10-02'] || []).map(b => b.text.slice(0, 30))));
     });
-    await scenario(browser, 'S16g2-fio8-semana-seguinte-2210', '2026-10-22', { [CFG]: { ...baseCfg, catchupPace: 2, fioWeek: { '2026-10-14': [77, 78] }, fioExtra: { '2026-10-14': EX5.concat([{ label: 9, id: 75, aula: 2, quest: 4, apost: 5, seal: 8 }]) } }, [PRG]: { ...SEAL77, 75: { aula: true, questoesD2: true, apostila: true } } }, async (page) => {
-        const w = await dumpWeek(page, ['QUI']);
-        check('DECISÃO FINAL: semana seguinte carrega o gravado — QUI 22/10 "Selar Fio 9 (sem. passada)" → ' + titleOf(75).slice(0, 18), modOf(w.QUI, /^Selar Fio 9 \(sem\. passada\)/).includes(titleOf(75)), w.QUI.blocks.filter(b => /Selar Fio/.test(b.text)).map(b => b.text.slice(0, 26)).join(' | '));
-    });
+    // S16g2-fio8-semana-seguinte-2210 APOSENTADO (Trilha, 20/10): mesma razão do S16b: a semana seguinte (21–27/10) é a T1 da Trilha; a semana seguinte carregando o fio extra gravado segue coberta pelo S16a (Sem.40 → Sem.41) e a carga >8h pelo S16g re-datado.
     // ── S16h: opção 1 (adiantar etapa) cai no dia leve desta semana (SÁB) com aviso; Aplicar move via fioPlan; DOM editado à mão perde o bloco movido ──
     const P77Q = { 77: { aula: true, questoesD2: true, accD2: 70 }, 75: { aula: true } };
     const EXH = [{ label: 3, id: 75, aula: 1, quest: 4, apost: 6, seal: 9 }]; // fio extra com folga (os fios do padrão são consecutivos: não há dia para adiantar)
@@ -793,14 +780,16 @@ async function scenario(browser, name, dateISO, seeds, fn) {
         check('SEX 02/10: banco do C da semana passada ⇒ ATB (+5d da apostila de DOM); sem registro (etapa de execução)', has(d, /^D6 · Banco: questões por conteúdo do Bloco C da semana passada \(\+5d da apostila\)/) && modsOf(d, /Bloco C da semana passada/) === 'ATB · Bônus Antibioticoterapia' && tasksOf(d, /Bloco C da semana passada/) === '', short(d));
         check('Sem.39 (2 blocos): lista A/B, nenhum "Bloco C" novo, sem aviso de cobertura', (await weekList(page)).length === 2 && !has(d, /Bloco C \(/) && (await warnTexts(page)).length === 0);
     });
-    await scenario(browser, 'S18b-blocoC-sem43-2910', '2026-10-29', { [CFG]: { ...baseCfg, catchupPace: 2 } }, async (page) => {
+    // (re-datado na Trilha, 20/10: a Sem.43 com Bloco C é a T2; a Sem.41 — sem simulado — ganha um C pelo bloco adicionado XYZ)
+    await scenario(browser, 'S18b-blocoC-sem41-1510', '2026-10-15', { [CFG]: { ...baseCfg, catchupPace: 2, customModules: [{ id: 1000, week: 41, code: 'XYZ', title: 'Bloco da grade real' }] } }, async (page) => {
         const L = await weekList(page);
-        check('Sem.43 lista A = Psiquiatria I, B = Psiquiatria II, C = OFT (bônus)', L.length === 3 && /Psiquiatria I$/.test(L[0].mod) && /Psiquiatria II$/.test(L[1].mod) && /^OFT/.test(L[2].mod) && L.map(x => x.letter).join('') === 'ABC', JSON.stringify(L));
-        const w = await dumpWeek(page);
-        check('Sem.43 (sem simulado): C = SÁB aula+D2 ⇒ OFT · DOM apostila ⇒ OFT; A/B intactos (QUI/SEX/SÁB/SEG/TER)', modsOf(w.SAB, /^D2-C/) === 'OFT · Bônus Oftalmologia' && modsOf(w.DOM, /^D4: Apostila do Bloco C/) === 'OFT · Bônus Oftalmologia' && /Psiquiatria I$/.test(modsOf(w.QUI, /^D2-A/)) && /Psiquiatria II$/.test(modsOf(w.SEX, /^D2-B/)) && /Psiquiatria II$/.test(modsOf(w.SAB, /Apostila do Bloco B/)) && /Psiquiatria I$/.test(modsOf(w.SEG, /^D5/)) && /Psiquiatria II$/.test(modsOf(w.TER, /^D6/)), short(w.SAB));
-        check('Sem.43 cargas (ritmo 2): SÁB ' + fmtH(hoursOf(w.SAB)) + ' (📚, +3,7h do C) · DOM ' + fmtH(hoursOf(w.DOM)) + ' · sem aviso de semana (só 1 dia acima de 8h)', hoursOf(w.SAB) > 8 && hoursOf(w.SAB) < 9 && hoursOf(w.DOM) < 8 && (await fitText(page)) === '', await fitText(page));
-        check('Sem.43 sem aviso de cobertura', (await warnTexts(page)).length === 0);
-        checkLight('Sem.43 com Bloco C:', w, '2026-10-28');
+        check('Sem.41 lista A = Neurologia I, B = Neurologia II, C = XYZ (bloco adicionado)', L.length === 3 && /Neurologia I —/.test(L[0].mod) && /Neurologia II/.test(L[1].mod) && /^XYZ/.test(L[2].mod) && L.map(x => x.letter).join('') === 'ABC', JSON.stringify(L));
+        const w = await dumpWeek(page, DAYS41);
+        check('Sem.41 (sem simulado): C = SÁB aula+D2 ⇒ XYZ · DOM apostila ⇒ XYZ; A/B intactos (QUI/SEX/SÁB/SEG; o banco B caía na TER 20/10)', modsOf(w.SAB, /^D2-C/) === 'XYZ · Bloco da grade real' && modsOf(w.DOM, /^D4: Apostila do Bloco C/) === 'XYZ · Bloco da grade real' && /Neurologia I —/.test(modsOf(w.QUI, /^D2-A/)) && /Neurologia II/.test(modsOf(w.SEX, /^D2-B/)) && /Neurologia II/.test(modsOf(w.SAB, /Apostila do Bloco B/)) && /Neurologia I —/.test(modsOf(w.SEG, /^D5/)), short(w.SAB));
+        check('Sem.41 cargas (ritmo 2): SÁB ' + fmtH(hoursOf(w.SAB)) + ' (📚, com o C) · DOM ' + fmtH(hoursOf(w.DOM)) + ' · sem aviso de semana (só 1 dia acima de 8h)', hoursOf(w.SAB) > 8 && hoursOf(w.SAB) < 9 && hoursOf(w.DOM) < 8 && DAYS41.filter(d => hoursOf(w[d]) > 8).length === 1 && (await fitText(page)) === '', (await fitText(page)) + ' · ' + DAYS41.map(d => d + '=' + fmtH(hoursOf(w[d]))).join(' '));
+        check('Sem.41 sem aviso de cobertura', (await warnTexts(page)).length === 0, (await warnTexts(page)).join(' / '));
+        const lt = w.QUA.light;
+        check('Sem.41 com Bloco C: 🌿 calculado com os 7 dias originais (' + lt.auto + '); selo só no dia escolhido se ele estiver em 14–19/10', !!lt && (lt.auto === 'Auto · TER' ? DAYS41.every(d => !w[d].lightBadge) : DAYS41.filter(d => w[d].lightBadge).length === 1), lt.auto + ' · ' + lt.note.slice(0, 60) + ' · selos: ' + (DAYS41.filter(d => w[d].lightBadge).join(',') || 'nenhum'));
     });
     await scenario(browser, 'S18c-blocoC-sem8-2502', '2026-02-25', {}, async (page) => {
         const L = await weekList(page);
@@ -809,30 +798,31 @@ async function scenario(browser, name, dateISO, seeds, fn) {
         check('Sem.8: QUI aula A ⇒ PRE2 e aula B ⇒ CIR2; SÁB aula C + D2-C ⇒ ANAT; DOM apostila C ⇒ ANAT (cascata genérica também no template antigo)', modsOf(w.QUI, /^Aula online Bloco A/) === 'PRE2 · Estudos Epidemiológicos' && modsOf(w.QUI, /^Aula online Bloco B/) === 'CIR2 · Urologia' && modsOf(w.SAB, /^D2-C/) === 'ANAT · Bônus Anatomia' && modsOf(w.DOM, /^D4: Apostila do Bloco C/) === 'ANAT · Bônus Anatomia', short(w.SAB));
         check('Sem.8 sem aviso de cobertura', (await warnTexts(page)).length === 0, (await warnTexts(page)).join(' / '));
     });
-    await scenario(browser, 'S18d-grupo-AB-C-sem43', '2026-10-29', { [CFG]: { ...baseCfg, catchupPace: 2, weekGroups: { 43: [[84, 93], [83]] } } }, async (page) => {
+    // (re-datado na Trilha, 20/10: Sem.38 — 3 blocos, semana de simulado (25/09): o grupo B vai para o DOM com a aula deslocada da sexta)
+    await scenario(browser, 'S18d-grupo-AB-C-sem38', '2026-09-24', { [CFG]: { ...baseCfg, catchupPace: 2, weekGroups: { 38: [[74, 92], [73]] } } }, async (page) => {
         const L = await weekList(page);
-        check('Agrupamento [A+B]+[C]: lista mostra A ×2 (Psiquiatria I e II) e B = OFT; nenhum C', L.length === 3 && L[0].letter === 'A ×2' && L[1].letter === 'A ↳' && L[2].letter === 'B' && /^OFT/.test(L[2].mod), JSON.stringify(L));
+        check('Agrupamento [A+B]+[C]: lista mostra A ×2 (INF1 AIDS e INF2 Parasitoses) e B = ATB; nenhum C', L.length === 3 && L[0].letter === 'A ×2' && L[1].letter === 'A ↳' && L[2].letter === 'B' && /^ATB/.test(L[2].mod), JSON.stringify(L));
         const w = await dumpWeek(page);
         const d2 = w.QUI.blocks[idx(w.QUI, /^D2-A/)];
-        check('QUI: aula A vira 2 aulas (3.4h) e D2-A = 60q (4h, "grupo A: 2 módulos (PSI1 + PSI1)") com 2 tarefas (uma por módulo) e 2 linhas ↳', w.QUI.blocks[idx(w.QUI, /^D3 · Aula online Bloco A/)].time === '3.4h' && d2.time === '4h' && /grupo A: 2 módulos \(PSI1 \+ PSI1\)/.test(d2.text) && d2.tasks.length === 2 && (d2.mods || []).length === 2, d2.time + ' · ' + tasksOf(w.QUI, /^D2-A/));
-        check('SEX: aula B + D2-B ⇒ OFT (o bônus vira o grupo B); apostila A = 3h com 2 tarefas', modsOf(w.SEX, /^D2-B/) === 'OFT · Bônus Oftalmologia' && w.SEX.blocks[idx(w.SEX, /Apostila do Bloco A/)].time === '3h' && w.SEX.blocks[idx(w.SEX, /Apostila do Bloco A/)].tasks.length === 2, short(w.SEX));
-        check('SÁB/DOM: nenhum bloco C (só 2 grupos); SEG banco A = 4h; TER banco B ⇒ OFT', !has(w.SAB, /Bloco C/) && !has(w.DOM, /Bloco C/) && w.SEG.blocks[idx(w.SEG, /^D5/)].time === '4h' && modsOf(w.TER, /^D6/) === 'OFT · Bônus Oftalmologia');
-        check('Sem aviso de cobertura com o agrupamento [A+B]+[C]', (await warnTexts(page)).length === 0);
+        check('QUI: aula A vira 2 aulas (3.4h) e D2-A = 60q (4h, "grupo A: 2 módulos (INF1 + INF2)") com 2 tarefas (uma por módulo) e 2 linhas ↳', w.QUI.blocks[idx(w.QUI, /^D3 · Aula online Bloco A/)].time === '3.4h' && d2.time === '4h' && /grupo A: 2 módulos \(INF1 \+ INF2\)/.test(d2.text) && d2.tasks.length === 2 && (d2.mods || []).length === 2, d2.time + ' · ' + tasksOf(w.QUI, /^D2-A/));
+        check('semana de simulado: aula B + D2-B deslocados para o DOM ⇒ ATB (o bônus vira o grupo B); apostila A (erros de quinta) no SÁB = 3h com 2 tarefas', modsOf(w.DOM, /deslocado da sexta/) === 'ATB · Bônus Antibioticoterapia' && w.SAB.blocks[idx(w.SAB, /Apostila do Bloco A/)].time === '3h' && w.SAB.blocks[idx(w.SAB, /Apostila do Bloco A/)].tasks.length === 2, short(w.SAB));
+        check('nenhum bloco C (só 2 grupos); SEG banco A = 4h; apostila B (erros de domingo) na SEG ⇒ ATB', !DAYS.some(dn => has(w[dn], /Bloco C/)) && w.SEG.blocks[idx(w.SEG, /^D5/)].time === '4h' && modsOf(w.SEG, /Apostila do Bloco B/) === 'ATB · Bônus Antibioticoterapia', short(w.SEG));
+        check('Sem aviso de cobertura com o agrupamento [A+B]+[C]', (await warnTexts(page)).length === 0, (await warnTexts(page)).join(' / '));
         await clickDay(page, 'QUI');
         await clickTask(page, /^D2-A/, null);
         let pg = await getLS(page, PRG);
-        check('Marcar o D2 do grupo (✓ do bloco) registra questoesD2 em Psiquiatria I (84) E II (93)', pg[84] && pg[84].questoesD2 === true && pg[93] && pg[93].questoesD2 === true, JSON.stringify(pg));
+        check('Marcar o D2 do grupo (✓ do bloco) registra questoesD2 em AIDS (74) E Parasitoses (92)', pg[74] && pg[74].questoesD2 === true && pg[92] && pg[92].questoesD2 === true, JSON.stringify(pg));
         let d = await readDay(page);
         check('Bloco D2-A fica ✓ (riscado) e mostra 2 campos de % (um por módulo)', d.blocks[idx(d, /^D2-A/)].done === true && d.blocks[idx(d, /^D2-A/)].pctInputs.length === 2, JSON.stringify(d.blocks[idx(d, /^D2-A/)].pctInputs));
-        await clickTask(page, /^D2-A/, /^✓ D2 · 30q \(toque 2\) ✓ · A · PSI1$/);
+        await clickTask(page, /^D2-A/, /^✓ D2 · 30q \(toque 2\) ✓ · A · INF1$/);
         pg = await getLS(page, PRG); d = await readDay(page);
-        check('Desmarcar um só botão tira questoesD2 só do 1º módulo (84); o bloco deixa de estar ✓', pg[84].questoesD2 === false && pg[93].questoesD2 === true && d.blocks[idx(d, /^D2-A/)].done === false, JSON.stringify([pg[84], pg[93]]));
-        const card = await readCard(page, /Psiquiatria II/);
-        check('Card de Psiquiatria II na aba Módulos reflete o D2 marcado pelo bloco do grupo', card && card.btns.includes('✓ D2 · 30q (toque 2) ✓'), JSON.stringify(card && card.btns));
+        check('Desmarcar um só botão tira questoesD2 só do 1º módulo (74); o bloco deixa de estar ✓', pg[74].questoesD2 === false && pg[92].questoesD2 === true && d.blocks[idx(d, /^D2-A/)].done === false, JSON.stringify([pg[74], pg[92]]));
+        const card = await readCard(page, /Parasitoses Intestinais/);
+        check('Card de Parasitoses Intestinais na aba Módulos reflete o D2 marcado pelo bloco do grupo', card && card.btns.includes('✓ D2 · 30q (toque 2) ✓'), JSON.stringify(card && card.btns));
     });
-    await scenario(browser, 'S18d2-grupo-AB-selagem-0411', '2026-11-05', { [CFG]: { ...baseCfg, catchupPace: 2, weekGroups: { 43: [[84, 93], [83]] } } }, async (page) => {
+    await scenario(browser, 'S18d2-grupo-AB-selagem-0110', '2026-10-01', { [CFG]: { ...baseCfg, catchupPace: 2, weekGroups: { 38: [[74, 92], [73]] } } }, async (page) => {
         await clickDay(page, 'QUA'); const d = await readDay(page); const sa = d.blocks[idx(d, /^Selar Bloco A/)];
-        check('QUA 04/11: "Selar Bloco A da semana passada · grupo A: 2 módulos" = 40min com 2 tarefas de selagem; selagem B ⇒ OFT; nenhuma selagem C', /grupo A: 2 módulos/.test(sa.text) && sa.time === '40min' && sa.tasks.length === 2 && modsOf(d, /^Selar Bloco B/) === 'OFT · Bônus Oftalmologia' && !has(d, /^Selar Bloco C/), tasksOf(d, /^Selar Bloco A/));
+        check('QUA 30/09: "Selar Bloco A da semana passada · grupo A: 2 módulos" = 40min com 2 tarefas de selagem; selagem B ⇒ ATB; nenhuma selagem C', /grupo A: 2 módulos/.test(sa.text) && sa.time === '40min' && sa.tasks.length === 2 && modsOf(d, /^Selar Bloco B/) === 'ATB · Bônus Antibioticoterapia' && !has(d, /^Selar Bloco C/), tasksOf(d, /^Selar Bloco A/));
     });
     await scenario(browser, 'S18e-grupo-A-BC-sem38-sim', '2026-09-24', { [CFG]: { ...baseCfg, catchupPace: 2, weekGroups: { 38: [[74], [92, 73]] } } }, async (page) => {
         const L = await weekList(page);
@@ -875,22 +865,29 @@ async function scenario(browser, name, dateISO, seeds, fn) {
         d = await readDay(page);
         check('SÁB volta a ter aula C + D2-C, agora do NOV1 (grupo C)', modsOf(d, /^D2-C/) === 'NOV1 · Bloco novo pela interface (editado)', modsOf(d, /^D2-C/));
     });
-    await scenario(browser, 'S18f2-bloco-adicionado-na-fila-2210', '2026-10-22', { [CFG]: { ...baseCfg, catchupPace: 2, customModules: [{ id: 1000, week: 41, code: 'XYZ', title: 'Bloco da grade real' }] } }, async (page) => {
-        await clickTab(page, 'DESATRASO'); const t = await bodyText(page);
-        check('Semana seguinte: o bloco adicionado (sem.41) entra na fila de desatraso e conta na projeção como qualquer módulo', /Bloco da grade real/.test(t) && /FILA COMPLETA/.test(t), (t.match(/(\d+)\s*módulos atrasados/) || [])[0]);
+    // ── S18f2 (Trilha, 20/10 — antes: bloco adicionado na fila do desatraso): bloco da grade real (Sem.41) entra na fila da Trilha ──
+    await scenario(browser, 'S18f2-trilha-bloco-adicionado-2210', '2026-10-22', { [CFG]: { ...baseCfg, customModules: [{ id: 1000, week: 41, code: 'XYZ', title: 'Bloco da grade real' }] } }, async (page) => {
+        await clickTab(page, 'TRILHA');
+        const rows = await page.evaluate(() => [...document.querySelectorAll('[data-t="trilha-row"]')].map(r => ({ id: Number(r.getAttribute('data-id')), text: r.innerText.replace(/\n/g, ' ') })));
+        const k = rows.findIndex(r => r.id === 1000);
+        check('o bloco adicionado (XYZ, Sem.41) está na fila pela ordem do curso — logo depois do último módulo da Sem.41 — com "Curso S41" e ↑↓ 📌', k > 0 && rows[k - 1].id === 80 && /XYZ · Bloco da grade real .*Curso S41 ↑ ↓ 📌/.test(rows[k].text) && rows.length === 94, k + ': ' + (rows[k] || {}).text);
+        check('fora do alcance até 01/01 (posição ' + (k + 1) + ' > 40) e contado na fila', /FORA DO ALCANCE/.test((rows[k] || {}).text || ''));
     });
-    await scenario(browser, 'S18g-aviso-cobertura-dia-editado-2910', '2026-10-29', { [CFG]: { ...baseCfg, catchupPace: 2 }, medplanner_schedule_v1: { '2026-10-31': [{ id: 'c-1', d: 'ANKI', color: '#0369A1', text: 'Anki + Meditação 15min', time: '35min' }, { id: 'c-2', d: 'PLAN', color: '#0F766E', text: 'PLAN da semana', time: '15min' }] } }, async (page) => {
+    // (re-datado na Trilha, 20/10: Sem.41 com o C adicionado (XYZ) e o SÁB 17/10 editado à mão)
+    await scenario(browser, 'S18g-aviso-cobertura-dia-editado-1510', '2026-10-15', { [CFG]: { ...baseCfg, catchupPace: 2, customModules: [{ id: 1000, week: 41, code: 'XYZ', title: 'Bloco da grade real' }] }, medplanner_schedule_v1: { '2026-10-17': [{ id: 'c-1', d: 'ANKI', color: '#0369A1', text: 'Anki + Meditação 15min', time: '35min' }, { id: 'c-2', d: 'PLAN', color: '#0F766E', text: 'PLAN da semana', time: '15min' }] } }, async (page) => {
         const warns = await warnTexts(page);
-        check('SÁB 31/10 editado à mão sem a apostila do B e sem a aula/D2 do C → 2 avisos no topo: "⚠️ PSI1 (Psiquiatria II) está na lista…" e "⚠️ OFT está na lista da semana mas não tem tarefas — agrupe-o ou defina os dias."', warns.length === 2 && warns[0] === '⚠️ PSI1 (Psiquiatria II) está na lista da semana mas não tem tarefas — agrupe-o ou defina os dias.' && warns[1] === '⚠️ OFT está na lista da semana mas não tem tarefas — agrupe-o ou defina os dias.', warns.join(' / '));
+        check('SÁB 17/10 editado à mão sem a apostila do B e sem a aula/D2 do C → 2 avisos no topo: "⚠️ NEU1 (Neurologia II…) está na lista…" e "⚠️ XYZ está na lista da semana mas não tem tarefas — agrupe-o ou defina os dias."', warns.length === 2 && /^⚠️ NEU1 \(Neurologia II/.test(warns[0]) && / está na lista da semana mas não tem tarefas — agrupe-o ou defina os dias\.$/.test(warns[0]) && warns[1] === '⚠️ XYZ está na lista da semana mas não tem tarefas — agrupe-o ou defina os dias.', warns.join(' / '));
         await clickDay(page, 'SAB'); await clickBtn18(page, /Voltar ao padr/);
         check('"Voltar ao padrão" no sábado restaura a cascata do C e o aviso some', (await warnTexts(page)).length === 0, (await warnTexts(page)).join(' / '));
     });
-    await scenario(browser, 'S18h-capacidade-sem43-p4', '2026-10-29', { [CFG]: { ...baseCfg, catchupPace: 4 } }, async (page) => {
+    // (re-datado na Trilha, 20/10: Sem.38 — 3 blocos, simulado na sexta e 2 plantões — no ritmo 4)
+    await scenario(browser, 'S18h-capacidade-sem38-p4', '2026-09-24', { [CFG]: { ...baseCfg, catchupPace: 4 } }, async (page) => {
         const t = await fitText(page);
-        check('Sem.43 ritmo 4: "Semana com 3 blocos … ritmo 4 não cabe (4 dias acima de 8h) · Sugestão: ritmo 2" + botão; nenhuma etapa de bloco é cortada', /^⚠️ Semana com 3 blocos \(A, B, C — 3 cascatas completas\): ritmo 4 não cabe nesta semana \(4 dias acima de 8h · 0 plantões\)\. Sugestão: ritmo 2\./.test(t), t);
-        await clickBtn18(page, /^Aplicar ritmo 2$/);
+        check('Sem.38 ritmo 4: "Semana com 3 blocos … ritmo 4 não cabe (N dias acima de 8h · 2 plantões) · Sugestão: ritmo Z" + botão; nenhuma etapa de bloco é cortada', /^⚠️ Semana com 3 blocos \(A, B, C — 3 cascatas completas\): ritmo 4 não cabe nesta semana \(\d dias acima de 8h · 2 plantões\)\. Sugestão: ritmo [123]/.test(t) && /o app não corta etapa de bloco\.$/.test(t), t);
+        const z = Number((t.match(/Sugestão: ritmo (\d)/) || [])[1]);
+        await clickBtn18(page, new RegExp('^Aplicar ritmo ' + z + '$'));
         const cfg = await getLS(page, CFG); const w = await dumpWeek(page, ['SAB', 'DOM']);
-        check('"Aplicar ritmo 2" grava catchupPace 2 (a paciente decide); o C continua inteiro (SÁB aula+D2, DOM apostila)', cfg.catchupPace === 2 && has(w.SAB, /^D2-C/) && has(w.DOM, /^D4: Apostila do Bloco C/), JSON.stringify(cfg.catchupPace));
+        check('"Aplicar ritmo ' + z + '" grava catchupPace ' + z + ' (a paciente decide); o C continua inteiro (SÁB aula+D2, DOM apostila)', cfg.catchupPace === z && has(w.SAB, /^D2-C/) && has(w.DOM, /^D4: Apostila do Bloco C/), JSON.stringify(cfg.catchupPace));
     });
 
     // ── S19: decisões da 2ª rodada (24/09) ──
@@ -899,9 +896,10 @@ async function scenario(browser, name, dateISO, seeds, fn) {
         check('SEG 03/08 (AMB, fronteira): "30 questões Bloco A … (fronteira 03/08)" ⇒ CAR3 logo após o Anki, marcável (toque 2)', idx(d, /^30 questões Bloco A .*fronteira 03\/08/) === 1 && modsOf(d, /fronteira 03\/08/) === 'CAR3 · DAC: IAM e Angina' && tasksOf(d, /fronteira 03\/08/) === 'D2 · 30q (toque 2) ✓ · A · CAR3', short(d));
         check('Sem.30 sem aviso de cobertura (CAR3 agora tem aula, questões e apostila)', (await warnTexts(page)).length === 0, (await warnTexts(page)).join(' / '));
     });
-    await scenario(browser, 'S19b-pin-meio-da-semana-1510', '2026-10-15', { [CFG]: { ...baseCfg, catchupPace: 2, fioWeek: { '2026-10-14': [77, 78] }, catchupPins: [60] } }, async (page) => {
+    // (re-datado na Trilha, 20/10: Sem.39 — em 15/10 o fio extra cairia na Trilha)
+    await scenario(browser, 'S19b-pin-meio-da-semana-0110', '2026-10-01', { [CFG]: { ...baseCfg, catchupPace: 2, fioWeek: { '2026-09-30': [74, 92] }, catchupPins: [60] } }, async (page) => {
         const banner = await page.evaluate(() => ([...document.querySelectorAll('span')].map(s => s.textContent.trim()).find(t => /^📌 Você fixou/.test(t)) || ''));
-        check('📌 fixado (60) com a semana já congelada [77, 78] → aviso "📌 Você fixou Sem.31 … Quer abri-lo já, como fio extra?"', /^📌 Você fixou Sem\.31 Lesões Precursoras.*Os fios desta semana já estão congelados — ele entra como 1º fio na próxima semana\. Quer abri-lo já, como fio extra\?$/.test(banner), banner);
+        check('📌 fixado (60) com a semana já congelada [74, 92] → aviso "📌 Você fixou Sem.31 … Quer abri-lo já, como fio extra?"', /^📌 Você fixou Sem\.31 Lesões Precursoras.*Os fios desta semana já estão congelados — ele entra como 1º fio na próxima semana\. Quer abri-lo já, como fio extra\?$/.test(banner), banner);
         await clickTab(page, 'DESATRASO'); const t = await bodyText(page);
         check('Regra 7 reescrita: "assume o 1º slot A PARTIR DA PRÓXIMA SEMANA … use a sugestão de redistribuição"', /assume o 1º slot A PARTIR DA PRÓXIMA SEMANA/.test(t) && /use a sugestão de redistribuição no Cronograma/.test(t) && /MATÉRIAS DESTA SEMANA \(2\)/.test(t));
         await clickTab(page, 'CRONOGRAMA'); await clickBtn18(page, /^Ver sugestão$/);
@@ -909,16 +907,16 @@ async function scenario(browser, name, dateISO, seeds, fn) {
         check('"Ver sugestão" propõe abrir o fixado como Fio 3 com a carga de cada dia (aula · questões · apostila · selagem)', /^💡 Abrir o Fio 3 — Sem\.31 Lesões Precursoras.*: aula .* · questões .* · apostila .* · selagem /.test(sug), sug);
         await clickBtn18(page, /^Aplicar$/);
         const cfg = await getLS(page, CFG);
-        check('"Aplicar" grava o fixado em config.fioExtra[2026-10-14] (label 3, id 60) e fecha o aviso (fillDismissed["…|pin"] = "pin:60")', cfg.fioExtra && cfg.fioExtra['2026-10-14'] && cfg.fioExtra['2026-10-14'].some(e => e.id === 60 && e.label === 3) && cfg.fillDismissed && cfg.fillDismissed['2026-10-14|pin'] === 'pin:60' && !(await page.evaluate(() => /📌 Você fixou/.test(document.body.innerText))), JSON.stringify(cfg.fioExtra) + ' ' + JSON.stringify(cfg.fillDismissed));
+        check('"Aplicar" grava o fixado em config.fioExtra[2026-09-30] (label 3, id 60) e fecha o aviso (fillDismissed["…|pin"] = "pin:60")', cfg.fioExtra && cfg.fioExtra['2026-09-30'] && cfg.fioExtra['2026-09-30'].some(e => e.id === 60 && e.label === 3) && cfg.fillDismissed && cfg.fillDismissed['2026-09-30|pin'] === 'pin:60' && !(await page.evaluate(() => /📌 Você fixou/.test(document.body.innerText))), JSON.stringify(cfg.fioExtra) + ' ' + JSON.stringify(cfg.fillDismissed));
         const w = await dumpWeek(page);
-        check('O Fio 3 (extra) aparece nos dias propostos ⇒ Sem.31 Lesões Precursoras; os fios 1 e 2 congelados não mudam (77, 78)', DAYS.some(dn => w[dn].blocks.some(b => /^Fio 3 · toque 1/.test(b.text) && /Sem\.31 Lesões Precursoras/.test(b.mod || ''))) && /Síndromes Febris/.test(modOf(w.QUI, /^Fio 1 · toque 1/)), '');
+        check('O Fio 3 (extra) aparece nos dias propostos ⇒ Sem.31 Lesões Precursoras; os fios 1 e 2 congelados não mudam (74, 92)', DAYS.some(dn => w[dn].blocks.some(b => /^Fio 3 · toque 1/.test(b.text) && /Sem\.31 Lesões Precursoras/.test(b.mod || ''))) && /AIDS/.test(modOf(w.QUI, /^Fio 1 · toque 1/)), modOf(w.QUI, /^Fio 1 · toque 1/).slice(0, 30));
         await clickTab(page, 'DESATRASO');
         check('MATÉRIAS DESTA SEMANA passa a listar o fio extra (3) com "sugestão"', /MATÉRIAS DESTA SEMANA \(3\)/.test(await bodyText(page)) && /FIO 3 · sugestão/.test(await bodyText(page)));
     });
-    await scenario(browser, 'S19b2-pin-deixar-1510', '2026-10-15', { [CFG]: { ...baseCfg, catchupPace: 2, fioWeek: { '2026-10-14': [77, 78] }, catchupPins: [60] } }, async (page) => {
+    await scenario(browser, 'S19b2-pin-deixar-0110', '2026-10-01', { [CFG]: { ...baseCfg, catchupPace: 2, fioWeek: { '2026-09-30': [74, 92] }, catchupPins: [60] } }, async (page) => {
         await clickBtn18(page, /^Deixar para a próxima semana$/);
         const cfg = await getLS(page, CFG);
-        check('"Deixar para a próxima semana" só grava fillDismissed["2026-10-14|pin"] = "pin:60" (nenhum fio aberto) e o aviso some', cfg.fillDismissed && cfg.fillDismissed['2026-10-14|pin'] === 'pin:60' && !(cfg.fioExtra && cfg.fioExtra['2026-10-14'] && cfg.fioExtra['2026-10-14'].length) && !(await page.evaluate(() => /📌 Você fixou/.test(document.body.innerText))), JSON.stringify(cfg.fillDismissed));
+        check('"Deixar para a próxima semana" só grava fillDismissed["2026-09-30|pin"] = "pin:60" (nenhum fio aberto) e o aviso some', cfg.fillDismissed && cfg.fillDismissed['2026-09-30|pin'] === 'pin:60' && !(cfg.fioExtra && cfg.fioExtra['2026-09-30'] && cfg.fioExtra['2026-09-30'].length) && !(await page.evaluate(() => /📌 Você fixou/.test(document.body.innerText))), JSON.stringify(cfg.fillDismissed));
     });
     await scenario(browser, 'S19c-revisei-no-bloco-1510', '2026-10-15', { [CFG]: { ...baseCfg, catchupPace: 2, fioWeek: { '2026-10-14': [77, 78] } }, [PRG]: { 60: { aula: true, questoesD2: true, apostila: true, smartcard: true, completedAt: '2026-10-08', accSelagem: 70 } } }, async (page) => {
         await clickDay(page, 'DOM'); let d = await readDay(page);
@@ -933,14 +931,15 @@ async function scenario(browser, name, dateISO, seeds, fn) {
         const card = await readCard(page, /Lesões Precursoras/);
         check('Card do módulo: D+30 recalculado a partir do r1DoneAt (15/10 + 30 = 14/11)', card && card.d30 === '14/11', JSON.stringify(card));
     });
-    await scenario(browser, 'S19d-aviso-semana-free-sim-3012', '2026-12-31', { [CFG]: { ...baseCfg, fioWeek: { '2026-12-16': [1, 2, 3, 4, 5, 6], '2026-12-23': [8, 9, 10, 11, 12, 13], '2026-12-30': [14, 15, 16, 17, 18, 19] } } }, async (page) => {
-        const t = await page.evaluate(() => ([...document.querySelectorAll('span')].map(s => s.textContent.trim()).filter(t => /^⚠️ Semana/.test(t)).join(' || ')));
-        check('FREE, semana de simulado: aviso de semana existe ("prova + correção (8h) e as etapas de fio na sexta somam 13,8h … ritmo travado nesta fase: 6 fios"), sem botão de ritmo', /^⚠️ Semana de simulado: a prova \+ correção \(8h\) e as etapas de fio na sexta somam 13,8h — considere deixar um fio para a semana seguinte ou mover as etapas da sexta \(ritmo travado nesta fase: 6 fios\)\.$/.test(t) && !(await page.evaluate(() => [...document.querySelectorAll('button')].some(b => /Aplicar ritmo/.test(b.innerText)))), t);
+    // ── S19d (Trilha, 20/10 — antes: aviso de semana FREE com simulado): semana final com 2 dias editados acima do limiar ⇒ aviso de semana sem botão de ritmo ──
+    await scenario(browser, 'S19d-trilha-aviso-semana-final-3112', '2026-12-31', { 'medplanner_schedule_v1': { '2026-12-29': [{ id: 'h1', d: 'EXTRA', color: '#0EA5E9', text: 'Bloco pesado de teste', time: '9h' }], '2026-12-30': [{ id: 'h2', d: 'EXTRA', color: '#0EA5E9', text: 'Bloco pesado de teste', time: '9h' }] } }, async (page) => {
+        const wf = await banner(page, 'trilha-weekfit');
+        check('aviso de semana da Trilha: "⚠️ Semana pesada: 2 dias acima do limiar (TER 29/12 9,0h · QUA 30/12 9,0h) · 0 plantões — mova blocos; o app não corta etapa." e nenhum botão', !!wf && wf.text.trim() === '⚠️ Semana pesada: 2 dias acima do limiar (TER 29/12 9,0h · QUA 30/12 9,0h) · 0 plantões — mova blocos; o app não corta etapa.' && !wf.btns.length, wf && wf.text);
+        check('nenhum "Aplicar ritmo" em tela (o ritmo da Trilha é a rampa, não um seletor)', !(await page.evaluate(() => [...document.querySelectorAll('button')].some(b => /^Aplicar ritmo/.test(b.innerText.trim())))));
+        const fin = await banner(page, 'trilha-final');
+        check('📦 da semana final com a carga dia a dia (31/12 e 01/01 contam pelo limiar do dia)', !!fin && /Carga dia a dia: TER 29\/12 9,0h · QUA 30\/12 9,0h · QUI 31\/12 [\d,]+h · SEX 01\/01 [\d,]+h \(01\/01 só selagem\)/.test(fin.text), fin && fin.text);
     });
-    await scenario(browser, 'S19d2-aviso-semana-catchup-sim-0412', '2026-12-03', {}, async (page) => {
-        const t = await page.evaluate(() => ([...document.querySelectorAll('span')].map(s => s.textContent.trim()).filter(t => /^⚠️ Semana/.test(t)).join(' || ')));
-        check('CATCHUP, semana de simulado (04/12): sexta = prova + correção (8h) + Anki → 8,6h → aviso de simulado com "ritmo travado nesta fase: 2 fios"', /^⚠️ Semana de simulado: a prova \+ correção \(8h\) e as etapas de fio na sexta somam 8,6h .*ritmo travado nesta fase: 2 fios/.test(t), t);
-    });
+    // S19d2-aviso-semana-catchup-sim-0412 APOSENTADO (Trilha, 20/10): fase CATCHUP inexistente na Trilha; 04/12 é sexta do bloco 04:30 (sem simulado pela regra). O aviso de semana da Trilha (sem botão de ritmo) está no S19d reescrito.
     await scenario(browser, 'S19e-nota-25-06', '2026-06-25', { medplanner_schedule_v1: { '2026-06-25': [{ id: 'sd-t1', d: 'AMB', color: '#6B7280', text: 'Ambulatório 8h–11h', time: '3h', done: false }, { id: 'sd-t3', d: 'EXTRA', color: '#0EA5E9', text: '📌 Estudo desta quinta (aulas online A/B + questões/apostila Bloco A) → movido p/ sáb (tarde) e dom', time: '', done: false }] } }, async (page) => {
         await clickDay(page, 'QUI'); const d = await readDay(page); const b = d.blocks[idx(d, /^📌 Estudo desta quinta/)];
         check('Bloco-nota "📌 Estudo desta quinta (… apostila Bloco A)" não oferece tarefa nem ↳ módulo', b && b.tasks.length === 0 && !b.mod && (b.mods || []).length === 0, JSON.stringify(b));
@@ -956,18 +955,21 @@ async function scenario(browser, name, dateISO, seeds, fn) {
         const card = await readCard(page, /Neurologia I — Cefaleias/);
         check('Card mostra "presencial assistida em 15/10 · registro complementar"', await page.evaluate(() => /presencial assistida em 15\/10 · registro complementar — não conta nos 4 checks/.test(document.body.innerText)) && card && card.btns.includes('✓ Aula presencial ✓'), JSON.stringify(card && card.btns));
     });
-    await scenario(browser, 'S19h-serie-simulado-2310', '2026-10-23', { [CFG]: { ...baseCfg, catchupPace: 2, simResults: { '2026-08-14': 62, '2026-08-28': 70, '2026-10-23': 75 } } }, async (page) => {
+    // (re-datado na Trilha, 20/10: o simulado de 23/10 cai em plantão na Trilha; a série usa o de 25/09)
+    await scenario(browser, 'S19h-serie-simulado-2809', '2026-09-28', { [CFG]: { ...baseCfg, catchupPace: 2, simResults: { '2026-08-14': 62, '2026-08-28': 70, '2026-09-25': 75 } } }, async (page) => {
         await clickDay(page, 'SEX');
-        check('Bloco de correção do simulado mostra "📈 Evolução: 62% (14/08) · 70% (28/08) · 75% (23/10)"', await page.evaluate(() => /📈 Evolução: 62% \(14\/08\) · 70% \(28\/08\) · 75% \(23\/10\)/.test(document.body.innerText)));
+        check('Bloco de correção do simulado mostra "📈 Evolução: 62% (14/08) · 70% (28/08) · 75% (25/09)"', await page.evaluate(() => /📈 Evolução: 62% \(14\/08\) · 70% \(28\/08\) · 75% \(25\/09\)/.test(document.body.innerText)));
         await clickTab(page, 'MÓDULOS');
-        check('Aba Módulos mostra a série "📈 Simulados (% por sexta): 62% (14/08) · 70% (28/08) · 75% (23/10) — acompanhamento clínico"', await page.evaluate(() => /📈 Simulados \(% por sexta\): 62% \(14\/08\) · 70% \(28\/08\) · 75% \(23\/10\) — acompanhamento clínico, não calibra o motor/.test(document.body.innerText)));
+        check('Aba Módulos mostra a série "📈 Simulados (% por sexta): 62% (14/08) · 70% (28/08) · 75% (25/09) — acompanhamento clínico"', await page.evaluate(() => /📈 Simulados \(% por sexta\): 62% \(14\/08\) · 70% \(28\/08\) · 75% \(25\/09\) — acompanhamento clínico, não calibra o motor/.test(document.body.innerText)));
     });
 
     // ── S20: AVISO DE ESPAÇAMENTO AO MOVER TAREFA (paciente, 24/09 — decisões 38/40) ──
     const SCH = 'medplanner_schedule_v1';
-    const moveViaUI = async (page, blockRe, toIdx) => {
+    const moveViaUI = async (page, blockRe, toIdx) => { // toIdx = índice do dia na semana visível (as opções do seletor são DATAS desde 20/10)
         await page.evaluate(() => { if (![...document.querySelectorAll('button')].some(b => b.innerText.trim() === '✓ Pronto')) { const e = [...document.querySelectorAll('button')].find(b => b.innerText.trim() === '✎ Reorganizar dia'); if (e) e.click(); } });
         await page.waitForTimeout(200);
+        const first = (await H.listDayTabs(page))[0].date; const y = first.slice(3) === '01' ? '2027' : '2026';
+        const d0 = new Date(y + '-' + first.slice(3) + '-' + first.slice(0, 2) + 'T12:00:00'); d0.setDate(d0.getDate() + toIdx); toIdx = d0.toISOString().slice(0, 10);
         const r = await page.evaluate(([bs, to]) => { const bre = new RegExp(bs); const blocks = [...document.querySelectorAll('div')].filter(el => el.style && /^3px solid/.test(el.style.borderLeft)); const el = blocks.find(b => { const body = b.children[0] && b.children[0].children[2]; const s = body && body.querySelector('span'); return s && bre.test(s.textContent.trim()); }); if (!el) return 'bloco não encontrado: ' + bs; const sel = [...el.querySelectorAll('select')].find(s => [...s.options].some(o => /mover p\/ dia/.test(o.textContent))); if (!sel) return 'select não encontrado'; Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(sel, String(to)); sel.dispatchEvent(new Event('change', { bubbles: true })); return true; }, [blockRe.source, toIdx]);
         if (r !== true) throw new Error(r); await page.waitForTimeout(300);
     };
@@ -975,22 +977,24 @@ async function scenario(browser, name, dateISO, seeds, fn) {
     const clickAsk = async (page, label) => { const ok = await page.evaluate((l) => { const el = document.querySelector('[data-pw="move-ask"]'); const b = el && [...el.querySelectorAll('button')].find(b => b.innerText.trim() === l); if (!b) return false; b.click(); return true; }, label); if (!ok) throw new Error('botão do diálogo não encontrado: ' + label); await page.waitForTimeout(300); };
     const has20 = (ask, re) => !!ask && ask.lines.some(l => re.test(l));
     const cfg20 = { ...baseCfg, catchupPace: 2, fioWeek: { '2026-10-14': [77, 78] } };
-    await scenario(browser, 'S20a-mover-questoes-4d-da-aula-1410', '2026-10-14', { [CFG]: cfg20 }, async (page) => {
+    const cfg20b = { ...baseCfg, catchupPace: 2, fioWeek: { '2026-10-07': [75, 76] } };
+    // (re-datado na Trilha, 20/10: Sem.40 — em 14/10 a reorganização caía na Trilha a partir de 20/10)
+    await scenario(browser, 'S20a-mover-questoes-4d-da-aula-0710', '2026-10-07', { [CFG]: cfg20b }, async (page) => {
         await clickDay(page, 'SAB'); await moveViaUI(page, /^Fio 1 · toque 2/, 5);
         let ask = await readAsk(page);
-        check('Fio 1 · questões SÁB 17/10 → SEG 19/10: diálogo (mesmo da carga) avisa sem bloquear: "as questões a 4 dias da aula (ideal: 1 a 2 dias)" e "a apostila 1 dia ANTES das questões"', has20(ask, /carga do destino: SEG 19\/10 \(6,6h\)/) && has20(ask, /^⚠️ Isso deixa a apostila 1 dia ANTES das questões \(a ordem é questões → apostila\) e as questões a 4 dias da aula \(ideal: 1 a 2 dias\)\.$/), JSON.stringify(ask));
+        check('Fio 1 · questões SÁB 10/10 → SEG 12/10: diálogo (mesmo da carga) avisa sem bloquear: "as questões a 4 dias da aula (ideal: 1 a 2 dias)" e "a apostila 1 dia ANTES das questões"', has20(ask, /carga do destino: SEG 12\/10 \(6,6h\)/) && has20(ask, /^⚠️ Isso deixa a apostila 1 dia ANTES das questões \(a ordem é questões → apostila\) e as questões a 4 dias da aula \(ideal: 1 a 2 dias\)\.$/), JSON.stringify(ask));
         check('Antes e depois de cada intervalo afetado: "aula → questões: 2d → 4d" e "questões → apostila: 1d → -1d"', has20(ask, /^· aula → questões: 2d → 4d \(ideal 1 a 2 dias\)$/) && has20(ask, /^· questões → apostila: 1d → -1d \(ideal ~1 dia\)$/), ask.lines.filter(l => /^·/.test(l)).join(' | '));
         check('Três opções: "Mover assim mesmo", "Ver como reorganizar o fio", "Cancelar"; nada gravado ainda', JSON.stringify(ask.btns) === JSON.stringify(['Mover assim mesmo', 'Ver como reorganizar o fio', 'Cancelar']) && !(await getLS(page, SCH)), JSON.stringify(ask.btns));
         await clickAsk(page, 'Ver como reorganizar o fio'); ask = await readAsk(page);
-        check('Proposta (mesma linguagem da redistribuição): aula SÁB 17/10 (6,5h) · questões SEG (seu movimento) · apostila ⚠️ QUA 21/10 (9,3h, sem. seguinte) · selagem SÁB 24/10 (5,0h) — dia leve (TER) preterido, ⚠️ à vista; botão "Aplicar"', has20(ask, /^💡 Reorganizar Sem\.40 Síndromes Febris: aula SÁB 17\/10 \(6,5h\) \(antes: QUI 15\/10\) · questões SEG 19\/10 \(seu movimento\) · apostila ⚠️ QUA 21\/10 \(9,3h, sem\. seguinte\) \(antes: DOM 18\/10\) · selagem SÁB 24\/10 \(5,0h, sem\. seguinte\) \(antes: QUA 21\/10 \(sem\. seguinte\)\)\.$/) && ask.btns[0] === 'Aplicar', ask.lines[ask.lines.length - 1]);
+        check('Proposta (mesma linguagem da redistribuição): aula ⚠️ SÁB 10/10 (6,3h + plantão) · questões SEG (seu movimento) · apostila ⚠️ QUA 14/10 (9,3h, sem. seguinte) · selagem SEX 16/10 (7,1h) — dia leve (TER 13/10) preterido, ⚠️ à vista; botão "Aplicar"', has20(ask, /^💡 Reorganizar Sem\.39 Endocardite Infecciosa \/ Meningite: aula ⚠️ SÁB 10\/10 \(6,3h \+ plantão\) \(antes: QUI 08\/10\) · questões SEG 12\/10 \(seu movimento\) · apostila ⚠️ QUA 14\/10 \(9,3h, sem\. seguinte\) \(antes: DOM 11\/10\) · selagem SEX 16\/10 \(7,1h, sem\. seguinte\) \(antes: QUA 14\/10 \(sem\. seguinte\)\)\.$/) && ask.btns[0] === 'Aplicar', ask.lines[ask.lines.length - 1]);
         await clickAsk(page, 'Aplicar');
         const cfg = await getLS(page, CFG), sch = await getLS(page, SCH);
-        check('"Aplicar" grava o movimento (SÁB e SEG editados) e a reorganização no plano do fio: fioPlan[14/10][1] = { aula: 3, apost: 7, seal: 10 }; diálogo fecha', JSON.stringify(cfg.fioPlan) === '{"2026-10-14":{"1":{"aula":3,"apost":7,"seal":10}}}' && Object.keys(sch || {}).sort().join(',') === '2026-10-17,2026-10-19' && !(await readAsk(page)), JSON.stringify(cfg.fioPlan) + ' ' + Object.keys(sch || {}).join(','));
+        check('"Aplicar" grava o movimento (SÁB e SEG editados) e a reorganização no plano do fio: fioPlan[07/10][1] = { aula: 3, apost: 7, seal: 9 }; diálogo fecha', JSON.stringify(cfg.fioPlan) === '{"2026-10-07":{"1":{"aula":3,"apost":7,"seal":9}}}' && Object.keys(sch || {}).sort().join(',') === '2026-10-10,2026-10-12' && !(await readAsk(page)), JSON.stringify(cfg.fioPlan) + ' ' + Object.keys(sch || {}).join(','));
         const w = await dumpWeek(page);
         check('Depois: aula do Fio 1 no SÁB, questões na SEG, nada na QUI/DOM; TER intacta', has(w.SAB, /^Fio 1 · toque 1/) && has(w.SEG, /^Fio 1 · toque 2/) && !has(w.QUI, /^Fio 1 · toque 1/) && !has(w.DOM, /^Fio 1 · toque 3/) && !has(w.SAB, /^Fio 1 · toque 2/), short(w.SAB) + ' || ' + short(w.SEG));
         await page.evaluate(() => { [...document.querySelectorAll('button')].find(b => b.innerText.trim() === '▶').click(); }); await page.waitForTimeout(400);
-        const w2 = await dumpWeek(page, ['QUA', 'SAB']);
-        check('Semana seguinte: apostila "Fio 1 (sem. passada) · toque 3" na QUA 21/10 e "Selar Fio 1 (sem. passada)" no SÁB 24/10 ⇒ Sem.40 Síndromes Febris', has(w2.QUA, /^Fio 1 \(sem\. passada\) · toque 3/) && /Síndromes Febris/.test(modOf(w2.QUA, /^Fio 1 \(sem\. passada\) · toque 3/)) && has(w2.SAB, /^Selar Fio 1 \(sem\. passada\)/), short(w2.QUA) + ' || ' + short(w2.SAB));
+        const w2 = await dumpWeek(page, ['QUA', 'SEX']);
+        check('Semana seguinte: apostila "Fio 1 (sem. passada) · toque 3" na QUA 14/10 e "Selar Fio 1 (sem. passada)" na SEX 16/10 ⇒ Sem.39 Endocardite Infecciosa / Meningite', has(w2.QUA, /^Fio 1 \(sem\. passada\) · toque 3/) && /Endocardite Infecciosa/.test(modOf(w2.QUA, /^Fio 1 \(sem\. passada\) · toque 3/)) && has(w2.SEX, /^Selar Fio 1 \(sem\. passada\)/) && /Endocardite Infecciosa/.test(modOf(w2.SEX, /^Selar Fio 1 \(sem\. passada\)/)), short(w2.QUA) + ' || ' + short(w2.SEX));
     });
     await scenario(browser, 'S20b-apostila-no-dia-do-banco-1410', '2026-10-14', { [CFG]: cfg20 }, async (page) => {
         await clickDay(page, 'SEX'); await moveViaUI(page, /^D4: Apostila do Bloco A/, 5);
@@ -1027,21 +1031,20 @@ async function scenario(browser, name, dateISO, seeds, fn) {
     });
 
     const removeViaUI = async (page, blockRe) => { await page.evaluate(() => { if (![...document.querySelectorAll('button')].some(b => b.innerText.trim() === '✓ Pronto')) { const e = [...document.querySelectorAll('button')].find(b => b.innerText.trim() === '✎ Reorganizar dia'); if (e) e.click(); } }); await page.waitForTimeout(200); const r = await page.evaluate((bs) => { const bre = new RegExp(bs); const blocks = [...document.querySelectorAll('div')].filter(el => el.style && /^3px solid/.test(el.style.borderLeft)); const el = blocks.find(b => { const body = b.children[0] && b.children[0].children[2]; const s = body && body.querySelector('span'); return s && bre.test(s.textContent.trim()); }); if (!el) return 'bloco não encontrado: ' + bs; const b = [...el.querySelectorAll('button')].find(b => /remover/.test(b.innerText)); if (!b) return 'botão remover não encontrado'; b.click(); return true; }, blockRe.source); if (r !== true) throw new Error(r); await page.waitForTimeout(300); };
-    await scenario(browser, 'S20g-etapa-apagada-recolocada-1410', '2026-10-14', { [CFG]: cfg20 }, async (page) => {
+    // (re-datado na Trilha, 20/10: Sem.40 — em 14/10 a reorganização caía na Trilha a partir de 20/10)
+    await scenario(browser, 'S20g-etapa-apagada-recolocada-0710', '2026-10-07', { [CFG]: cfg20b }, async (page) => {
         await clickDay(page, 'DOM'); await removeViaUI(page, /^Fio 1 · toque 3/);
-        check('DOM 18/10 editado à mão: apostila do Fio 1 apagada (override gravado)', Object.keys((await getLS(page, SCH)) || {}).join(',') === '2026-10-18' && !has(await readDay(page), /^Fio 1 · toque 3/));
+        check('DOM 11/10 editado à mão: apostila do Fio 1 apagada (override gravado)', Object.keys((await getLS(page, SCH)) || {}).join(',') === '2026-10-11' && !has(await readDay(page), /^Fio 1 · toque 3/));
         await clickDay(page, 'SAB'); await moveViaUI(page, /^Fio 1 · toque 2/, 2);
         let ask = await readAsk(page);
-        check('Questões SÁB → SEX (intervalo em si na faixa) MAS a apostila apagada entra como ausente: "⚠️ a apostila deste módulo não está em nenhum dia desta semana (apagada de um dia editado — a cascata a esperava DOM 18/10)" — nunca "tudo na faixa" por ficção', has20(ask, /^⚠️ a apostila deste módulo não está em nenhum dia desta semana \(apagada de um dia editado — a cascata a esperava DOM 18\/10\)$/) && !has20(ask, /^⚠️ Isso deixa/) && JSON.stringify(ask.btns) === JSON.stringify(['Mover assim mesmo', 'Ver como reorganizar o fio', 'Cancelar']), JSON.stringify(ask && ask.lines));
+        check('Questões SÁB → SEX (intervalo em si na faixa) MAS a apostila apagada entra como ausente: "⚠️ a apostila deste módulo não está em nenhum dia desta semana (apagada de um dia editado — a cascata a esperava DOM 11/10)" — nunca "tudo na faixa" por ficção', has20(ask, /^⚠️ a apostila deste módulo não está em nenhum dia desta semana \(apagada de um dia editado — a cascata a esperava DOM 11\/10\)$/) && !has20(ask, /^⚠️ Isso deixa/) && JSON.stringify(ask.btns) === JSON.stringify(['Mover assim mesmo', 'Ver como reorganizar o fio', 'Cancelar']), JSON.stringify(ask && ask.lines));
         await clickAsk(page, 'Ver como reorganizar o fio'); ask = await readAsk(page);
-        check('Proposta recoloca a apostila: "aula QUI 15/10 (fica) · questões SEX 16/10 (seu movimento) · apostila SÁB 17/10 (6,3h) (recolocada — estava apagada) · selagem SEG 19/10 (5,3h) (antes: QUA 21/10)"', has20(ask, /^💡 Reorganizar Sem\.40 Síndromes Febris: aula QUI 15\/10 \(fica\) · questões SEX 16\/10 \(seu movimento\) · apostila SÁB 17\/10 \(6,3h\) \(recolocada — estava apagada\) · selagem SEG 19\/10 \(5,3h\) \(antes: QUA 21\/10 \(sem\. seguinte\)\)\.$/) && ask.btns[0] === 'Aplicar', ask.lines[ask.lines.length - 1]);
+        check('Proposta recoloca a apostila: "aula QUI 08/10 (fica) · questões SEX 09/10 (seu movimento) · apostila ⚠️ SÁB 10/10 (6,1h + plantão) (recolocada — estava apagada) · selagem SEG 12/10 (5,3h) (antes: QUA 14/10)"', has20(ask, /^💡 Reorganizar Sem\.39 Endocardite Infecciosa \/ Meningite: aula QUI 08\/10 \(fica\) · questões SEX 09\/10 \(seu movimento\) · apostila ⚠️ SÁB 10\/10 \(6,1h \+ plantão\) \(recolocada — estava apagada\) · selagem SEG 12\/10 \(5,3h\) \(antes: QUA 14\/10 \(sem\. seguinte\)\)\.$/) && ask.btns[0] === 'Aplicar', ask.lines[ask.lines.length - 1]);
         await clickAsk(page, 'Aplicar');
         const cfg = await getLS(page, CFG); const w = await dumpWeek(page, ['QUI', 'SEX', 'SAB', 'DOM', 'SEG']);
-        check('"Aplicar": fioPlan[14/10][1] = { apost: 3, seal: 5 }; cadeia completa de novo — aula QUI, questões SEX, apostila SÁB (recolocada), selagem SEG; DOM segue sem ela', JSON.stringify(cfg.fioPlan) === '{"2026-10-14":{"1":{"apost":3,"seal":5}}}' && has(w.QUI, /^Fio 1 · toque 1/) && has(w.SEX, /^Fio 1 · toque 2/) && has(w.SAB, /^Fio 1 · toque 3/) && has(w.SEG, /^Selar Fio 1:/) && !has(w.DOM, /^Fio 1 · toque 3/), JSON.stringify(cfg.fioPlan));
+        check('"Aplicar": fioPlan[07/10][1] = { apost: 3, seal: 5 }; cadeia completa de novo — aula QUI, questões SEX, apostila SÁB (recolocada), selagem SEG; DOM segue sem ela', JSON.stringify(cfg.fioPlan) === '{"2026-10-07":{"1":{"apost":3,"seal":5}}}' && has(w.QUI, /^Fio 1 · toque 1/) && has(w.SEX, /^Fio 1 · toque 2/) && has(w.SAB, /^Fio 1 · toque 3/) && has(w.SEG, /^Selar Fio 1:/) && !has(w.DOM, /^Fio 1 · toque 3/), JSON.stringify(cfg.fioPlan));
     });
 
     await browser.close();
-    const fails = H.results.filter(r => !r.ok);
-    console.log(`\n══════════ RESUMO: ${H.results.length} checks · ${H.results.length - fails.length} ✅ · ${fails.length} ❌ ══════════`);
-    fails.forEach(f => console.log('  ❌ ' + f.id + (f.evidence ? ' — ' + f.evidence : '')));
+    H.summary('audit');
 })();
