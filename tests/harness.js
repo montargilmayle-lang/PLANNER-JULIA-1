@@ -4,26 +4,48 @@ const path = require('path');
 
 const FILE = process.env.PLANNER_FILE || path.resolve('/home/user/PLANNER-JULIA-1/planner_residencia_2026_offline.html');
 
-async function openPlanner(browser, dateISO, seeds = {}) {
-    const ctx = await browser.newContext({ viewport: { width: 420, height: 900 }, locale: 'pt-BR', timezoneId: 'America/Bahia' });
+// seeds: { chave: valor } (JSON.stringify) · opts.raw = { chave: string } (cópia literal do localStorage — H.reopen)
+async function openPlanner(browser, dateISO, seeds = {}, opts = {}) {
+    const ctx = await browser.newContext({ viewport: { width: 420, height: 900 }, locale: 'pt-BR', timezoneId: 'America/Bahia', acceptDownloads: true });
     const page = await ctx.newPage();
-    page.on('pageerror', e => console.log('  [pageerror]', e.message));
+    page.on('pageerror', e => { console.log('  [pageerror]', e.message); results.push({ id: 'pageerror (' + dateISO + '): ' + e.message, ok: false, evidence: '' }); }); // erro de página = ❌ (a tela de erro não pode passar em verde)
+    page.on('console', m => { if (m.type() === 'error' && !/favicon|net::ERR/.test(m.text())) { console.log('  [console.error]', m.text().slice(0, 300)); results.push({ id: 'console.error (' + dateISO + '): ' + m.text().slice(0, 160), ok: false, evidence: '' }); } });
     await page.addInitScript((dd) => {
         const F = new Date(dd + 'T12:00:00').getTime(); const O = Date;
         class M extends O { constructor(...a) { a.length === 0 ? super(F) : super(...a); } static now() { return F; } }
         window.Date = M;
     }, dateISO);
-    await page.addInitScript((s) => {
+    await page.addInitScript(([s, raw]) => {
+        if (sessionStorage.getItem('__pw_seeded')) return; // seeds só na 1ª carga (reload não sobrescreve o que o app gravou)
+        sessionStorage.setItem('__pw_seeded', '1');
         // evita o seed da semana da prova (27/06) interferir: marca como já aplicado
         localStorage.setItem('medplanner_seed_weekend_20260627', 'true');
         for (const k of Object.keys(s)) localStorage.setItem(k, JSON.stringify(s[k]));
-    }, seeds);
+        for (const k of Object.keys(raw || {})) localStorage.setItem(k, raw[k]);
+    }, [seeds, opts.raw || null]);
     await page.route('**/*', r => r.request().url().startsWith('file://') ? r.continue() : r.abort());
     await page.goto('file://' + FILE, { waitUntil: 'load' });
     await page.waitForTimeout(1200);
     return { ctx, page };
 }
 
+async function listDayTabs(page) { // abas da semana visível: [{ code, date }] (a Sem.41 tem 6, a Trilha começa na TER, a Sem.52 tem 4)
+    return page.evaluate(() => [...document.querySelectorAll('button')].map(b => b.innerText.split('\n').map(s => s.trim())).filter(t => t.length >= 3 && /^\d\d\/\d\d$/.test(t[2])).map(t => ({ code: t[1], date: t[2] })));
+}
+async function clickDate(page, ddmm) {
+    const ok = await page.evaluate((dm) => { const bs = [...document.querySelectorAll('button')].filter(b => { const t = b.innerText.split('\n').map(s => s.trim()); return t.length >= 3 && t[2] === dm; }); if (!bs.length) return false; bs[0].click(); return true; }, ddmm);
+    if (!ok) throw new Error('aba de data não encontrada: ' + ddmm);
+    await page.waitForTimeout(150);
+}
+async function reopen(browser, ctx, page, dateISO) { // troca o relógio mantendo o localStorage (sem reload: novo contexto com cópia literal)
+    const raw = await page.evaluate(() => { const o = {}; for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); o[k] = localStorage.getItem(k); } return o; });
+    await ctx.close();
+    return openPlanner(browser, dateISO, {}, { raw });
+}
+async function navWeek(page, delta) { // ◀ (−1) / ▶ (+1)
+    for (let i = 0; i < Math.abs(delta); i++) { const ok = await page.evaluate((d) => { const b = [...document.querySelectorAll('button')].find(x => x.innerText.trim() === (d < 0 ? '◀' : '▶')); if (!b) return false; b.click(); return true; }, delta); if (!ok) throw new Error('botão de semana não encontrado'); await page.waitForTimeout(120); }
+}
+async function headerWeek(page) { return page.evaluate(() => { const t = document.body.innerText; const m = t.match(/Sem\.\n?(\d+)/); const r = t.match(/(\d\d\/\d\d)–(\d\d\/\d\d) · (auto|manual)/); return { week: m ? Number(m[1]) : null, range: r ? r[1] + '–' + r[2] : null }; }); }
 async function clickDay(page, code) {
     // botões das abas de dia: "⭐\nQUA\n09/09"
     const ok = await page.evaluate((code) => {
@@ -73,18 +95,23 @@ async function readDay(page) {
             }
             const mods = body ? [...body.querySelectorAll('div')].filter(d => /^↳/.test(d.textContent.trim())).map(d => d.textContent.replace(/^↳\s*/, '').trim()) : []; // grupo com N módulos: uma linha ↳ por módulo
             // T1/T2: tarefas marcáveis do bloco (botões "… (toque N) ✓" / "Selagem ✓"), ✓ principal e inputs de %
-            const tasks = [...el.querySelectorAll('button')].map(b => b.innerText.trim()).filter(t => /\(toque \d\) ✓|Selagem ✓|Aula presencial ✓/.test(t));
+            const tasks = [...el.querySelectorAll('button')].map(b => b.innerText.trim()).filter(t => /\(toque \d\) ✓|Selagem ✓|Aula presencial ✓|Aula feita em áudio ✓/.test(t));
             const done = !!(row.children[0] && row.children[0].textContent.trim() === '✓');
             const pctInputs = [...el.querySelectorAll('input[placeholder="%"]')].map(i => i.value);
-            return { tag, text, time, mod, mods, tasks, done, pctInputs };
+            const tm = el.getAttribute('data-tm'), ts = el.getAttribute('data-ts'), au = el.getAttribute('data-au');
+            const notes = body ? [...body.querySelectorAll('div')].filter(d => d.children.length === 0 && /^(⚠️ a aula|🎬|🎧 no plantão)/.test(d.textContent.trim())).map(d => d.textContent.trim()) : [];
+            return { tag, text, time, mod, mods, tasks, done, pctInputs, tm: tm == null ? null : Number(tm), ts: ts || null, au: au ? 1 : 0, notes };
         });
         // cabeçalho do dia
         const venvEl = [...document.querySelectorAll('div')].find(d => d.style && d.style.color === 'rgb(245, 197, 24)' && /^💊/.test(d.textContent.trim()));
         const venv = venvEl ? venvEl.textContent.replace(/^💊\s*/, '').trim() : '';
-        const titleEl = venvEl ? venvEl.previousElementSibling : null;
+        const typeEl = document.querySelector('[data-t="day-type"]');
+        const dayType = typeEl ? typeEl.textContent.replace(/^🗓️\s*/, '').trim() : '';
+        const titleEl = typeEl ? typeEl.previousElementSibling : (venvEl ? venvEl.previousElementSibling : null);
         const title = titleEl ? titleEl.textContent.trim() : '';
+        const date = (title.match(/(\d\d\/\d\d)/) || [])[1] || '';
         const warn = [...document.querySelectorAll('div')].filter(d => d.style && (d.style.color === 'rgb(248, 113, 113)' || d.style.color === 'rgb(245, 197, 24)') && /acima d[eo]/.test(d.textContent) && d.style.fontSize === '9px').map(d => d.textContent.trim());
-        const simBtn = [...document.querySelectorAll('button')].map(b => b.innerText.trim()).find(t => /Simulado marcado|Sexta de estudo ativo|Sexta de plantão/.test(t)) || null;
+        const simBtn = [...document.querySelectorAll('button')].map(b => b.innerText.trim()).find(t => /Simulado marcado|Sexta de estudo ativo|Sexta de plantão|último dia de acesso: sem simulado/.test(t)) || null;
         const weekBadge = ([...document.querySelectorAll('span')].map(s => s.textContent.trim()).find(t => /^Sem\.\d+$/.test(t))) || '';
         const hdr = [...document.querySelectorAll('span')].map(s => s.textContent.trim()).find(t => /% das semanas/.test(t)) || '';
         const lsel = [...document.querySelectorAll('select')].find(s => [...s.options].some(o => /^Auto · /.test(o.textContent)));
@@ -92,18 +119,24 @@ async function readDay(page) {
         const lightBadge = !![...document.querySelectorAll('div')].find(d => d.children.length === 0 && /^🌿 Hoje sem Venvanse/.test(d.textContent.trim()));
         const breatherBadge = !![...document.querySelectorAll('div')].find(d => d.children.length === 0 && /^🌬️ Dia de respiro/.test(d.textContent.trim()));
         if (light) light.label = lsel.previousElementSibling ? lsel.previousElementSibling.textContent.trim() : '';
-        return { title, venv, warn, simBtn, weekBadge, pct: hdr, blocks: list, light, lightBadge, breatherBadge };
+        return { title, date, venv, dayType, warn, simBtn, weekBadge, pct: hdr, blocks: list, light, lightBadge, breatherBadge };
     });
 }
 
 function fmt(day) {
     const out = [];
-    out.push(`  ▸ ${day.title} · 💊 ${day.venv}` + (day.warn.length ? ' · ' + day.warn.join(' · ') : '') + (day.simBtn ? ' · [btn] ' + day.simBtn : '') + (day.lightBadge ? ' · 🌿 SELO' : '') + (day.breatherBadge ? ' · 🌬️ RESPIRO' : '') + (day.light ? ` · [🌿 ${day.light.value === 'auto' ? day.light.auto : 'manual ' + day.light.value} · ${day.light.note}]` : ''));
-    day.blocks.forEach((b, i) => out.push(`     ${String(i + 1).padStart(2)}. [${b.tag}] ${b.text}${b.time ? ' {' + b.time + '}' : ''}${b.mod ? '  ⇒ ' + b.mod : ''}`));
+    out.push(`  ▸ ${day.title} · ${day.dayType ? '🗓️ ' + day.dayType + (day.venv ? ' · 💊 ' + day.venv : '') : '💊 ' + day.venv}` + (day.warn.length ? ' · ' + day.warn.join(' · ') : '') + (day.simBtn ? ' · [btn] ' + day.simBtn : '') + (day.lightBadge ? ' · 🌿 SELO' : '') + (day.breatherBadge ? ' · 🌬️ RESPIRO' : '') + (day.light ? ` · [🌿 ${day.light.value === 'auto' ? day.light.auto : 'manual ' + day.light.value} · ${day.light.note}]` : ''));
+    day.blocks.forEach((b, i) => out.push(`     ${String(i + 1).padStart(2)}. [${b.tag}] ${b.text}${b.time ? ' {' + b.time + '}' : ''}${b.mod ? '  ⇒ ' + b.mod : ''}${b.tm != null ? '  ‹tm=' + b.tm + ' ts=' + b.ts + (b.au ? ' au' : '') + '›' : ''}`));
     return out.join('\n');
 }
 
 const results = [];
+function summary(label) { // imprime o resumo e devolve código ≠ 0 em qualquer falha (bateria "verde" tem que significar algo)
+    const ok = results.filter(r => r.ok).length, bad = results.filter(r => !r.ok);
+    console.log(`\n══════════ RESUMO${label ? ' ' + label : ''}: ${results.length} checks · ${ok} ✅ · ${bad.length} ❌ ══════════`);
+    bad.forEach(r => console.log('   ❌ ' + r.id + (r.evidence ? ' — ' + r.evidence : '')));
+    if (bad.length) process.exitCode = 1;
+}
 function check(id, cond, evidence) { results.push({ id, ok: !!cond, evidence }); console.log(`   ${cond ? '✅' : '❌'} ${id}${evidence ? ' — ' + evidence : ''}`); }
 function idx(day, re) { return day.blocks.findIndex(b => re.test(b.text)); }
 function has(day, re) { return idx(day, re) >= 0; }
@@ -188,7 +221,7 @@ async function readCard(page, titleRe) { // aba MÓDULOS: busca pelo título e l
         const m = c.textContent.match(/Consolidado (\d\d\/\d\d)(?: · D\+7 (\d\d\/\d\d))?(?: · D\+30 (\d\d\/\d\d))?/);
         const pcts = [...c.querySelectorAll('input[placeholder="%"]')].map(i => i.value);
         const labels = [...c.querySelectorAll('span')].map(s => s.textContent.trim()).filter(t => /^% /.test(t));
-        return { btns, consolidado: m ? m[1] : null, d7: m ? m[2] : null, d30: m ? m[3] : null, pcts, labels, pct: (c.textContent.match(/(\d+)%\s*(Completo|Em progresso|Não iniciado)/) || [])[1] };
+        return { btns, consolidado: m ? m[1] : null, d7: m ? m[2] : null, d30: m ? m[3] : null, pcts, labels, pct: ([...c.querySelectorAll('div')].map(d => d.textContent.trim()).find(t => /^\d{1,3}%$/.test(t)) || '').replace('%', '') || (c.textContent.match(/(\d+)%\s*(Completo|Em progresso|Não iniciado)/) || [])[1] };
     }, titleRe.source);
 }
 async function clickCardBtn(page, titleRe, labelRe) {
@@ -223,4 +256,15 @@ async function typeCardPct(page, titleRe, field, value) { // field: 'accD2' | 'a
 }
 async function getLS(page, key) { return page.evaluate((k) => JSON.parse(localStorage.getItem(k) || 'null'), key); }
 async function bodyText(page) { return page.evaluate(() => document.body.innerText); }
-module.exports = { pw, openPlanner, clickDay, clickTab, readDay, fmt, check, idx, has, results, FILE, setLight, hoursOf, expectedLight, fmtH, LBL7, DAYS7, clickTask, typeBlockPct, readCard, clickCardBtn, typeCardPct, getLS, bodyText, parseH };
+// ── Trilha: utilitários comuns (trilha.js, audit.js) ──
+const TRAIL_FIELD = { aula: 'aula', quest: 'questoesD2', apost: 'apostila', seal: 'smartcard' }, TRAIL_STAMP = { aula: 'aulaAt', quest: 'questoesD2At', apost: 'apostilaAt', seal: 'smartcardAt' };
+async function setLS(page, key, val) { await page.evaluate(([k, v]) => localStorage.setItem(k, JSON.stringify(v)), [key, val]); }
+// marca no registro da Trilha (direto no localStorage) toda etapa planejada com data ≤ até, carimbada no dia dela — "ela fez tudo no dia"
+async function markUntil(page, ate, except = []) {
+    const cfg = await getLS(page, 'medplanner_config_v1'); const tr = (await getLS(page, 'medplanner_trail_v1')) || {};
+    Object.entries(cfg.trilhaPlan || {}).forEach(([id, p]) => { Object.keys(TRAIL_FIELD).forEach(ts => { if (!p[ts] || p[ts] > ate || except.some(e => e[0] === Number(id) && e[1] === ts)) return; const r = (tr[id] = tr[id] || {}); r[TRAIL_FIELD[ts]] = true; r[TRAIL_STAMP[ts]] = p[ts]; }); const r = tr[id]; if (r && Object.keys(TRAIL_FIELD).every(ts => r[TRAIL_FIELD[ts]]) && !r.completedAt) r.completedAt = r.smartcardAt; });
+    await setLS(page, 'medplanner_trail_v1', tr);
+}
+async function banner(page, key) { return page.evaluate((k) => { const el = document.querySelector('[data-t="' + k + '"]'); return el ? { text: el.innerText, btns: [...el.querySelectorAll('button')].map(b => b.innerText.trim()) } : null; }, key); }
+async function clickIn(page, key, label) { const ok = await page.evaluate(([k, l]) => { const el = document.querySelector('[data-t="' + k + '"]'); const b = el && [...el.querySelectorAll('button')].find(b => b.innerText.trim() === l || b.innerText.trim().startsWith(l)); if (!b) return false; b.click(); return true; }, [key, label]); if (!ok) throw new Error('botão não encontrado em ' + key + ': ' + label); await page.waitForTimeout(350); }
+module.exports = { pw, openPlanner, clickDay, clickTab, readDay, fmt, check, idx, has, results, FILE, setLight, hoursOf, expectedLight, fmtH, LBL7, DAYS7, clickTask, typeBlockPct, readCard, clickCardBtn, typeCardPct, getLS, bodyText, parseH, listDayTabs, clickDate, reopen, navWeek, headerWeek, summary, setLS, markUntil, banner, clickIn, TRAIL_FIELD, TRAIL_STAMP };
