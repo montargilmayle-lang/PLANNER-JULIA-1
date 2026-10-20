@@ -25,6 +25,7 @@ async function trailMap(page, nWeeks) { // navega da semana visível por n seman
     return map;
 }
 const allText = (day) => [day.title, day.dayType, day.venv].concat(day.warn, day.blocks.map(b => b.text + ' ' + (b.notes || []).join(' '))).join(' | ');
+async function revStatus(page) { return page.evaluate(() => [...document.querySelectorAll('[data-t="rev-status"]')].map(e => ({ text: e.innerText.trim(), fits: e.scrollWidth <= e.clientWidth + 1 && e.offsetHeight > 0 }))); } // linha de estado da revisão da Trilha (decisão 73)
 async function trilhaRows(page) { await clickTab(page, 'TRILHA'); return page.evaluate(() => ({ rows: [...document.querySelectorAll('[data-t="trilha-row"]')].map(r => ({ id: Number(r.getAttribute('data-id')), pos: Number(r.getAttribute('data-pos')), planned: r.getAttribute('data-planned') === '1', pinned: r.getAttribute('data-pinned') === '1', text: r.innerText.replace(/\n/g, ' '), btns: [...r.querySelectorAll('button')].map(b => b.innerText.trim()) })), lineAfter: (() => { const l = document.querySelector('[data-t="trilha-line"]'); const p = l && l.previousElementSibling; return p ? Number(p.getAttribute('data-pos')) : null; })(), line: (document.querySelector('[data-t="trilha-line"]') || {}).innerText || '', counts: (document.querySelector('[data-t="trilha-counts"]') || {}).innerText || '', ramp: (document.querySelector('[data-t="trilha-ramp"]') || {}).innerText || '' })); }
 async function clickRow(page, id, label) { const ok = await page.evaluate(([i, l]) => { const r = document.querySelector('[data-t="trilha-row"][data-id="' + i + '"]'); const b = r && [...r.querySelectorAll('button')].find(b => b.innerText.trim() === l); if (!b) return false; b.click(); return true; }, [id, label]); if (!ok) throw new Error('botão ' + label + ' da linha ' + id + ' não encontrado'); await page.waitForTimeout(300); }
 const DEFAULT12 = [5, 6, 14, 19, 24, 32, 34, 85, 86, 1, 2, 3];
@@ -434,6 +435,62 @@ const DEFAULT12 = [5, 6, 14, 19, 24, 32, 34, 85, 86, 1, 2, 3];
         check('semana sem etapa não diz "Todas as etapas desta semana estão marcadas" nem oferece ⏩', !(await banner(page, 'trilha-adv')));
         await navWeek(page, 1); const n2 = await page.evaluate(() => [...document.querySelectorAll('[data-t="trilha-panel"] [data-mod]')].filter(e => e.getAttribute('data-kind') === 'novo').length);
         check('a T2 volta à rampa: prévia com 4 novos', n2 === 4, 'T2 novos=' + n2);
+    });
+
+    // ── TR15 · decisão 73 (paciente, 20/10): revisão vencida que passaria o dia de 14,5h vira opcional e desliza, sem ⏳ e sem tom de atraso ──
+    // 1º acesso 20/10, ela faz tudo no dia; a selagem de CIR1 (26/10) com 85% ⇒ D+7 em +10 dias = QUI 05/11 (plantão 06h–17h, dia já com 14,5h)
+    await scenario(browser, 'TR15-revisao-dia-cheio-0511', '2026-10-20', {}, async (S) => {
+        let page = S.page;
+        await markUntil(page, '2026-10-26'); await page.evaluate(() => { const t = JSON.parse(localStorage.getItem('medplanner_trail_v1')); t[5].accSelagem = 85; localStorage.setItem('medplanner_trail_v1', JSON.stringify(t)); });
+        page = await S.reopen('2026-10-27'); await markUntil(page, '2026-11-02');
+        page = await S.reopen('2026-11-03'); await markUntil(page, '2026-11-04');
+        page = await S.reopen('2026-11-05');
+        const qui = await readDay(page); const rv = qui.blocks.find(b => /^Revisão adaptativa/.test(b.text));
+        const tot = qui.blocks.reduce((a, b) => a + H.parseH(b.time), 0);
+        check('QUI 05/11 (14,5h sem a revisão): o bloco vira "Revisão adaptativa — opcional hoje: o dia já está cheio; se não fizer, ela passa para SÁB 07/11" (opcional), o dia fica em ' + tot.toFixed(2).replace('.', ',') + 'h e sem ⚠️ de tempo hábil', !!rv && rv.text === 'Revisão adaptativa — opcional hoje: o dia já está cheio; se não fizer, ela passa para SÁB 07/11' && rv.time === 'opcional' && tot <= 14.5 + 1e-9 && !qui.warn.some(w => /tempo hábil/.test(w)), (rv && rv.text) + ' | ' + qui.warn.join(' · '));
+        check('o bloco opcional mantém "Revisei" + % (como no plantão longo)', /Revisei/.test(await bodyText(page)));
+        const st = await revStatus(page);
+        check('alerta e seção do dia sem tom de atraso, em linha própria visível no celular (420px, sem reticências): "Opcional hoje: o dia está cheio; passa para SÁB 07/11." — nunca "em atraso"', st.length >= 2 && st.every(x => x.text === 'Opcional hoje: o dia está cheio; passa para SÁB 07/11.' && x.fits) && !/em atraso/.test(await bodyText(page)), JSON.stringify(st));
+        await clickDate(page, '07/11'); const stF = await revStatus(page); await clickDate(page, '05/11');
+        check('navegando para o SÁB 07/11 (futuro): a seção do dia diz "Passa para este dia (o dia em que venceu está cheio)." — nunca "Passou para hoje" (o card do topo segue falando de hoje)', stF.some(x => x.text === 'Passa para este dia (o dia em que venceu está cheio).') && !stF.some(x => /^Passou para hoje/.test(x.text)), JSON.stringify(stF));
+        check('nenhum ⏳ (revisão não é etapa pendente)', !(await banner(page, 'trilha-pending')));
+        await markUntil(page, '2026-11-06'); page = await S.reopen('2026-11-07');
+        const sab = await readDay(page); const rv2 = sab.blocks.find(b => /^Revisão adaptativa/.test(b.text));
+        const st2 = await revStatus(page);
+        check('SÁB 07/11 (1º dia com folga; a SEX 06/11 é simulado): revisão normal de 45min e "Passou para hoje (o dia em que venceu estava cheio)." visível, sem "em atraso"', !!rv2 && rv2.text === 'Revisão adaptativa (o app avisa pelo seu %)' && rv2.time === '45min' && st2.length >= 2 && st2.every(x => x.text === 'Passou para hoje (o dia em que venceu estava cheio).' && x.fits) && !/em atraso/.test(await bodyText(page)), (rv2 && rv2.text) + ' | ' + JSON.stringify(st2));
+    });
+    // ── TR15c · o passado é julgado como foi: depois de "Recolocar" (as etapas saem do dia cheio), a revisão continua "passou", nunca "em atraso" ──
+    const chain0511 = async (S, seeds) => { let page = S.page;
+        await markUntil(page, '2026-10-26'); await page.evaluate(() => { const t = JSON.parse(localStorage.getItem('medplanner_trail_v1')); t[5].accSelagem = 85; localStorage.setItem('medplanner_trail_v1', JSON.stringify(t)); });
+        page = await S.reopen('2026-10-27'); await markUntil(page, '2026-11-02');
+        page = await S.reopen('2026-11-03'); await markUntil(page, '2026-11-04');
+        if (seeds) await page.evaluate((v) => localStorage.setItem('medplanner_schedule_v1', JSON.stringify(v)), seeds);
+        return S.reopen('2026-11-05'); };
+    await scenario(browser, 'TR15c-revisao-depois-de-recolocar-0711', '2026-10-20', {}, async (S) => {
+        let page = await chain0511(S);
+        check('05/11 aberto com a revisão opcional ⇒ trilhaRevFull["2026-11-05"] = true (o dia cheio fica registrado)', ((await getLS(page, CFG)).trilhaRevFull || {})['2026-11-05'] === true, JSON.stringify((await getLS(page, CFG)).trilhaRevFull));
+        page = await S.reopen('2026-11-07'); // as etapas de 05/11 ficaram sem marcar ⇒ ⏳
+        await clickIn(page, 'trilha-pending', 'Ver como recolocar'); await clickIn(page, 'trilha-pending', 'Aplicar');
+        const st = await revStatus(page);
+        check('depois de "Recolocar" tirar as etapas de 05/11, a revisão segue "Passou para hoje (o dia em que venceu estava cheio)." — nunca "em atraso"', st.length >= 1 && st.every(x => x.text === 'Passou para hoje (o dia em que venceu estava cheio).') && !/em atraso/.test(await bodyText(page)), JSON.stringify(st));
+    });
+    // ── TR15d · a folga é medida na lista REAL: SÁB 07/11 editado à mão a 14h ⇒ o app aponta o DOM 08/11 ──
+    await scenario(browser, 'TR15d-revisao-dia-editado-0511', '2026-10-20', {}, async (S) => {
+        const page = await chain0511(S, { '2026-11-07': [{ id: 'e1', d: 'EXTRA', color: '#0EA5E9', text: 'Compromisso longo (editado)', time: '14h' }] });
+        const rv = (await readDay(page)).blocks.find(b => /^Revisão adaptativa/.test(b.text));
+        check('QUI 05/11: "… se não fizer, ela passa para DOM 08/11" (o SÁB 07/11 editado não tem folga)', !!rv && rv.text === 'Revisão adaptativa — opcional hoje: o dia já está cheio; se não fizer, ela passa para DOM 08/11', rv && rv.text);
+    });
+    // ── TR15e · depois de 01/01 a regra da Trilha para: a revisão volta ao texto de sempre (nada de "o dia está cheio") ──
+    await scenario(browser, 'TR15e-revisao-depois-de-0101', '2027-01-04', { [TRL]: { 5: { aula: true, questoesD2: true, apostila: true, smartcard: true, aulaAt: '2026-12-15', questoesD2At: '2026-12-16', apostilaAt: '2026-12-17', smartcardAt: '2026-12-23', completedAt: '2026-12-23', accSelagem: 85 } } }, async (S) => {
+        const st = await revStatus(S.page);
+        check('04/01/2027 (revisão D+7 venceu 02/01): "2d em atraso." como antes — nenhum "o dia está cheio" depois do fim da Trilha', st.length >= 1 && st.every(x => x.text === '2d em atraso.') && !/o dia está cheio/.test(await bodyText(S.page)), JSON.stringify(st));
+    });
+    // ── TR15b · decisão 73 no limiar reduzido: dia de 04h30 (📚 a 5h) — a revisão que passaria de 5h de estudo vira opcional ──
+    const tr15b = { ...mkTrail(plan3, '2026-11-24'), 60: { aula: true, questoesD2: true, apostila: true, smartcard: true, aulaAt: '2026-11-05', questoesD2At: '2026-11-06', apostilaAt: '2026-11-07', smartcardAt: '2026-11-15', completedAt: '2026-11-15', accSelagem: 85 } };
+    await scenario(browser, 'TR15b-revisao-limiar-reduzido-2511', '2026-11-25', { [CFG]: cfg3, [TRL]: tr15b }, async (S) => {
+        const page = S.page; const qua = await readDay(page); const rv = qua.blocks.find(b => /^Revisão adaptativa/.test(b.text));
+        const st = H.hoursOf(qua);
+        check('QUA 25/11 (04h30): com a revisão o estudo passaria de 5h ⇒ "Revisão adaptativa — opcional hoje…" (opcional), estudo do dia ' + st.toFixed(2).replace('.', ',') + 'h ≤ 5h', !!rv && /^Revisão adaptativa — opcional hoje: o dia já está cheio; se não fizer, ela passa para (SÁB|DOM) \d\d\/11$/.test(rv.text) && rv.time === 'opcional' && st <= 5 + 1e-9, (rv && rv.text) + ' · estudo ' + st.toFixed(2));
     });
 
     // ── TR14 · registro em 1 toque no bloco e "Revisei" no registro da Trilha ──

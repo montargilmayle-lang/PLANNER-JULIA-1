@@ -1138,7 +1138,32 @@ function trilhaAudioTarget(iso, P, trail) { // plantão longo: a 1ª aula planej
         .sort((a, b) => P.plan[a].aula < P.plan[b].aula ? -1 : P.plan[a].aula > P.plan[b].aula ? 1 : (P.qpos[a] || 0) - (P.qpos[b] || 0));
     return c.length ? { id: Number(c[0]), aula: P.plan[c[0]].aula } : null;
 }
-// Lista GERADA de um dia da Trilha. X = { cfg, P, trail, hoje, base, keepDone }. base = o dia sem etapas e sem revisão (capacidade do agendador).
+// ── Decisão 73 (paciente, 20/10): revisão vencida que levaria o dia acima do tempo hábil (14,5h) — ou, num dia de limiar reduzido (04h30,
+// pós-noturno, feriado mais leve), acima desse limiar — vira opcional e desliza para o próximo dia com folga, como no plantão longo:
+// sem entrar nos pendentes ⏳ e sem tom de atraso. O agendador não reserva a revisão (ela só existe depois do % da selagem).
+const REV_H = 0.75; // bloco "Revisão adaptativa" (45min)
+function trilhaRevOver(iso, l) { const lim = studyWarnFor(iso); return dayLoadHours(l) + REV_H > DAY_CAP_H + 1e-9 || (lim < STUDY_WARN_H && studyHours(l) + REV_H > lim + 1e-9); }
+const REV_BLOCK_RE = /^Revisão adaptativa|revisão no tempo morto/;
+function trilhaRevRoom(iso, X) { const sh = shiftFor(iso); if (!isTrilhaDay(iso) || (sh && sh.kind === "longo") || (dowOf(iso) === 5 && simForCfg(X.cfg || {}, iso))) return false; const ed = X.ov && X.ov[iso]; return !trilhaRevOver(iso, ed ? ed.filter(a => !(a.d === "REV" && REV_BLOCK_RE.test(a.text || ""))) : trilhaListFor(iso, { ...X, noRev: true })); } // dia em que a revisão cabe inteira (pela lista REAL: dia editado à mão vale como ela deixou)
+function trilhaRevNext(iso, X) { for (let d = addDaysISO(iso, 1); d <= TRILHA_END; d = addDaysISO(d, 1)) if (trilhaRevRoom(d, X)) return d; return null; }
+function trilhaReviewTone(revs, X, hoje, future) { // o atraso de uma revisão da Trilha conta do 1º dia que tinha folga para ela (deslizar não é atraso); dia cheio = opcional, nunca "em atraso"
+    if (hoje > TRILHA_END) return revs; // depois de 01/01 não há dia da Trilha: a revisão volta ao texto de sempre
+    const full = (X.cfg && X.cfg.trilhaRevFull) || {}; // dias que estavam cheios quando ela abriu o app (gravado no congelamento): o passado é julgado como foi, não pelo plano de hoje
+    const room = (d) => d < hoje && full[d] ? false : trilhaRevRoom(d, X);
+    return revs.map(r => {
+        if (r.src !== "trail") return r;
+        if (!trilhaRevRoom(hoje, X)) return { ...r, daysLate: 0, slid: true, optToday: true, next: trilhaRevNext(hoje, X), future };
+        let eff = null; for (let d = r.due < TRILHA_START ? TRILHA_START : r.due; d <= hoje; d = addDaysISO(d, 1)) if (room(d)) { eff = d; break; }
+        if (eff === r.due) return future ? { ...r, future } : r;
+        return { ...r, daysLate: diffDays(eff, hoje), slid: true, future };
+    }).sort((a, b) => a.daysLate - b.daysLate || a.week - b.week);
+}
+function trilhaReviewStatus(a) { // linha de estado da revisão da Trilha (quebra linha: nunca cortada com reticências no celular)
+    if (a.optToday) return (a.future ? "Opcional neste dia: o dia está cheio" : "Opcional hoje: o dia está cheio") + (a.next ? "; passa para " + DOW_LBL[dowOf(a.next)] + " " + fmtBR(a.next) : "; não há dia com folga até 01/01") + ".";
+    if (a.future) return a.slid && a.daysLate <= 0 ? "Passa para este dia (o dia em que venceu está cheio)." : a.daysLate > 0 ? "Venceu em " + DOW_LBL[dowOf(a.due)] + " " + fmtBR(a.due) + "." : "Vence neste dia.";
+    return a.daysLate > 0 ? a.daysLate + "d em atraso." : a.slid ? "Passou para hoje (o dia em que venceu estava cheio)." : "Vence hoje.";
+}
+// Lista GERADA de um dia da Trilha. X = { cfg, P, trail, hoje, base, keepDone, noRev }. base = o dia sem etapas e sem revisão (capacidade do agendador).
 function trilhaListFor(iso, X) {
     const cfg = X.cfg || {}, P = X.P || null, trail = X.trail || {}, hoje = X.hoje || todayISO();
     const sh = shiftFor(iso), dw = dowOf(iso), longo = !!sh && sh.kind === "longo";
@@ -1156,7 +1181,11 @@ function trilhaListFor(iso, X) {
         });
         (P.ghosts[iso] || []).forEach(g => { const m = modById(g.id); if (m) acts.push({ d: "EXTRA", color: "#475569", text: "↷ Trilha · " + m.code + " — " + TS_WORD[g.ts] + " recolocada para " + (g.to ? DOW_LBL[dowOf(g.to)] + " " + fmtBR(g.to) : "depois de 01/01 (segue no novo cursinho)"), time: "", gh: 1 }); });
         if (longo) { const au = trilhaAudioTarget(iso, P, trail); const m = au && modById(au.id); if (m) acts.push({ d: "D3", color: "#7E22CE", text: "🎧 Áudio (opcional, nos tempos mortos) — aula de " + m.code + " " + m.title + " (planejada " + DOW_LBL[dowOf(au.aula)] + " " + fmtBR(au.aula) + "). O conteúdo visual (imagens, ECG, dermatoscopia) precisa do vídeo depois.", time: "opcional", tm: m.id, ts: "aula", au: 1 }); }
-        if (!isSim && computeReviews(trail, iso).length) acts.push(longo ? AC("REV", "#15803D", "📱 revisão no tempo morto — 10 questões + smartcards", "opcional") : AC("REV", "#15803D", "Revisão adaptativa (o app avisa pelo seu %)", "45min")); // só se vencer; no plantão longo vira opcional e, se não marcada, aparece no próximo dia aberto
+        if (!isSim && !X.noRev && computeReviews(trail, iso).length) { // só se vencer; no plantão longo vira opcional e, se não marcada, aparece no próximo dia aberto
+            if (longo) acts.push(AC("REV", "#15803D", "📱 revisão no tempo morto — 10 questões + smartcards", "opcional"));
+            else if (!trilhaRevRoom(iso, X)) { const nx = trilhaRevNext(iso, X); acts.push(AC("REV", "#15803D", "Revisão adaptativa — opcional hoje: o dia já está cheio" + (nx ? "; se não fizer, ela passa para " + DOW_LBL[dowOf(nx)] + " " + fmtBR(nx) : "; não há dia com folga até 01/01: se não fizer, ela fica para depois do acesso"), "opcional")); } // decisão 73 (paciente, 20/10): como no plantão longo — sem ⏳ e sem tom de atraso
+            else acts.push(AC("REV", "#15803D", "Revisão adaptativa (o app avisa pelo seu %)", "45min"));
+        }
     }
     if (dw === 6) acts.push(AC("PLAN", "#0F766E", "Implementação de intenção + RECOMPENSA por escrito · pomodoros: aba Trilha · backup semanal", "15min"));
     if (iso === "2026-12-29") acts.push(AC("PLAN", "#0F766E", "📦 Exportar da plataforma o que é seu (apostilas, resumos, cadernos de erros) + 💾 backup do app — o acesso termina em 01/01", ""));
@@ -1411,6 +1440,7 @@ function trilhaFinalPlan(P, cfg, trail, hoje, edited) { // 📦 semana final (29
 function trilhaFreezePatch(cfg, trail, hoje, P, scheduleOv) { // o que o App grava (um único saveConfig): 1º acesso, semanas a congelar, semana final
     const patch = {}; let changed = false;
     if (!cfg.trilhaFirstOpen) { patch.trilhaFirstOpen = hoje; changed = true; }
+    if (!(cfg.trilhaRevFull || {})[hoje] && computeReviews(trail, hoje).length && !trilhaRevRoom(hoje, { cfg, P, trail, hoje, ov: scheduleOv })) { patch.trilhaRevFull = { ...(cfg.trilhaRevFull || {}), [hoje]: true }; changed = true; } // decisão 73: o dia em que a revisão ficou opcional fica registrado como cheio
     const weeksAll = { ...(cfg.trilhaWeeks || {}) }, planAll = { ...(cfg.trilhaPlan || {}) }; let froze = false;
     for (let w = P.L + 1; w <= P.curW; w++) { // semana corrente + semanas sem app aberto (congelam como estavam planejadas; as etapas viram pendentes ⏳)
         const tue = weekStartISO(w); const W = P.weeks[tue];
@@ -1530,7 +1560,8 @@ function ReviewRows({ alerts, onDone }) {
                     React.createElement("div", { style: { color: "#64748b", fontSize: 10, whiteSpace: "nowrap", overflow: "hidden",
                             textOverflow: "ellipsis" } },
                         a.title,
-                        a.daysLate > 0 ? ` \u00B7 ${a.daysLate}d em atraso` : " \u00B7 vence hoje")),
+                        a.src === "trail" ? "" : (a.daysLate > 0 ? ` \u00B7 ${a.daysLate}d em atraso` : " \u00B7 vence hoje")),
+                    a.src === "trail" && React.createElement("div", { "data-t": "rev-status", style: { color: a.daysLate > 0 && !a.future ? "#94a3b8" : "#86efac", fontSize: 10, lineHeight: 1.4, marginTop: 1 } }, trilhaReviewStatus(a))),
                 asking
                     ? React.createElement("div", { style: { display: "flex", gap: 6, alignItems: "center" } },
                         React.createElement("input", { type: "number", min: 0, max: 100, inputMode: "numeric", placeholder: "% acerto", value: pctVal,
@@ -1617,7 +1648,7 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, trail, P, onSa
     };
     // Sexta de simulado? override manual → sexta de plantão = não → paridade quinzenal (âncora 14/08) · 01/01 sem simulado (último dia de acesso)
     const simFor = (fri) => simForCfg(config, fri);
-    const trilhaGen = (iso, keepDone) => trilhaListFor(iso, { cfg: config, P, trail, hoje: hojeT, keepDone }).map((a, i) => ({ ...a, id: a.tm != null ? "t-" + a.tm + "-" + a.ts + (a.au ? "-au" : "") : "g-" + iso + "-" + i })); // id estável por (módulo, etapa)
+    const trilhaGen = (iso, keepDone) => trilhaListFor(iso, { cfg: config, P, trail, hoje: hojeT, keepDone, ov: scheduleOv }).map((a, i) => ({ ...a, id: a.tm != null ? "t-" + a.tm + "-" + a.ts + (a.au ? "-au" : "") : "g-" + iso + "-" + i })); // id estável por (módulo, etapa)
     // Gerador por CONTEXTO de semana (a sugestão de redistribuição usa o da semana seguinte para avaliar a carga dos dias onde cai)
     const genForCtx = (ctx, dayIdx, paceOv, keepDone) => {
         const week = ctx.week, wkPh = ctx.wkPh, prevPh = ctx.prevPh, prevIds = ctx.prevIds, plan = ctx.plan, prevPlan = ctx.prevPlan, extras = ctx.extras, prevExtras = ctx.prevExtras, prev2Extras = ctx.prev2Extras, prev3Extras = ctx.prev3Extras, prevIdsFor = ctx.prevIdsFor;
@@ -2347,7 +2378,7 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, trail, P, onSa
     const isTDay = dayDate >= TRILHA_START; // dia da Trilha (registro próprio; blocos sem tm viram nota)
     const day = isTDay ? trilhaRow(dayDate, config) : schedFor(dayDate)[activeIdx];
     const list = listFor(activeIdx);
-    const dayReviews = isTDay ? computeReviews(trail, dayDate, "trail") : computeReviews(reviews.progress, dayDate, "progress"); // a partir de 20/10 as revisões vêm só do registro da Trilha (decisão 2, 19/10)
+    const dayReviews = isTDay ? (P ? trilhaReviewTone(computeReviews(trail, dayDate, "trail"), { cfg: config, P, trail, hoje: todayISO(), ov: scheduleOv }, dayDate, dayDate > todayISO()) : computeReviews(trail, dayDate, "trail")) : computeReviews(reviews.progress, dayDate, "progress"); // a partir de 20/10 as revisões vêm só do registro da Trilha (decisão 2, 19/10)
     const doneCount = list.filter(a => isBlockDoneAt(a, dayDate)).length;
     return (React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 16 } },
         hojeT > TRILHA_END && P && React.createElement(TrilhaBalanco, { P, trail, closing: true }), // depois de 01/01: tela de encerramento com o balanço (paciente, 20/10)
@@ -3475,6 +3506,7 @@ function App() {
     const tOn = trailOn(hoje);
     const reviews = useMemo(() => tOn ? computeReviews(trail, hoje, "trail") : computeReviews(progress, hoje, "progress"), [progress, trail, config, hoje]); // a partir de 20/10 as revisões vêm só do registro da Trilha (decisão 2, 19/10)
     const P = useMemo(() => (loaded && config && trail) ? buildTrilhaPlan(config, trail, hoje) : null, [loaded, config, trail, hoje]); // motor da Trilha (só calcula)
+    const reviewsT = useMemo(() => tOn && P ? trilhaReviewTone(reviews, { cfg: config, P, trail, hoje, ov: scheduleOv }, hoje) : reviews, [reviews, P, config, trail, hoje, scheduleOv]); // decisão 73: revisão que deslizou (dia cheio, plantão longo, simulado) não aparece "em atraso"
     setPaceCfg((todayISO() >= CATCHUP_START && todayISO() < FREE_START) ? 2 : (config && config.catchupPace)); // ritmo primeiro: a projeção depende dele · P7: CATCHUP = 2
     setCatchupPins(config && config.catchupPins);
     __SIM_SAVE = (ov) => saveConfig({ ...config, simOverrides: ov });
@@ -3507,7 +3539,7 @@ function App() {
         const h = todayISO(); if (h < TRILHA_START || h > TRILHA_END) return;
         const patch = trilhaFreezePatch(config, trail, h, P, scheduleOv);
         if (patch) saveConfig({ ...config, ...patch });
-    }, [loaded, config, trail, P]);
+    }, [loaded, config, trail, P, scheduleOv]);
     const markReviewDone = useCallback((id, kind, pct, src) => { // src = "trail" (a partir de 20/10) | "progress" (histórico)
         const isT = src === "trail";
         (isT ? setTrail : setProgress)(prev => {
@@ -3649,7 +3681,7 @@ function App() {
                     React.createElement("div", { style: { background: "linear-gradient(90deg,#f5c518,#e8833a)", borderRadius: 4, height: 4,
                             width: `${Math.round(effWeek / lastWeek(config.startDate) * 100)}%` } })))),
         React.createElement("div", { style: { padding: "16px 16px 100px" } },
-            (tab === "schedule" || tab === "modules" || tab === "catchup") && (React.createElement(ReviewAlerts, { alerts: reviews, onDone: markReviewDone })),
+            (tab === "schedule" || tab === "modules" || tab === "catchup") && (React.createElement(ReviewAlerts, { alerts: reviewsT, onDone: markReviewDone })),
             tab === "schedule" && (React.createElement(Schedule, { config: config, effWeek: effWeek, scheduleOv: scheduleOv, events: events, reviews: { progress }, trail: trail, P: P, onSaveSchedule: saveSchedule, onSaveEvents: saveEvents, onUpdateProgress: saveProgress, onUpdateTrail: saveTrail, onReviewDone: markReviewDone, onGoTrilha: () => setTab("catchup") })),
             tab === "modules" && (React.createElement(ModuleTracker, { progress: progress, onUpdate: saveProgress, effWeek: effWeek, reviews: reviews, simResults: config.simResults, trail: trail, onUpdateTrail: saveTrail, P: P, trailMode: tOn })),
             tab === "catchup" && (tOn ? React.createElement(TrilhaTab, { config: config, trail: trail, progress: progress, P: P, onSaveConfig: saveConfig, onUpdateTrail: saveTrail, onGoSchedule: () => setTab("schedule") })
