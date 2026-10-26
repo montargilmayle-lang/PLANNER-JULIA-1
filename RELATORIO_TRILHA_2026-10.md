@@ -9,9 +9,13 @@ A paciente não iniciou em 20/10. A Trilha começa **hoje, SEG 26/10**, com a 1�
 ### A.1 · O que mudou (e como)
 
 1. **`TRILHA_START = "2026-10-26"`.** A fronteira do histórico ganhou nome próprio: **`POS_CURSO = "2026-10-20"`** — o 1º dia depois do curso. Tudo o que era "fronteira do histórico / motor antigo desligado / registro do curso × da trilha / rótulo pela data" fica em 20/10 (por isso o histórico até 19/10 não muda uma vírgula); tudo o que é "etapa, cota, 1º acesso, revisão" passa a 26/10.
-2. **Semana de 20/10 descartada:** ao carregar, o app tira do plano os `trilhaWeeks` e `trilhaPlan` daquela semana (inclusive Adiantar e 🔓) e o `trilhaFirstOpen` antigo, e guarda tudo em `config.trilhaDescartes` (nada é apagado — ⚙️). `trilhaFirstOpen` passa a ser o dia em que ela abre a versão nova (hoje, 26/10). O `trail_v1` não é tocado: módulo com etapa marcada volta à fila com o que já fez (não reabre); módulo fechado não volta. Dias editados à mão (≥ 20/10) que traziam etapa do plano descartado vão para `medplanner_schedule_archive_v1` (como o "↺ Voltar ao padrão") — os outros ficam como ela deixou. A migração só age se houver o dado antigo, então é idempotente (abrir de novo não faz nada; um backup antigo importado é limpo de novo).
+2. **Semana de 20/10 descartada** (migração ao carregar, revisada pela revisão adversarial — §A.11):
+   - **Config:** todo `trilhaWeeks`/`trilhaPlan` feito no calendário antigo (inclusive Adiantar, 🔓 e uma semana de 27/10, se a versão anterior tiver sido aberta depois de hoje) e o `trilhaFirstOpen` antigo saem do plano e ficam em `config.trilhaDescartes` (nada é apagado — ⚙️). `trilhaFirstOpen` passa a ser o dia em que ela abre a versão nova (hoje, 26/10). Escolhas antigas de rampa ou dia leve que caíam dentro da T1 são levadas para a T1; as outras vão para `trilhaDescartes`.
+   - **Dias gravados:** o original vai sempre para `medplanner_schedule_archive_v1`. Em 20–25/10 o dia vira transição e **ficam os ✓ dela e os blocos que ela criou** (ex.: uma consulta); a partir de 26/10, saem só as etapas do plano antigo e entram as do plano novo daquele dia.
+   - **`trail_v1` não é tocado:** módulo com etapa marcada não reabre — se houvesse um começado, ele viria à frente da fila para continuar logo (📚 intervalos); módulo fechado não volta. Com os dados reais nada foi executado, então a fila é a mesma (5, 6, 14…).
+   - Idempotente: abrir de novo não faz nada; um backup antigo importado é limpo de novo.
 3. **20–25/10 = dias de transição.** **A forma mais limpa** (respondendo à pergunta): não um terceiro regime, e sim os dias pós-curso **sem etapa** — eles já estão do lado de cá da fronteira do histórico (motor antigo desligado desde 20/10), então basta que o gerador do dia da trilha tenha um ramo de transição que devolve só o **bloco do plantão** (quando há), **Anki**, **academia** e **lazer** (com a véspera), mais a nota **"🗓️ A trilha começa em 26/10 (segunda) — hoje sem etapa de módulo"**. Sem etapa, revisão, PLAN, 🌿, simulado (nem o botão na sexta 23/10). O painel da semana diz "SEMANA DE TRANSIÇÃO · 20/10–25/10 — a trilha começa na segunda 26/10 com o 1º módulo da fila", o selo diz "Transição" e a aba Trilha mostra "🗓️ Dias de transição (20/10–25/10) …". Nada é gravado da trilha nesses dias (nem o 1º acesso).
-4. **Semanas:** Sem.42 = transição 20–25/10 (TER→DOM, 6 dias) · **Sem.43 = T1 = SEG 26/10 → SEG 02/11 (8 dias, duas segundas)** · depois TER→SEG: T2 03–09/11 … **T10 = Sem.52 = 29/12–01/01** (4 dias) — **10 semanas**. A chave da T1 é "2026-10-26" (uma segunda). O dia ativo do Cronograma passou a distinguir as duas segundas (antes, tocar na aba 02/11 abria o 26/10); as 8 abas cabem em 420px; o seletor 🌿, o "mover para" e a grade da academia levam a data quando a semana tem 8 dias.
+4. **Semanas:** Sem.42 = transição 20–25/10 (TER→DOM, 6 dias) · **Sem.43 = T1 = SEG 26/10 → SEG 02/11 (8 dias, duas segundas)** · depois TER→SEG: T2 03–09/11 … **T10 = Sem.52 = 29/12–01/01** (4 dias) — **10 semanas**. A chave da T1 é "2026-10-26" (uma segunda). O dia ativo do Cronograma passou a distinguir as duas segundas (tocar na aba 02/11 abre o 02/11; ◀ a partir de SEG 09/11 cai na SEG 02/11, a mais perto); as 8 abas cabem num celular de 360px; o seletor 🌿, o "mover para" e a grade da academia levam a data quando a semana tem 8 dias.
 
 ### A.2 · Rampa semana a semana
 
@@ -183,8 +187,8 @@ Ideais: questões→apostila em 1 dia 27/36 · apostila→selagem em 3 dias 31/3
 
 ### A.7 · 20–25/10 sem etapa nenhuma e histórico até 19/10 idêntico
 
-- **20–25/10:** nenhuma etapa, áudio, revisão, PLAN, 🌿 ou simulado em nenhum dos 6 dias — conferido pela tela (TR0, TR0b, S7b, intervalsTrilha "nenhuma etapa em 20–25/10") e também com o app chegando com a semana de 20/10 congelada pela versão anterior e um dia editado com etapa antiga (TR16: a edição de 22/10 vai para o arquivo e o dia fica de transição). Cada dia: TER 20/10 plantão longo (🚑 só Anki no trajeto) · QUA 21/10 plantão 13h–18h · QUI 22/10 plantão 06h–12h · SEX 23/10 plantão 05h30–17h (sem simulado) · SÁB 24/10 Anki e lazer · DOM 25/10 Anki, academia e "dormir ~21h45" (plantão 06h de 26/10).
-- **Histórico:** `historico.js` compara o app de antes da Trilha (git 11c65b8) com o novo, dia a dia de 07/01 a 19/10, em três modos — relógio na quarta de cada semana, relógio em 21/10 (agora transição) e **relógio em 26/10 (hoje)** navegando ◀ até a Sem.1. Única diferença, a de sempre: a TER 20/10 não está na Sem.41 (é o 1º dia pós-curso). Resultado na §A.10.
+- **20–25/10:** nenhuma etapa, áudio, revisão, PLAN, 🌿 ou simulado em nenhum dos 6 dias — conferido pela tela (TR0, TR0b, S7b, intervalsTrilha "nenhuma etapa em 20–25/10") e também com o app chegando com a semana de 20/10 congelada pela versão anterior e dias gravados com etapa antiga, simulado ou PLAN (TR16, TR16c: o original vai para o arquivo e o dia fica de transição, com os ✓ dela). Cada dia: TER 20/10 plantão longo (🚑 só Anki no trajeto) · QUA 21/10 plantão 13h–18h · QUI 22/10 plantão 06h–12h · SEX 23/10 plantão 05h30–17h (sem simulado) · SÁB 24/10 Anki e lazer · DOM 25/10 Anki, academia e "dormir ~21h45" (plantão 06h de 26/10).
+- **Histórico:** `historico.js` compara o app de antes da Trilha (git 11c65b8) com o novo, dia a dia de 07/01 a 19/10, em quatro modos — relógio na quarta de cada semana, relógio em 21/10 (agora transição), **relógio em 26/10 (hoje)** navegando ◀ até a Sem.1 e, no modo D, **20 e 21/10 gravados depois do curso**: (D1) pela versão de 20/10, com etapas e ✓; (D2) com ✓ marcado por ela num dia de transição na versão nova; (D3) uma edição de 20/10 feita no tempo do curso, que continua valendo. Nos três a Sem.41 é a do app de antes da Trilha: o dia leve histórico (que lê a TER 20/10) só usa uma lista do tempo do curso; lista gravada depois do curso nunca conta. Única diferença, a de sempre: a TER 20/10 não está na Sem.41 (é o 1º dia pós-curso). Resultado na §A.10.
 
 ### A.8 · Passagem pelos oito
 
@@ -197,7 +201,7 @@ Ideais: questões→apostila em 1 dia 27/36 · apostila→selagem em 3 dias 31/3
 | 🏃 Corpo | não | Academia nos dias de transição como nos demais (sábado sem treino — ver §A.9). |
 | 🧩 TDAH/funções executivas | não | Uma tela por dia, a nota de transição diz o que esperar; nada de ⏳ herdado da semana descartada; as 8 abas e as duas segundas distinguíveis. |
 | 💬 Autonomia | não | Nada decidido por ela além do pedido; os pontos abertos estão em §A.9. |
-| ⚙️ Dados/engenharia | não | Nada apagado: semana de 20/10 em `trilhaDescartes`, edições no arquivo, `trail_v1` intocado; migração idempotente; histórico idêntico. |
+| ⚙️ Dados/engenharia | não | Nada apagado: semana de 20/10 em `trilhaDescartes`, originais dos dias gravados no arquivo (os ✓ e blocos dela ficam na tela), `trail_v1` intocado; migração idempotente e refeita se o arquivo falhar; histórico idêntico (também com a versão anterior aberta em 20–25/10). |
 
 ### A.9 · Para você decidir (nada aplicado)
 
@@ -208,6 +212,28 @@ Ideais: questões→apostila em 1 dia 27/36 · apostila→selagem em 3 dias 31/3
 ### A.10 · Bateria e `cmp`
 
 (preenchido abaixo)
+
+### A.11 · Revisão adversarial antes do merge (5 lentes + verificação de cada achado)
+
+Lentes: transição, calendário, migração, semana de 8 dias, docs/testes. Cada achado foi reproduzido (Playwright ou motor em node) e corrigido; o teste novo falha na versão de antes da correção e passa na de agora.
+
+| Achado | Correção | Teste |
+|---|---|---|
+| Dia gravado pela versão de 20/10 com etapa era arquivado inteiro: uma consulta acrescentada por ela e os ✓ (Anki etc.) sumiam da tela | o original vai para o arquivo; o dia fica com os blocos e ✓ dela, sem as etapas antigas, e recebe as etapas do plano novo daquele dia | TR16c (QUA 28/10) |
+| Dia de transição gravado **sem** etapa mantinha PLAN, simulado com o campo de %, texto antigo e ⚠️ de carga | todo dia gravado em 20–25/10 é refeito como transição a cada carga (fica o que é dela) | TR16, TR16c |
+| Versão anterior aberta em 27/10 ou depois congelaria a semana de 27/10 (19, 24, 32) por cima da T1 — 6 módulos, 8,7h de estudo em 30/10 | qualquer marca do calendário antigo descarta todo `trilhaWeeks`/`trilhaPlan` (enquanto o config não traz `trilhaInicio`) | TR16e |
+| ✓ num dia de transição (20 ou 21/10), ou uma lista da versão de 20/10, mudava o dia leve histórico da Sem.41 (0,3h × 4,1h) | o dia leve histórico só lê edição do tempo do curso (`trilhaCourseList`); a lista de depois do curso nunca conta | `historico.js` modo D (D1–D3) |
+| Rampa/dia leve/dispensa gravados na chave de 27/10 ficavam sem efeito e sem registro | levados para a T1 (se a T1 não tem valor) ou para `trilhaDescartes` | TR16c |
+| Limpeza dos dias gravados só rodava junto com a do config e não repetia se o arquivo falhasse; um bloco antigo restante podia ser "movido" e reescrever o plano novo | marca própria (`config.trilhaInicio`), repete até gravar; "mover p/ dia" nunca num dia de transição | TR16d |
+| Módulo começado na versão anterior (ex.: aula feita pelo Adiantar) esperaria a vez na fila — 12 dias entre aula e questões | começado vem à frente da fila e continua logo (≤ 7 dias da aula); nos dados reais nada foi executado | TR16b, TR16f |
+| ◀ a partir de SEG 09/11 abria SEG 26/10 (14 dias antes) | o dia ativo guarda a data; vai à segunda mais perto | TR0c |
+| 8 abas da T1 não cabiam em celular de 360px (SEG 02/11 escondida) | abas de 36px com espaço de 4px na semana de 8 dias (316px) | TR0 (360px) |
+| Título da academia na transição dizia "6 dos 7 dias" | texto sem contagem quando a semana não tem 7 dias | TR0b |
+| (testes) Várias checagens de "nenhuma etapa em 20–25/10" liam só a marca `data-tm`, que o app não põe nos dias de transição — não podiam falhar | `transStage` no harness reconhece etapa, revisão, PLAN e simulado também pela etiqueta e pelo texto; usado em TR0, TR0b, TR16, TR16b, TR16c, S7b, intervalsTrilha e coverageTrilha (a). Prova: com o ramo de transição desligado ou a limpeza desligada, as checagens ficam vermelhas | mutantes m1/m2 |
+| Bloco criado por ela com etiqueta diferente de "extra" num dia de transição sumiria | fica todo bloco dela (id `c-<hora>` do "adicionar"), qualquer etiqueta; nunca um bloco gerado | TR16c (SÁB 24/10) |
+| ✓ na nota "a trilha começa em 26/10" era tirado ao abrir de novo | o ✓ da nota também fica | conferido por script (abrir 2×: nada muda, nada arquivado) |
+
+Achados refutados pela verificação (já estavam corrigidos quando foram conferidos): sobreposição de chaves antigas de rampa/dia leve; limpeza só junto com o config; arquivo do dia inteiro; semana de 27/10; repetição após falha do arquivo.
 
 
 ## 0 · Decisões da paciente e aval (20/10/2026)

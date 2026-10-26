@@ -140,6 +140,9 @@ function summary(label) { // imprime o resumo e devolve código ≠ 0 em qualque
 function check(id, cond, evidence) { results.push({ id, ok: !!cond, evidence }); console.log(`   ${cond ? '✅' : '❌'} ${id}${evidence ? ' — ' + evidence : ''}`); }
 function idx(day, re) { return day.blocks.findIndex(b => re.test(b.text)); }
 function has(day, re) { return idx(day, re) >= 0; }
+// Num dia de transição (20–25/10) o app não põe data-tm (um bloco de etapa que sobrasse viraria nota): a etapa é reconhecida também pela etiqueta e pelo texto
+const STAGE_TAGS = ['D1', 'D2', 'D3', 'D4', 'SEL', 'REV', 'PLAN', 'D7', 'DESAT'];
+function transStage(b) { return b.tm != null || !!b.au || STAGE_TAGS.includes(b.tag) || /^Trilha · |^🎧|^↷ |SIMULADO|^📱 revisão/.test(b.text || ''); }
 
 async function setLight(page, value) {
     const ok = await page.evaluate((v) => { const s = [...document.querySelectorAll('select')].find(s => [...s.options].some(o => /^Auto · /.test(o.textContent))); if (!s) return false; s.value = v; s.dispatchEvent(new Event('change', { bubbles: true })); return true; }, value);
@@ -267,4 +270,4 @@ async function markUntil(page, ate, except = []) {
 }
 async function banner(page, key) { return page.evaluate((k) => { const el = document.querySelector('[data-t="' + k + '"]'); return el ? { text: el.innerText, btns: [...el.querySelectorAll('button')].map(b => b.innerText.trim()) } : null; }, key); }
 async function clickIn(page, key, label) { const ok = await page.evaluate(([k, l]) => { const el = document.querySelector('[data-t="' + k + '"]'); const b = el && [...el.querySelectorAll('button')].find(b => b.innerText.trim() === l || b.innerText.trim().startsWith(l)); if (!b) return false; b.click(); return true; }, [key, label]); if (!ok) throw new Error('botão não encontrado em ' + key + ': ' + label); await page.waitForTimeout(350); }
-module.exports = { pw, openPlanner, clickDay, clickTab, readDay, fmt, check, idx, has, results, FILE, setLight, hoursOf, expectedLight, fmtH, LBL7, DAYS7, clickTask, typeBlockPct, readCard, clickCardBtn, typeCardPct, getLS, bodyText, parseH, listDayTabs, clickDate, reopen, navWeek, headerWeek, summary, setLS, markUntil, banner, clickIn, TRAIL_FIELD, TRAIL_STAMP };
+module.exports = { transStage, pw, openPlanner, clickDay, clickTab, readDay, fmt, check, idx, has, results, FILE, setLight, hoursOf, expectedLight, fmtH, LBL7, DAYS7, clickTask, typeBlockPct, readCard, clickCardBtn, typeCardPct, getLS, bodyText, parseH, listDayTabs, clickDate, reopen, navWeek, headerWeek, summary, setLS, markUntil, banner, clickIn, TRAIL_FIELD, TRAIL_STAMP };

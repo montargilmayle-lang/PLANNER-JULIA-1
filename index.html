@@ -1180,7 +1180,7 @@ function trilhaListFor(iso, X) {
     const isSim = dw === 5 && simForCfg(cfg, iso);
     const AC = (d, color, text, time) => ({ d, color, text, time });
     if (isTransDay(iso)) { // 20–25/10 (paciente, 26/10): dia de TRANSIÇÃO — sem etapa da trilha, sem revisão, sem simulado e sem o motor antigo
-        let tr = [AC("ANKI", "#0369A1", "Anki + Meditação 15min", "35min"), AC("EXTRA", "#475569", "🗓️ A trilha começa em " + fmtBR(TRILHA_START) + " (" + DOW_FULL[dowOf(TRILHA_START)].toLowerCase() + ") — hoje sem etapa de módulo", "")];
+        let tr = [AC("ANKI", "#0369A1", "Anki + Meditação 15min", "35min"), { ...AC("EXTRA", "#475569", "🗓️ A trilha começa em " + fmtBR(TRILHA_START) + " (" + DOW_FULL[dowOf(TRILHA_START)].toLowerCase() + ") — hoje sem etapa de módulo", ""), pc: 1 }]; // pc = lista pós-curso (o dia leve histórico da Sem.41 não a usa)
         if (dw !== 6) tr.push(AC("GYM", "#1D4ED8", "Academia — horário livre", "1h"));
         const vt = vesperaTxt(iso); tr.push(AC("LAZER", "#6B7280", vt ? "Noite leve — " + vt : "Lazer à noite ❤️", "livre"));
         return sh ? buildShiftDayT(sh, iso, tr) : tr;
@@ -1259,15 +1259,17 @@ function mergeOrder(saved, def) { // ordem salva por ela (↑↓) + módulos que
     def.forEach((id, i) => { if (has.has(id)) return; const later = new Set(def.slice(i + 1)); const j = out.findIndex(x => later.has(x)); if (j >= 0) out.splice(j, 0, id); else out.push(id); has.add(id); });
     return out;
 }
-function trilhaQueue(cfg) { // planejados (na ordem em que abriram) → fixados 📌 → o resto na ordem dela/padrão
+function trilhaQueue(cfg, trail) { // planejados (na ordem em que abriram) → começados (etapa marcada, sem plano — ex.: semana descartada no início em 26/10: o que ela fez continua logo, sem esperar a vez) → fixados 📌 → o resto na ordem dela/padrão
     const def = trilhaDefaultOrder();
     const base = Array.isArray(cfg && cfg.trilhaOrder) ? mergeOrder(cfg.trilhaOrder, def) : def;
     const plan = (cfg && cfg.trilhaPlan) || {}, weeks = (cfg && cfg.trilhaWeeks) || {};
     const pos = (id) => { const p = plan[id]; const W = weeks[p.wk] || {}; const seq = (W.mods || []).concat(W.rise || [], W.adv || []).map(Number); const k = seq.indexOf(Number(id)); return [p.wk || "", k < 0 ? 99 : k, base.indexOf(Number(id))]; };
     const planned = Object.keys(plan).map(Number).filter(id => modById(id)).sort((a, b) => { const x = pos(a), y = pos(b); for (let i = 0; i < 3; i++) if (x[i] !== y[i]) return x[i] < y[i] ? -1 : 1; return 0; });
-    const pset = new Set(planned); const rest = base.filter(id => !pset.has(id));
+    const pset = new Set(planned); const tr = trail || {};
+    const started = base.filter(id => !pset.has(id) && tr[id] && STAGES_T.some(ts => tr[id][TS_FIELD[ts]]) && !STAGES_T.every(ts => tr[id][TS_FIELD[ts]])); const sset = new Set(started);
+    const rest = base.filter(id => !pset.has(id) && !sset.has(id));
     const pins = (Array.isArray(cfg && cfg.trilhaPins) ? cfg.trilhaPins.map(Number) : []).filter((id, i, a) => rest.indexOf(id) >= 0 && a.indexOf(id) === i); const ps = new Set(pins);
-    return planned.concat(pins, rest.filter(id => !ps.has(id)));
+    return planned.concat(started, pins, rest.filter(id => !ps.has(id)));
 }
 // ── Rampa e regra de subida (🧠 😴 🩺): igual ou menor que a anterior vale sempre; maior só se a anterior fechou E a semana não toca o bloco 04h30 ──
 function rampBase(cfg, tue) { const r = (cfg && cfg.trilhaRamp) || {}; const v = r[tue] !== undefined ? r[tue] : TRILHA_RAMP_DEFAULT[tue]; return Math.max(0, Math.min(9, Number(v) || 0)); }
@@ -1332,7 +1334,7 @@ function trilhaPredictLight(tue, w, cfg) { // dia leve PREVISTO antes de distrib
 function buildTrilhaPlan(cfg, trail, hoje, opts) { // → semanas (congeladas e prévia), plano efetivo, etapas por dia, fila, alcance, pendentes
     cfg = cfg || {}; trail = trail || {}; opts = opts || {};
     const L = lcw(), LW = lastWeek(), W1 = trilhaW1();
-    const Q = trilhaQueue(cfg); const qpos = {}; Q.forEach((id, i) => { qpos[id] = i; });
+    const Q = trilhaQueue(cfg, trail); const qpos = {}; Q.forEach((id, i) => { qpos[id] = i; });
     const st = { load: {}, kinds: {}, cfg, capMemo: {} };
     const plan = {}, frozen = new Set();
     Object.keys(cfg.trilhaPlan || {}).forEach(id => { if (!modById(id)) return; plan[id] = { ...cfg.trilhaPlan[id] }; frozen.add(Number(id)); });
@@ -1460,27 +1462,67 @@ function trilhaFinalPlan(P, cfg, trail, hoje, edited) { // 📦 semana final (29
 // Início em 26/10 (paciente, 26/10: ela não começou em 20/10 — nada foi executado). Ao carregar, a semana congelada de 20/10 (trilhaWeeks e trilhaPlan
 // daquela semana, inclusive Adiantar e 🔓) sai do plano e o 1º acesso volta a ser registrado a partir de 26/10. Nada se perde (⚙️): o que sai fica em
 // config.trilhaDescartes. O registro trail_v1 não é tocado: módulo com etapa marcada volta à fila com o que já fez (nada reabre), módulo fechado não volta.
+// As escolhas por semana gravadas com chaves que deixaram de ser início de semana (20/10 = transição; 27/10 caiu dentro da T1) também vão para o registro;
+// a que cai em dia da T1 passa para ela (rampa da semana de 27/10 · dia sem remédio que aponta para 26/10–02/11), se a T1 ainda não tiver a sua.
 function trilhaMigrateStart(cfg, hoje) {
     if (!cfg) return null;
-    const wks = cfg.trilhaWeeks || {}, plan = cfg.trilhaPlan || {};
-    const oldW = Object.keys(wks).filter(k => k < TRILHA_START), oldP = Object.keys(plan).filter(id => { const p = plan[id] || {}; return !!p.wk && p.wk < TRILHA_START; });
+    const wks = cfg.trilhaWeeks || {}, plan = cfg.trilhaPlan || {}, ramp = cfg.trilhaRamp || {}, light = cfg.lightDayOverrides || {}, dis = cfg.trilhaDismiss || {};
+    const stale = (k) => k >= POS_CURSO && k <= TRILHA_END && POST_WEEKS.indexOf(k) < 1; // chave pós-curso que não é início de semana da trilha
+    const badWk = (k) => !!k && (k < TRILHA_START || POST_WEEKS.indexOf(k) < 1); // semana do calendário antigo (20/10, 27/10)
     const oldF = cfg.trilhaFirstOpen && cfg.trilhaFirstOpen < TRILHA_START;
-    if (!oldW.length && !oldP.length && !oldF) return null;
+    const marked = oldF || Object.keys(wks).some(badWk) || Object.keys(plan).some(id => badWk((plan[id] || {}).wk));
+    const allOld = marked && cfg.trilhaInicio !== TRILHA_START; // a versão nova nunca rodou nesta config: tudo o que a trilha gravou veio do calendário antigo (inclusive semanas de 03/11 em diante, se a antiga ficou aberta mais dias)
+    const oldW = Object.keys(wks).filter(k => allOld || badWk(k)), oldP = Object.keys(plan).filter(id => { const p = plan[id] || {}; return allOld || badWk(p.wk); });
+    const oldR = Object.keys(ramp).filter(stale).sort(), oldL = Object.keys(light).filter(stale).sort(), oldD = Object.keys(dis).filter(k => stale(k.split("|")[0]));
+    if (!oldW.length && !oldP.length && !oldF && !oldR.length && !oldL.length && !oldD.length) return null;
     const out = { ...cfg }, rec = { at: hoje || todayISO(), why: "início da trilha em " + fmtBR(TRILHA_START), trilhaWeeks: {}, trilhaPlan: {}, trilhaFirstOpen: cfg.trilhaFirstOpen || null };
     if (oldW.length) { const nw = { ...wks }; oldW.forEach(k => { rec.trilhaWeeks[k] = wks[k]; delete nw[k]; }); out.trilhaWeeks = nw; }
     if (oldP.length) { const np = { ...plan }; oldP.forEach(id => { rec.trilhaPlan[id] = plan[id]; delete np[id]; }); out.trilhaPlan = np; }
     if (oldF) delete out.trilhaFirstOpen;
+    const t1 = TRILHA_START, t1End = weekEndISO(trilhaW1());
+    if (oldR.length) { const nr = { ...ramp }; rec.trilhaRamp = {}; oldR.forEach(k => { rec.trilhaRamp[k] = ramp[k]; delete nr[k]; if (k > t1 && k <= t1End && nr[t1] === undefined) nr[t1] = ramp[k]; }); out.trilhaRamp = nr; } // a semana de 27/10 virou a T1
+    if (oldL.length) { const nl = { ...light }; rec.lightDayOverrides = {}; oldL.forEach(k => { rec.lightDayOverrides[k] = light[k]; delete nl[k]; const v = light[k]; if (v === undefined || v === null || v === "" || !(Number(v) >= 0)) return; const d = addDaysISO(k, Number(v)); if (d >= t1 && d <= t1End && nl[t1] === undefined) nl[t1] = diffDays(t1, d); }); out.lightDayOverrides = nl; } // o dia sem remédio escolhido continua o mesmo dia
+    if (oldD.length) { const nd = { ...dis }; rec.trilhaDismiss = {}; oldD.forEach(k => { rec.trilhaDismiss[k] = dis[k]; delete nd[k]; }); out.trilhaDismiss = nd; }
+    if (allOld) ["trilhaRevFull", "trilhaFinalAutoAt", "trilhaFinalLog"].forEach(k => { if (cfg[k] !== undefined) { rec[k] = cfg[k]; delete out[k]; } }); // marcas do plano antigo (dia cheio, semana final)
     out.trilhaDescartes = (Array.isArray(cfg.trilhaDescartes) ? cfg.trilhaDescartes : []).concat([rec]);
     return out;
 }
-// Dias editados à mão (a partir de 20/10) que trazem etapa do plano descartado: a edição vai para medplanner_schedule_archive_v1 (como o ↺ Voltar
-// ao padrão) e o dia volta a ser gerado — 20–25/10 sem etapa nenhuma; de 26/10 em diante, as etapas do plano novo. Dia editado sem etapa fica como ela deixou.
-function trilhaMigrateSchedule(sov, hoje) {
-    const days = Object.keys(sov || {}).filter(d => d >= POS_CURSO && Array.isArray(sov[d]) && sov[d].some(a => a && a.tm != null));
+function trilhaArchiveDays(sov, days, hoje, why) { // guarda as listas em medplanner_schedule_archive_v1 (como o ↺ Voltar ao padrão); false se não conseguiu
+    try { const k = STORAGE_PREFIX + "schedule_archive_v1"; const arc = JSON.parse(localStorage.getItem(k) || "{}"); days.forEach(d => { arc[d] = (arc[d] || []).concat([{ at: hoje || todayISO(), why, list: sov[d] }]); }); localStorage.setItem(k, JSON.stringify(arc)); return true; } catch (e) { return false; }
+}
+// Dias de transição (20–25/10) gravados (ela marcou um ✓, moveu ou editou — em qualquer versão): a lista vira a do dia de transição, com os ✓ dela no
+// Anki, na academia, no plantão e no lazer e os blocos que ela mesma acrescentou; o original vai para o arquivo. Roda a cada carga e é idempotente (a lista
+// limpa não muda). Devolve também as listas originais de 20 e 21/10 que ainda não estavam guardadas, para o dia leve histórico da Sem.41 (listLeg).
+const TRANS_KEEP_DONE = ["ANKI", "GYM", "LAZER", "AMB"];
+function trilhaTransList(iso, saved) {
+    const gen = trilhaListFor(iso, {}).map((a, i) => ({ ...a, id: "g-" + iso + "-" + i }));
+    const done = new Set((saved || []).filter(b => b && b.done && TRANS_KEEP_DONE.includes(b.d)).map(b => b.d)), noteDone = (saved || []).some(b => b && b.pc && b.done);
+    const mine = (saved || []).filter(b => b && b.tm == null && !b.gh && !b.au && !b.pc && !/^↷ /.test(b.text || "") && !/^[gt]-/.test(String(b.id || "")) && (b.d === "EXTRA" || /^c-\d+$/.test(String(b.id || "")))); // os que ela criou ("adicionar": id c-<hora>, qualquer etiqueta); nunca um bloco gerado
+    return gen.map(a => (a.pc ? noteDone : done.has(a.d)) ? { ...a, done: true } : a).concat(mine);
+}
+// Lista gravada no tempo do curso (versão de antes da Trilha: ids "g-<semana>-<dia>-<i>" e "c-<hora>", sem campo da trilha). Só ela conta para o dia leve
+// histórico da Sem.41 em 20 e 21/10 — uma lista gravada depois do curso (Trilha desde 20/10, transição) nunca muda o histórico até 19/10.
+function trilhaCourseList(l) { return Array.isArray(l) && !l.some(a => a && (a.tm != null || a.ts || a.au || a.pc || a.gh || /^(g-\d{4}-|t-)/.test(String(a.id || "")))); }
+function trilhaSanitizeTransition(sov, cfg, hoje) {
+    const days = Object.keys(sov || {}).filter(d => isTransDay(d) && Array.isArray(sov[d])).filter(d => JSON.stringify(trilhaTransList(d, sov[d])) !== JSON.stringify(sov[d]));
     if (!days.length) return null;
+    if (!trilhaArchiveDays(sov, days, hoje, "dia de transição (a trilha começa em " + fmtBR(TRILHA_START) + ")")) return false; // sem arquivo, nada muda
+    const out = { ...sov }, legacy = {}, have = (cfg && cfg.trilhaLegacyOv) || {};
+    days.forEach(d => { if ((d === POS_CURSO || d === addDaysISO(POS_CURSO, 1)) && have[d] === undefined) legacy[d] = trilhaCourseList(sov[d]) ? sov[d] : null; out[d] = trilhaTransList(d, sov[d]); }); // null = sem edição do tempo do curso (vale o gerado)
+    return { sov: out, legacy };
+}
+// Dias editados à mão de 26/10 em diante com etapa do plano antigo (de antes do início em 26/10): o original vai para o arquivo e o dia fica com o que é
+// dela (blocos que ela acrescentou, os ✓, a ordem) — saem só as etapas, o áudio e as linhas "↷" do plano antigo, e entram as etapas do plano novo daquele dia.
+// Roda UMA vez (config.trilhaInicio) — depois disso uma etapa num dia editado é do plano novo.
+function trilhaMigrateSchedule(sov, hoje, P) {
+    const old = (a) => a && (a.tm != null || a.au || a.gh);
+    const days = Object.keys(sov || {}).filter(d => d >= TRILHA_START && Array.isArray(sov[d]) && sov[d].some(old));
+    if (!days.length) return null;
+    if (!trilhaArchiveDays(sov, days, hoje, "início da trilha em " + fmtBR(TRILHA_START))) return false; // sem arquivo, nada muda (tenta de novo na próxima carga)
     const out = { ...sov };
-    try { const k = STORAGE_PREFIX + "schedule_archive_v1"; const arc = JSON.parse(localStorage.getItem(k) || "{}"); days.forEach(d => { arc[d] = (arc[d] || []).concat([{ at: hoje || todayISO(), why: "início da trilha em " + fmtBR(TRILHA_START), list: sov[d] }]); }); localStorage.setItem(k, JSON.stringify(arc)); } catch (e) { return null; } // sem arquivo, nada sai
-    days.forEach(d => { delete out[d]; });
+    days.forEach(d => { let cur = sov[d].filter(a => !old(a));
+        ((P && P.byDay[d]) || []).forEach(({ id, ts }) => { const m = modById(id); if (!m) return; const b = { id: "t-" + id + "-" + ts, ...trilhaStageBlock(m, ts), tm: id, ts }; const li = cur.map(x => x.d).lastIndexOf("LAZER"); cur = li >= 0 ? cur.slice(0, li).concat([b], cur.slice(li)) : cur.concat([b]); }); // como o putIntoT: antes do LAZER
+        out[d] = cur; });
     return out;
 }
 function trilhaFreezePatch(cfg, trail, hoje, P, scheduleOv) { // o que o App grava (um único saveConfig): 1º acesso, semanas a congelar, semana final
@@ -1642,10 +1684,15 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, trail, P, onSa
     const hojeT = todayISO();
     // Dia ativo guardado como DIA DA SEMANA (getDay): navegar entre semanas mantém o dia; o índice sai da data (nunca do template).
     // A 1ª semana da Trilha tem duas segundas (26/10 e 02/11): a 2ª ocorrência do mesmo dia da semana guarda +7 (numa semana com uma só, vale a última).
+    // Navegando de outra semana para uma com duas ocorrências do dia, vale a mais perto do dia que ela via (de 09/11 ◀ → 02/11; de 19/10 ▶▶ → 26/10).
     const dayKeyOf = (w, i) => { const g = dowOf(weekDayISO(startISO, w, i)); let n = 0; for (let j = 0; j < i; j++) if (dowOf(weekDayISO(startISO, w, j)) === g) n++; return g + 7 * n; };
-    const [activeDow, setActiveDow] = useState(() => dayKeyOf(effWeek, todayDayIdx(effWeek, startISO)));
-    const activeIdx = (() => { let last = -1; for (let i = 0; i < WL; i++) { const k = dayKeyOf(week, i); if (k === activeDow) return i; if (k % 7 === activeDow % 7) last = i; } return last >= 0 ? last : Math.min(todayDayIdx(week, startISO), WL - 1); })();
-    const setActiveIdx = (i) => setActiveDow(dayKeyOf(week, i));
+    const [activeDow, setActiveDow] = useState(() => { const i0 = todayDayIdx(effWeek, startISO); return { k: dayKeyOf(effWeek, i0), w: effWeek, iso: weekDayISO(startISO, effWeek, i0) }; });
+    const activeIdx = (() => { const cands = []; let exact = -1; for (let i = 0; i < WL; i++) { const k = dayKeyOf(week, i); if (k === activeDow.k) exact = i; if (k % 7 === activeDow.k % 7) cands.push(i); }
+        if (activeDow.w === week && exact >= 0) return exact;
+        if (cands.length > 1) return cands.reduce((b, i) => Math.abs(diffDays(activeDow.iso, weekDayISO(startISO, week, i))) < Math.abs(diffDays(activeDow.iso, weekDayISO(startISO, week, b))) ? i : b, cands[0]);
+        if (cands.length) return cands[0];
+        return Math.min(todayDayIdx(week, startISO), WL - 1); })();
+    const setActiveIdx = (i) => setActiveDow({ k: dayKeyOf(week, i), w: week, iso: weekDayISO(startISO, week, i) });
     const [editMode, setEditMode] = useState(false);
     const [adding, setAdding] = useState(false);
     const [newAct, setNewAct] = useState({ d: "EXTRA", text: "", time: "" });
@@ -1959,9 +2006,10 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, trail, P, onSa
     const listLeg = (d) => { const iso = isoAt(d); if (iso < POS_CURSO || iso > addDaysISO(POS_CURSO, 1)) return listAt(d);
         if (!(iso in legacyMemo)) {
             const kL = LCW - week; const c41 = kL === 0 ? curCtx : ctxAt(kL);
-            if (iso === POS_CURSO) legacyMemo[iso] = scheduleOv[iso] || genForCtx({ ...c41, legacy: true }, 6, null, kL !== 0);
+            const LO = (config && config.trilhaLegacyOv) || {}; const ovL = LO[iso] !== undefined ? LO[iso] : (trilhaCourseList(scheduleOv[iso]) ? scheduleOv[iso] : null); // só a edição do tempo do curso (guardada em trilhaLegacyOv quando o dia virou transição); lista gravada depois do curso não conta
+            if (iso === POS_CURSO) legacyMemo[iso] = ovL || genForCtx({ ...c41, legacy: true }, 6, null, kL !== 0);
             else { const w41 = weekDayISO(startISO, LCW, 0), w42 = addDaysISO(w41, 7), ids41 = kL === 0 ? wkIds : idsAt(kL);
-                legacyMemo[iso] = scheduleOv[iso] || genForCtx({ week: LCW + 1, wkPh: "G2", prevPh: "G2", prevIds: ids41, plan: fioPlanAll[w42] || {}, prevPlan: fioPlanAll[w41] || {}, extras: fioExtraAll[w42] || [], prevExtras: fioExtraAll[w41] || [], prev2Extras: fioExtraAll[addDaysISO(w41, -7)] || [], prev3Extras: fioExtraAll[addDaysISO(w41, -14)] || [], prevIdsFor: () => ids41, cur: false, legacy: true, legacyCal: true }, 0, null, true); }
+                legacyMemo[iso] = ovL || genForCtx({ week: LCW + 1, wkPh: "G2", prevPh: "G2", prevIds: ids41, plan: fioPlanAll[w42] || {}, prevPlan: fioPlanAll[w41] || {}, extras: fioExtraAll[w42] || [], prevExtras: fioExtraAll[w41] || [], prev2Extras: fioExtraAll[addDaysISO(w41, -7)] || [], prev3Extras: fioExtraAll[addDaysISO(w41, -14)] || [], prevIdsFor: () => ids41, cur: false, legacy: true, legacyCal: true }, 0, null, true); }
         }
         return legacyMemo[iso]; };
     const distToShift = (iso) => shiftDates.length ? Math.min(...shiftDates.map(d => Math.abs(diffDays(d, iso)))) : 99;
@@ -2321,7 +2369,7 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, trail, P, onSa
     const moveToIso = (fromIdx, idx, toIso) => { // seletor "→ mover p/ dia" (valor = data)
         const act = listFor(fromIdx)[idx]; if (!act || !toIso) return;
         const fromIso = dateFor(fromIdx);
-        if (act.tm != null && !act.au && !act.gh) {
+        if (act.tm != null && !act.au && !act.gh && !isTransDay(fromIso)) { // num dia de transição, um bloco de etapa que sobrou é nota (move como bloco comum)
             if (!(P && P.frozen.has(act.tm))) { window.alert("Esta etapa ainda é prévia — a semana dela congela quando começar. Mova-a depois, já na semana dela."); return; }
             const an = analyzeMoveT(act, fromIso, toIso);
             const l = listAtISO(toIso) || []; const destHrs = dayLoadHours(l) + actHours(act);
@@ -2336,7 +2384,7 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, trail, P, onSa
     };
     const moveOptsFor = (act) => { // dias de destino: bloco de etapa da Trilha = esta semana e a seguinte (até 01/01); demais = os dias desta semana
         const out = [];
-        if (act && act.tm != null && !act.au && !act.gh) { const end = weekEndISO(Math.min(week + 1, lastWeek(startISO)), startISO); for (let d = dateFor(0) < TRILHA_START ? TRILHA_START : dateFor(0); d <= end && d <= TRILHA_END; d = addDaysISO(d, 1)) if (d !== dayDate) out.push(d); return out; } // esta semana e a seguinte (a 1ª da Trilha tem 8 dias), nunca um dia de transição
+        if (act && act.tm != null && !act.au && !act.gh && !isTransDay(dayDate)) { const end = weekEndISO(Math.min(week + 1, lastWeek(startISO)), startISO); for (let d = dateFor(0) < TRILHA_START ? TRILHA_START : dateFor(0); d <= end && d <= TRILHA_END; d = addDaysISO(d, 1)) if (d !== dayDate) out.push(d); return out; } // esta semana e a seguinte (a 1ª da Trilha tem 8 dias), nunca um dia de transição
         for (let i = 0; i < WL; i++) if (i !== activeIdx) out.push(dateFor(i));
         return out;
     };
@@ -2557,15 +2605,15 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, trail, P, onSa
                     : React.createElement("span", { style: { color: "#64748b", fontSize: 10, lineHeight: 1.4 } }, DOW_LBL[dowOf(isoAt(lightDay.idx))] + " " + fmtBR(isoAt(lightDay.idx)) + " · " + fmtHrs(lightDay.hours) + " de estudo" + (lightDay.source === "manual" ? " · escolha manual" : isTW ? " · previsto antes de distribuir as etapas (menor carga entre os dias livres; nunca aula nova)" : " · menor carga entre os dias livres") + " · validar com a psiquiatra"))
                 : React.createElement("span", { style: { color: "#f5c518", fontSize: 10, fontWeight: 800, lineHeight: 1.4 } }, "🌿 Nenhum dia candidato esta semana (todos com plantão, pós-noturno, presencial ou simulado)"),
             lightDay.source === "auto" && lightAuto.tie && lightAuto.tie.length > 1 && React.createElement("span", { style: { color: "#86efac", fontSize: 10, fontWeight: 700, lineHeight: 1.4, width: "100%" } }, "🌿 Vários dias com carga parecida (" + lightAuto.tie.map(i => DOW_LBL[dowOf(isoAt(i))]).join(", ") + ") — escolhi " + DOW_LBL[dowOf(isoAt(lightAuto.idx))] + "; toque para trocar.")),
-        React.createElement("div", { style: { display: "flex", gap: 6, overflowX: "auto", paddingBottom: 4 } }, Array.from({ length: WL }, (_d, i) => {
+        React.createElement("div", { style: { display: "flex", gap: WL > 7 ? 4 : 6, overflowX: "auto", paddingBottom: 4 } }, Array.from({ length: WL }, (_d, i) => { // 8 abas (26/10–02/11): 8×36 + 7×4 = 316px, cabem num celular de 360px
             const dt = dateFor(i);
             const d = dt >= POS_CURSO ? trilhaRow(dt, config) : schedFor(dt)[i]; // rótulo pela DATA (Sem.41 = 6 abas, transição 20–25/10 = 6, 1ª da Trilha 26/10–02/11 = 8, TER→SEG = 7, Sem.52 = 4)
             const isToday = dt === todayISO();
             const active = activeIdx === i;
-            return (React.createElement("button", { key: i, onClick: () => { setActiveIdx(i); setAdding(false); }, style: { flex: 1, minWidth: WL > 7 ? 42 : 56, background: active ? "#f5c518" : "#1e293b",
+            return (React.createElement("button", { key: i, onClick: () => { setActiveIdx(i); setAdding(false); }, style: { flex: 1, minWidth: WL > 7 ? 36 : 56, background: active ? "#f5c518" : "#1e293b",
                     border: "1px solid", borderColor: active ? "#f5c518" : (isToday ? "#f5c518" : "#334155"),
                     borderRadius: 10, color: active ? "#0f172a" : "#94a3b8",
-                    padding: "8px 4px", cursor: "pointer", fontSize: 11, fontWeight: 700, transition: "all .2s" } },
+                    padding: WL > 7 ? "8px 2px" : "8px 4px", cursor: "pointer", fontSize: 11, fontWeight: 700, transition: "all .2s" } },
                 React.createElement("div", { style: { fontSize: 16 } }, d.emoji),
                 React.createElement("div", null, DOW_TAB[dowOf(dt)]),
                 React.createElement("div", { style: { fontSize: 8, color: active ? "#7c5a00" : "#64748b", marginTop: 1 } }, fmtBR(dt)),
@@ -2776,7 +2824,7 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, trail, P, onSa
                     fmtBR(dayDate)),
                 dayReviews.length > 0 ? React.createElement(ReviewRows, { alerts: dayReviews, onDone: onReviewDone }) : (React.createElement("div", { style: { color: "#475569", fontSize: 12, lineHeight: 1.5 } }, isTransDay(dayDate) ? "Dia de transição: sem revisão e sem etapa — a trilha começa em " + fmtBR(TRILHA_START) + "." : "Sem revis\u00F5es D+7/D+30 vencendo aqui. Ap\u00F3s aula/estudo, mantenha o D+1: 5 quest\u00F5es rel\u00E2mpago + reler palavras-chave antes de dormir.")))),
         React.createElement("div", { style: { background: "#1e293b", borderRadius: 12, padding: 16 } },
-            React.createElement("div", { style: { color: "#94a3b8", fontSize: 11, marginBottom: 12 } }, WL > 7 ? "ACADEMIA — sem treino no sábado (descanso) nem no dia pós-noturno" : "ACADEMIA — 1 treino em 6 dos 7 dias · sem treino no dia pós-noturno"),
+            React.createElement("div", { style: { color: "#94a3b8", fontSize: 11, marginBottom: 12 } }, (WL > 7 || isTransW) ? "ACADEMIA — sem treino no sábado (descanso) nem no dia pós-noturno" : "ACADEMIA — 1 treino em 6 dos 7 dias · sem treino no dia pós-noturno"),
             React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(" + (dayDate >= AMB_START ? WL : 7) + ",1fr)", gap: 4 } }, (dayDate >= AMB_START
                 ? Array.from({ length: WL }, (_, i) => ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sab"][dowOf(dateFor(i))] + (WL > 7 ? " " + fmtBR(dateFor(i)).slice(0, 2) : "")).map((nm, i) => { // 1ª semana da Trilha: duas segundas — o dia leva a data
                     // Reflete a lista REAL do dia (template da fase + plantões datados + suas edições): sem horário fixo;
@@ -3530,15 +3578,23 @@ function App() {
             setTrail(tr || {});
             setSleepData(s || {});
             setDopeData(d || DOPAMINE_DEFAULTS);
-            const cM = trilhaMigrateStart(c, todayISO()); if (cM) await saveData("config_v1", cM); // início em 26/10: a semana congelada de 20/10 sai do plano (guardada em trilhaDescartes)
-            setConfig(cM || c || { startDate: DEFAULT_START, manualWeek: null });
+            let cfg0 = c || null, cfgDirty = false, schDirty = false; const hojeL = todayISO();
+            const cM = trilhaMigrateStart(cfg0, hojeL); if (cM) { cfg0 = cM; cfgDirty = true; } // início em 26/10: a semana congelada de 20/10 sai do plano (guardada em trilhaDescartes)
             let sov = sc || {};
             if (!seeded) {
                 sov = { ...sov, ...WEEKEND_SEED }; // consolidação da semana da prova (uma vez)
                 await saveData("schedule_v1", sov);
                 await saveData(WEEKEND_SEED_FLAG, true);
             }
-            if (cM) { const sM = trilhaMigrateSchedule(sov, todayISO()); if (sM) { sov = sM; await saveData("schedule_v1", sov); } } // dias editados com etapa do plano descartado → arquivo
+            if (hojeL >= POS_CURSO) {
+                const base0 = () => cfg0 || { startDate: DEFAULT_START, manualWeek: null };
+                const sT = trilhaSanitizeTransition(sov, cfg0, hojeL); // 20–25/10 gravados → dia de transição (o original vai para o arquivo)
+                if (sT) { sov = sT.sov; schDirty = true; if (Object.keys(sT.legacy).length) { cfg0 = { ...base0(), trilhaLegacyOv: { ...((cfg0 && cfg0.trilhaLegacyOv) || {}), ...sT.legacy } }; cfgDirty = true; } }
+                if (!(cfg0 && cfg0.trilhaInicio === TRILHA_START)) { setModuleCfg(cfg0); setStartCfg(cfg0 && cfg0.startDate); const P0 = buildTrilhaPlan(cfg0 || {}, tr || {}, hojeL); const sM = trilhaMigrateSchedule(sov, hojeL, P0); if (sM !== false) { if (sM) { sov = sM; schDirty = true; } cfg0 = { ...base0(), trilhaInicio: TRILHA_START }; cfgDirty = true; } } // uma vez: dias ≥ 26/10 com etapa do plano antigo → arquivo
+            }
+            if (schDirty) await saveData("schedule_v1", sov);
+            if (cfgDirty) await saveData("config_v1", cfg0);
+            setConfig(cfg0 || { startDate: DEFAULT_START, manualWeek: null });
             setScheduleOv(sov);
             setEvents(ev || {});
             setLoaded(true);

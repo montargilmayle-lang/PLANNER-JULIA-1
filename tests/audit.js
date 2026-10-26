@@ -372,7 +372,7 @@ async function scenario(browser, name, dateISO, seeds, fn) {
         const hw = await headerWeek(page); const tabs = await listDayTabs(page);
         check('Sem.42 = transição 20/10–25/10 (6 abas, TER a DOM)', hw.week === 42 && hw.range === '20/10–25/10' && tabs.map(t => t.code).join() === 'TER,QUA,QUI,SEX,SAB,DOM', JSON.stringify([hw, tabs]));
         const d = await readDay(page); console.log(fmt(d));
-        check('SEX 23/10: 🚑 Plantão 05h30–17h + Anki no trajeto + nota "a trilha começa em 26/10" + academia + lazer — sem SIMULADO, sem botão do simulado, sem etapa, sem revisão', has(d, /^🚑 Plantão 05h30–17h$/) && has(d, /^Anki no trajeto — 20min$/) && has(d, /^🗓️ A trilha começa em 26\/10 \(segunda\) — hoje sem etapa de módulo$/) && !has(d, /SIMULADO/) && !d.simBtn && !d.blocks.some(b => b.tm != null || b.tag === 'REV' || b.tag === 'D7'), fmt(d));
+        check('SEX 23/10: 🚑 Plantão 05h30–17h + Anki no trajeto + nota "a trilha começa em 26/10" + academia + lazer — sem SIMULADO, sem botão do simulado, sem etapa, sem revisão', has(d, /^🚑 Plantão 05h30–17h$/) && has(d, /^Anki no trajeto — 20min$/) && has(d, /^🗓️ A trilha começa em 26\/10 \(segunda\) — hoje sem etapa de módulo$/) && !has(d, /SIMULADO/) && !d.simBtn && !d.blocks.some(H.transStage), fmt(d));
         const cfg = await getLS(page, 'medplanner_config_v1');
         check('nada da Trilha gravado na transição (sem trilhaFirstOpen/trilhaWeeks/trilhaPlan) e nenhum fioWeek ≥ 20/10', !cfg || (!cfg.trilhaFirstOpen && !cfg.trilhaWeeks && !cfg.trilhaPlan && !Object.keys(cfg.fioWeek || {}).some(k => k >= '2026-10-20')), JSON.stringify(cfg));
     });

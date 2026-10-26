@@ -38,7 +38,8 @@ const VENV_TIME = /Venvanse[^.\n]{0,40}\d{1,2}(h|:\d\d)|\d{1,2}(h|:\d\d)[^.\n]{0
     check('36 módulos planejados até 01/01 (prévia de 19/10)', order.length === 36, order.length);
     check('transição 20–25/10 sem abertura e aberturas por semana da Trilha = rampa [' + RAMP.join(',') + ']', opens[0] === 0 && JSON.stringify(opens.slice(1)) === JSON.stringify(RAMP), JSON.stringify(opens));
     const trans = Object.entries(map).flatMap(([id, m]) => STG.filter(ts => m[ts] && m[ts] < '2026-10-26').map(ts => id + ' ' + ts + ' ' + br(m[ts])));
-    check('nenhuma etapa em 20–25/10 (transição)', !trans.length, trans.join(', '));
+    const transB = Object.entries(days).filter(([di]) => di < '2026-10-26').flatMap(([di, d]) => d.blocks.filter(H.transStage).map(b => br(di) + ' ' + b.tag + ' ' + (b.text || '').slice(0, 40)));
+    check('nenhuma etapa em 20–25/10 (transição): nem no plano lido, nem bloco de etapa/revisão/PLAN/simulado na tela (pela etiqueta e pelo texto — o app não põe data-tm nesses dias)', !trans.length && !transB.length && Object.keys(days).filter(di => di < '2026-10-26').length === 6, trans.concat(transB).join(', '));
     check('cadeia completa e dentro das faixas em todos (aula→questões 1–2 · questões→apostila 1–2 · apostila→selagem 2–5), nunca duas etapas do módulo no mesmo dia', !bad.length, bad.join(', '));
     const onBlocked = Object.entries(map).flatMap(([id, m]) => STG.filter(ts => BLOCKED.includes(m[ts])).map(ts => id + ' ' + ts + ' ' + br(m[ts])));
     check('nada em plantão longo (20/10, 27/10, 03/11, 10/11, 12/11) nem em sexta de simulado (06/11, 18/12)', !onBlocked.length, onBlocked.join(', '));

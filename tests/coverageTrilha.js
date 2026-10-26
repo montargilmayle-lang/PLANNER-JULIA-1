@@ -25,7 +25,9 @@ async function previewMap(page) {
     let { ctx, page } = await openPlanner(browser, '2026-10-19', {});
     await navWeek(page, 1);
     const transNovos = await page.evaluate(() => [...document.querySelectorAll('[data-t="trilha-panel"] [data-mod]')].length);
-    check('(a) semana de transição (20–25/10): nenhum módulo no painel', transNovos === 0, transNovos);
+    const transHdr = await page.evaluate(() => ((document.querySelector('[data-t="trilha-panel"]') || {}).innerText || '').split('\n')[0]);
+    const transDays = []; for (const t of await H.listDayTabs(page)) { await H.clickDate(page, t.date); const d = await H.readDay(page); transDays.push([t.date, d.blocks.filter(H.transStage).map(b => b.tag + ' ' + (b.text || '').slice(0, 40))]); }
+    check('(a) semana de transição (20–25/10): painel "SEMANA DE TRANSIÇÃO", nenhum módulo nele e nenhum bloco de etapa nos 6 dias (pela etiqueta e pelo texto)', transNovos === 0 && /SEMANA DE TRANSIÇÃO/.test(transHdr) && transDays.length === 6 && transDays.every(([, b]) => !b.length), JSON.stringify([transNovos, transHdr, transDays.filter(([, b]) => b.length)]));
     await navWeek(page, 1);
     const pv = await previewMap(page);
     check('(a) aberturas por semana na prévia = rampa [' + RAMP.join(',') + ']', JSON.stringify(pv.novos.map(n => n.length)) === JSON.stringify(RAMP), JSON.stringify(pv.novos.map(n => n.length)));
