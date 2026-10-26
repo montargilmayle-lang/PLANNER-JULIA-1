@@ -1,5 +1,5 @@
 // Cargas por dia (estudo) — semana com 3 blocos (Sem.38), nos 3 agrupamentos e ritmos 2/4, mais a semana seguinte (selagem C na QUA', banco C na QUI').
-// A Sem.43/44 saiu (20/10: a partir dela é a Trilha — cargas em intervalsTrilha.js).
+// As antigas Sem.43/44 do curso saíram (20–25/10 transição; Trilha desde 26/10 — cargas em intervalsTrilha.js).
 const H = require('./harness.js');
 const CFG = 'medplanner_config_v1';
 const base = { startDate: '2026-01-07', manualWeek: null };

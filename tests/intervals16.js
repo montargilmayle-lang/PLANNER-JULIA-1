@@ -1,5 +1,5 @@
 // Tabela de intervalos — semana com 3 blocos (A, B, C) em semana de simulado (sem.38, 23/09→30/09), com o agrupamento padrão (3 grupos),
-// [A+B]+[C] e [A]+[B+C]. Lida do cronograma renderizado (2 semanas seguidas). A Sem.43 saiu (20/10: a partir dela é a Trilha).
+// [A+B]+[C] e [A]+[B+C]. Lida do cronograma renderizado (2 semanas seguidas). A antiga Sem.43 do curso saiu (sem motor antigo a partir de 20/10: 20–25/10 transição, Trilha desde 26/10).
 const H = require('./harness.js');
 const CFG = 'medplanner_config_v1';
 const base = { startDate: '2026-01-07', manualWeek: null, catchupPace: 2 };

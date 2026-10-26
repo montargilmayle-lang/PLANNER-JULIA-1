@@ -1,5 +1,5 @@
 // Teste permanente de cobertura do CURSO: em todas as semanas com módulos até a última do curso (1–41, a 7 não existe; a Sem.41 vai de
-// 14 a 19/10 — a partir de 20/10 é a Trilha, coberta por coverageTrilha.js), todo módulo listado em "BLOCOS DESTA SEMANA" tem ao menos
+// 14 a 19/10 — a partir de 20/10 é pós-curso: 20–25/10 transição sem módulos, Trilha desde 26/10, coberta por coverageTrilha.js), todo módulo listado em "BLOCOS DESTA SEMANA" tem ao menos
 // aula (toque 1), questões (toque 2) e apostila (toque 3) marcáveis em algum dia da semana (abas lidas pela data).
 // Oráculo independente (lê ↳ módulo + botões de cada bloco) e, no arquivo corrigido, o aviso ⚠️ do app tem de estar ausente.
 const H = require('./harness.js');

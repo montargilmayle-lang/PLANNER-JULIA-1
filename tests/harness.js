@@ -29,7 +29,7 @@ async function openPlanner(browser, dateISO, seeds = {}, opts = {}) {
     return { ctx, page };
 }
 
-async function listDayTabs(page) { // abas da semana visível: [{ code, date }] (a Sem.41 tem 6, a Trilha começa na TER, a Sem.52 tem 4)
+async function listDayTabs(page) { // abas da semana visível: [{ code, date }] (Sem.41 = 6 · Sem.42 transição = 6, TER→DOM · Sem.43 = T1 = 8, SEG 26/10 → SEG 02/11, duas SEG: use clickDate, nunca clickDay('SEG') · depois TER→SEG · Sem.52 = 4)
     return page.evaluate(() => [...document.querySelectorAll('button')].map(b => b.innerText.split('\n').map(s => s.trim())).filter(t => t.length >= 3 && /^\d\d\/\d\d$/.test(t[2])).map(t => ({ code: t[1], date: t[2] })));
 }
 async function clickDate(page, ddmm) {

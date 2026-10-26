@@ -1,6 +1,214 @@
-# Relatório — TRILHA AUTÔNOMA (20/10/2026 → 01/01/2027)
+# Relatório — TRILHA AUTÔNOMA (26/10/2026 → 01/01/2027; transição 20–25/10)
 
-Entregue antes do merge, como pedido ("bateria completa verde, `cmp` do `index.html`, PR sem merge e relatório antes"). Plano aprovado: *TRILHA AUTÔNOMA — substitui o cronograma do cursinho a partir de 20/10/2026*. Data do relatório: 20/10/2026.
+Entregue antes do merge, como pedido ("bateria completa verde, `cmp` do `index.html`, PR sem merge e relatório antes"). Plano aprovado: *TRILHA AUTÔNOMA — substitui o cronograma do cursinho a partir de 20/10/2026*. Data do relatório: 20/10/2026. **Revisão de 26/10/2026: início adiado para 26/10 (pedido da paciente), com 20–25/10 de transição — §A.** As seções §0–§14 ficam como estavam (medidas com início em 20/10, decisões já tomadas); os números do plano vigente estão em §A.
+
+## A · Início em 26/10 (pedido de 26/10/2026) — decisão 74
+
+A paciente não iniciou em 20/10. A Trilha começa **hoje, SEG 26/10**, com a 1ª aula da fila (**CIR1 · Trauma I**) à tarde, depois do plantão curto 06h–12h; **a ordem da fila não muda** — tudo só desliza para começar hoje. Nada que é ancorado no calendário se desloca: plantões nas datas reais, simulados de 06/11 e 18/12, bloco 04h30 de 16/11 a 11/12, feriados de 3h (24, 25 e 31/12) e o encerramento em 01/01.
+
+### A.1 · O que mudou (e como)
+
+1. **`TRILHA_START = "2026-10-26"`.** A fronteira do histórico ganhou nome próprio: **`POS_CURSO = "2026-10-20"`** — o 1º dia depois do curso. Tudo o que era "fronteira do histórico / motor antigo desligado / registro do curso × da trilha / rótulo pela data" fica em 20/10 (por isso o histórico até 19/10 não muda uma vírgula); tudo o que é "etapa, cota, 1º acesso, revisão" passa a 26/10.
+2. **Semana de 20/10 descartada:** ao carregar, o app tira do plano os `trilhaWeeks` e `trilhaPlan` daquela semana (inclusive Adiantar e 🔓) e o `trilhaFirstOpen` antigo, e guarda tudo em `config.trilhaDescartes` (nada é apagado — ⚙️). `trilhaFirstOpen` passa a ser o dia em que ela abre a versão nova (hoje, 26/10). O `trail_v1` não é tocado: módulo com etapa marcada volta à fila com o que já fez (não reabre); módulo fechado não volta. Dias editados à mão (≥ 20/10) que traziam etapa do plano descartado vão para `medplanner_schedule_archive_v1` (como o "↺ Voltar ao padrão") — os outros ficam como ela deixou. A migração só age se houver o dado antigo, então é idempotente (abrir de novo não faz nada; um backup antigo importado é limpo de novo).
+3. **20–25/10 = dias de transição.** **A forma mais limpa** (respondendo à pergunta): não um terceiro regime, e sim os dias pós-curso **sem etapa** — eles já estão do lado de cá da fronteira do histórico (motor antigo desligado desde 20/10), então basta que o gerador do dia da trilha tenha um ramo de transição que devolve só o **bloco do plantão** (quando há), **Anki**, **academia** e **lazer** (com a véspera), mais a nota **"🗓️ A trilha começa em 26/10 (segunda) — hoje sem etapa de módulo"**. Sem etapa, revisão, PLAN, 🌿, simulado (nem o botão na sexta 23/10). O painel da semana diz "SEMANA DE TRANSIÇÃO · 20/10–25/10 — a trilha começa na segunda 26/10 com o 1º módulo da fila", o selo diz "Transição" e a aba Trilha mostra "🗓️ Dias de transição (20/10–25/10) …". Nada é gravado da trilha nesses dias (nem o 1º acesso).
+4. **Semanas:** Sem.42 = transição 20–25/10 (TER→DOM, 6 dias) · **Sem.43 = T1 = SEG 26/10 → SEG 02/11 (8 dias, duas segundas)** · depois TER→SEG: T2 03–09/11 … **T10 = Sem.52 = 29/12–01/01** (4 dias) — **10 semanas**. A chave da T1 é "2026-10-26" (uma segunda). O dia ativo do Cronograma passou a distinguir as duas segundas (antes, tocar na aba 02/11 abria o 26/10); as 8 abas cabem em 420px; o seletor 🌿, o "mover para" e a grade da academia levam a data quando a semana tem 8 dias.
+
+### A.2 · Rampa semana a semana
+
+Mesma forma aprovada (começa leve, travada no bloco 04h30, pico em 15–21/12, zero na semana final), com uma semana a menos: **3 · 4 · 4 · 4 · 4 · 4 · 4 · 5 · 4 · 0 = 36**. T3 (10–16/11, pelo 16/11) a T7 (08–14/12, pelo 08–11/12) tocam o bloco 04h30 — não sobem; a T8 (15/12) só vai a 5 se a T7 fechar.
+
+| Semana | Datas | Dias | Rampa | Cota | Estado | Módulos novos |
+|---|---|---|---|---|---|---|
+| T1 (Sem.43) | 26/10–02/11 | 8 | 3 | 3 | congelada hoje | CIR1 Trauma I · CIR1 Trauma II · CIR2 Urologia |
+| T2 (Sem.44) | 03/11–09/11 | 7 | 4 | 4 | prévia | CIR2 Cicatrização de Feridas e Queimaduras · CIR2 Cirurgia Pediátrica · CIR3 Preparo Pré-operatório e Risco Cirúrgico · CIR3 Hérnias da Parede Abdominal |
+| T3 (Sem.45) | 10/11–16/11 | 7 | 4 | 4 | prévia | CIR4 Especialidade Cirúrgica · CIR4 Especialidade Cirúrgica · NEF1 Glomerulopatias I · GIN1 Ciclo Menstrual e Anticoncepção |
+| T4 (Sem.46) | 17/11–23/11 | 7 | 4 | 4 | prévia | NEF1 Glomerulopatias II · GIN1 Amenorreia e Ovário Policístico · NEF2 Distúrbio Hidroeletrolítico · OBS1 Diagnóstico de Gravidez e Modificações do Organismo |
+| T5 (Sem.47) | 24/11–30/11 | 7 | 4 | 4 | prévia | NEF3 Insuficiência Renal · NEF2 Distúrbio Ácido-Básico · PRE1 Medidas de Saúde Coletiva · PED1 Neonatologia I |
+| T6 (Sem.48) | 01/12–07/12 | 7 | 4 | 4 | prévia | PRE2 Estudos Epidemiológicos · ANAT Bônus Anatomia · REU1 Intro à Reumatologia + Artrites · PED1 Neonatologia II |
+| T7 (Sem.49) | 08/12–14/12 | 7 | 4 | 4 | prévia | REU1 Gota · PRE2 Epidemiologia Clínica · OBS2 Assistência Clínica ao Parto e Parto Prematuro · PRE3 Vigilância da Saúde |
+| T8 (Sem.50) | 15/12–21/12 | 7 | 5 | 5 | prévia | REU2 Colagenoses · PRE3 Saúde do Trabalhador + Ética Médica · REU2 Vasculites · PED2 Aleitamento Materno · HEM1 Anemias I |
+| T9 (Sem.51) | 22/12–28/12 | 7 | 4 | 4 | prévia | PED2 Crescimento e Desenvolvimento Normais · HEM1 Anemia II · HEM2 Leucemias Agudas e Crônicas · HEM2 Linfomas e Mieloma Múltiplo |
+| T10 (Sem.52) | 29/12–01/01 | 4 | 0 | 0 | prévia | — |
+
+Soma das cotas: 36. Alcance N = 36 (dentro, as 4 etapas datadas até 01/01); fila = 93; fora = 57.
+
+### A.3 · Alcance
+
+**N = 36 dentro** (as 4 etapas datadas até 01/01) · **57 fora** (fila de 93) · 0 fechados. A sua conta (≈ 36) bate. Saem do alcance os 4 que eram #37–#40 no plano de 20/10: **HEM2 · Distúrbios da Hemostasia, GAS1 · Doenças do Esôfago, GIN2 · Sangramento Uterino Anormal, Endometriose e Infertilidade, GAS1 · Doenças do Estômago** (agora os primeiros fora). Últimos dentro: #33 PED2 · Crescimento e Desenvolvimento, #34 HEM1 · Anemia II, #35 HEM2 · Leucemias, #36 HEM2 · Linfomas e Mieloma.
+
+### A.4 · Cota proporcional na 1ª semana (8 dias) — a escolha
+
+A regra da decisão 71 fica como está: a semana do 1º acesso recebe `round(rampa × dias que restam ÷ dias da semana)`, contando o dia do 1º acesso, e só quando o 1º acesso cai **depois** do 1º dia da semana. Na T1 o denominador é **8**. Como o 1º acesso é hoje e hoje é o 1º dia, **restam 8 de 8 dias ⇒ cota cheia (3)**, sem marca de proporcional — e a T2 sobe a 4 se a T1 fechar. Por quê: a proporcionalidade existe para a semana não abrir acima do que os dias que sobram sustentam; com a semana inteira pela frente não há o que reduzir, e a T1 de 8 dias fica leve (pior dia de estudo: 4,3h, QUA 28/10; 27/10 é plantão longo). Se ela só abrisse depois: 27/10 → 3 (round 2,625) · 28, 29 e 30/10 → 2 · 31/10 e 01/11 → 1 · 02/11 → 0 (testado: TR13 em 28/10, TR13b em 02/11, TR13c em 26/10).
+
+### A.5 · Carga dia a dia — transição + as 10 semanas (plano visto em 26/10, sem revisões vencidas)
+
+| Dia | Plantão | Etapas | Estudo | Total | 📚 limiar | Marcas |
+|---|---|---|---|---|---|---|
+| **Sem.42** | | | | | | |
+| TER 20/10 | 06h–19h (longo) | — | 0,33h | 13,83h | 8h | transição |
+| QUA 21/10 | 13h–18h (curto) | — | 0,33h | 6,33h | 8h | transição |
+| QUI 22/10 | 06h–12h (curto) | — | 0,33h | 7,33h | 8h | transição |
+| SEX 23/10 | 05h30–17h (curto) | — | 0,33h | 12,83h | 8h | transição |
+| SÁB 24/10 |  | — | 0,58h | 0,58h | 8h | transição |
+| DOM 25/10 |  | — | 0,58h | 1,58h | 8h | transição |
+| **Sem.43** | | | | | | |
+| SEG 26/10 | 06h–12h (curto) | CIR1 aula | 2,03h | 9,03h | 8h |  |
+| TER 27/10 | 06h–19h (longo) | — | 0,33h | 13,83h | 8h |  |
+| QUA 28/10 |  | CIR1 aula, CIR1 questões | 4,28h | 5,28h | 8h |  |
+| QUI 29/10 | 06h–15h (curto) | CIR1 questões, CIR1 apostila | 3,83h | 13,83h | 8h |  |
+| SEX 30/10 |  | CIR2 aula, CIR1 apostila | 3,78h | 4,78h | 8h |  |
+| SÁB 31/10 |  | — | 0,83h | 0,83h | 8h | 🌿 |
+| DOM 01/11 |  | CIR2 questões, CIR1 selagem | 3,25h | 4,25h | 8h |  |
+| SEG 02/11 |  | CIR2 apostila, CIR1 selagem | 2,75h | 3,75h | 8h |  |
+| **Sem.44** | | | | | | |
+| TER 03/11 | 06h–19h (longo) | — | 0,33h | 13,83h | 8h |  |
+| QUA 04/11 | 06h–15h (curto) | — | 0,33h | 10,33h | 8h |  |
+| QUI 05/11 | 06h–17h (curto) | CIR2 selagem | 1h | 13h | 8h |  |
+| SEX 06/11 |  | — | 8,58h | 9,58h | 8h | 📚 🎯 |
+| SÁB 07/11 |  | — | 0,83h | 0,83h | 8h | 🌿 |
+| DOM 08/11 |  | — | 0,58h | 1,58h | 8h |  |
+| SEG 09/11 | 06h–09h30 (curto) | CIR2 aula, CIR2 aula, CIR3 aula, CIR3 aula | 7,13h | 11,63h | 8h |  |
+| **Sem.45** | | | | | | |
+| TER 10/11 | 06h–19h (longo) | — | 0,33h | 13,83h | 8h |  |
+| QUA 11/11 |  | NEF1 aula, CIR2 questões, CIR2 questões, CIR3 questões, CIR3 questões | 10,28h | 11,28h | 8h | 📚 |
+| QUI 12/11 | 06h–19h (longo) | — | 0,33h | 13,83h | 8h |  |
+| SEX 13/11 |  | GIN1 aula, NEF1 questões, CIR2 apostila, CIR2 apostila, CIR3 apostila, CIR3 apostila | 10,28h | 11,28h | 8h | 📚 |
+| SÁB 14/11 |  | — | 0,83h | 0,83h | 8h | 🌿 |
+| DOM 15/11 |  | CIR4 aula, CIR4 aula, GIN1 questões, NEF1 apostila | 7,48h | 8,48h | 8h |  |
+| SEG 16/11 | 04h30–12h30 (madrugada) | CIR4 questões, CIR2 selagem, CIR2 selagem, CIR3 selagem, CIR3 selagem | 5h | 14h | 5h |  |
+| **Sem.46** | | | | | | |
+| TER 17/11 | 04h30–12h30 (madrugada) | CIR4 questões, CIR4 apostila, GIN1 apostila | 5,33h | 14,33h | 5h | 📚 |
+| QUA 18/11 | 04h30–12h30 (madrugada) | NEF1 aula, CIR4 apostila, NEF1 selagem | 4,2h | 13,2h | 5h |  |
+| QUI 19/11 | 04h30–12h30 (madrugada) | NEF1 questões | 2,33h | 11,33h | 5h |  |
+| SEX 20/11 | 04h30–12h30 (madrugada) | GIN1 aula, NEF1 apostila, CIR4 selagem, GIN1 selagem | 4,87h | 13,87h | 5h |  |
+| SÁB 21/11 |  | — | 0,83h | 0,83h | 8h | 🌿 |
+| DOM 22/11 |  | NEF2 aula, OBS1 aula, GIN1 questões, CIR4 selagem | 6,65h | 7,65h | 8h |  |
+| SEG 23/11 | 04h30–12h30 (madrugada) | NEF2 questões, GIN1 apostila, NEF1 selagem | 4,5h | 13,5h | 5h |  |
+| **Sem.47** | | | | | | |
+| TER 24/11 | 04h30–12h30 (madrugada) | OBS1 questões, NEF2 apostila | 3,83h | 12,83h | 5h |  |
+| QUA 25/11 | 04h30–12h30 (madrugada) | NEF3 aula, OBS1 apostila | 3,53h | 12,53h | 5h |  |
+| QUI 26/11 | 04h30–12h30 (madrugada) | NEF3 questões, GIN1 selagem | 3h | 12h | 5h |  |
+| SEX 27/11 | 04h30–12h30 (madrugada) | NEF2 aula, NEF3 apostila, NEF2 selagem | 4,2h | 13,2h | 5h |  |
+| SÁB 28/11 |  | — | 0,83h | 0,83h | 8h | 🌿 |
+| DOM 29/11 |  | PRE1 aula, PED1 aula, NEF2 questões, OBS1 selagem | 6,65h | 7,65h | 8h |  |
+| SEG 30/11 | 04h30–12h30 (madrugada) | PRE1 questões, NEF2 apostila, NEF3 selagem | 4,5h | 13,5h | 5h |  |
+| **Sem.48** | | | | | | |
+| TER 01/12 | 04h30–12h30 (madrugada) | PED1 questões, PRE1 apostila | 3,83h | 12,83h | 5h |  |
+| QUA 02/12 | 04h30–12h30 (madrugada) | PRE2 aula, PED1 apostila | 3,53h | 12,53h | 5h |  |
+| QUI 03/12 | 04h30–12h30 (madrugada) | PRE2 questões, NEF2 selagem | 3h | 12h | 5h |  |
+| SEX 04/12 | 04h30–12h30 (madrugada) | ANAT aula, PRE2 apostila, PRE1 selagem | 4,2h | 13,2h | 5h |  |
+| SÁB 05/12 |  | — | 0,83h | 0,83h | 8h | 🌿 |
+| DOM 06/12 |  | REU1 aula, PED1 aula, ANAT questões, PED1 selagem | 6,65h | 7,65h | 8h |  |
+| SEG 07/12 | 04h30–12h30 (madrugada) | REU1 questões, ANAT apostila, PRE2 selagem | 4,5h | 13,5h | 5h |  |
+| **Sem.49** | | | | | | |
+| TER 08/12 | 04h30–12h30 (madrugada) | PED1 questões, REU1 apostila | 3,83h | 12,83h | 5h |  |
+| QUA 09/12 | 04h30–12h30 (madrugada) | REU1 aula, PED1 apostila | 3,53h | 12,53h | 5h |  |
+| QUI 10/12 | 04h30–12h30 (madrugada) | PRE2 aula, ANAT selagem | 2,7h | 11,7h | 5h |  |
+| SEX 11/12 | 04h30–12h30 (madrugada) | PRE3 aula, REU1 questões, REU1 selagem | 4,7h | 13,7h | 5h |  |
+| SÁB 12/12 |  | PRE2 questões, PRE3 questões, REU1 apostila, PED1 selagem | 7h | 7h | 8h |  |
+| DOM 13/12 |  | OBS2 aula, PRE2 apostila, PRE3 apostila | 5,28h | 6,28h | 8h |  |
+| SEG 14/12 |  | — | 0,58h | 1,58h | 8h | 🌿 |
+| **Sem.50** | | | | | | |
+| TER 15/12 |  | REU2 aula, REU2 aula, OBS2 questões, REU1 selagem | 6,65h | 7,65h | 8h |  |
+| QUA 16/12 |  | REU2 questões, REU2 questões, OBS2 apostila, PRE2 selagem, PRE3 selagem | 7,42h | 8,42h | 8h |  |
+| QUI 17/12 |  | PRE3 aula, PED2 aula, HEM1 aula, REU2 apostila, REU2 apostila | 8,68h | 9,68h | 8h | 📚 |
+| SEX 18/12 |  | — | 8,58h | 9,58h | 8h | 📚 🎯 |
+| SÁB 19/12 |  | PRE3 questões, PED2 questões, HEM1 questões, OBS2 selagem | 7,5h | 7,5h | 8h |  |
+| DOM 20/12 |  | PRE3 apostila, PED2 apostila, HEM1 apostila, REU2 selagem, REU2 selagem | 6,42h | 7,42h | 8h |  |
+| SEG 21/12 |  | — | 0,58h | 1,58h | 8h | 🌿 |
+| **Sem.51** | | | | | | |
+| TER 22/12 |  | PED2 aula, HEM1 aula | 3,98h | 4,98h | 8h |  |
+| QUA 23/12 |  | PED2 questões, HEM1 questões, PRE3 selagem, PED2 selagem, HEM1 selagem | 6,58h | 7,58h | 8h |  |
+| QUI 24/12 |  | PED2 apostila | 2,08h | 3,08h | 3h | 🎄 |
+| SEX 25/12 |  | HEM1 apostila | 2,08h | 3,08h | 3h | 🎄 |
+| SÁB 26/12 |  | — | 0,83h | 0,83h | 8h | 🌿 |
+| DOM 27/12 |  | HEM2 aula, HEM2 aula, PED2 selagem | 4,65h | 5,65h | 8h |  |
+| SEG 28/12 |  | HEM2 questões, HEM2 questões, HEM1 selagem | 5,25h | 6,25h | 8h |  |
+| **Sem.52** | | | | | | |
+| TER 29/12 |  | — | 0,58h | 1,58h | 8h | 🌿 |
+| QUA 30/12 |  | HEM2 apostila, HEM2 apostila | 3,58h | 4,58h | 8h |  |
+| QUI 31/12 |  | — | 0,58h | 1,58h | 3h | 🎄 |
+| SEX 01/01 |  | HEM2 selagem, HEM2 selagem | 1,92h | 2,92h | 8h | 🏁 |
+
+Dias acima do tempo hábil (14,5h): nenhum. Dias acima do 📚: 06/11, 11/11, 13/11, 17/11, 17/12, 18/12.
+
+**De 03/11 em diante a carga por dia é idêntica à do plano de 20/10** (mesmas semanas TER→SEG, mesma rampa — conferido dia a dia); só os módulos andam 4 posições. Acima do 📚 (informativo, abaixo do tempo hábil): QUA 11/11 e SEX 13/11 (10,3h — decisão 70), TER 17/11 (5,3h num dia de 04h30), QUI 17/12 (8,7h — decisão 72) e as sextas de simulado (06/11, 18/12).
+
+**Uso real (simulador do motor):** varredura de todas as datas possíveis de 1º acesso, **26/10 → 28/12 (64 datas): nenhuma deixa dia acima de 14,5h**. Simulação progressiva com 1º acesso hoje, ela fazendo tudo no dia e as revisões vencidas no 1º dia com folga, com selagens a **50, 70 e 85%**: **36 módulos fechados até 01/01** nos três casos; nenhum dia acima de 14,5h (pior: 14,33h, TER 17/11); revisões deslizam no máximo 1 dia (decisão 73).
+
+### A.6 · Tabela de intervalos — os 36 módulos planejados
+
+| # | Módulo | Semana | Aula | Questões | Apostila | Selagem | a→q | q→p | p→s |
+|---|---|---|---|---|---|---|---|---|---|
+| 1 | CIR1 Trauma I | 26/10 | SEG 26/10 | QUA 28/10 | QUI 29/10 | DOM 01/11 | 2 | 1 | 3 |
+| 2 | CIR1 Trauma II | 26/10 | QUA 28/10 | QUI 29/10 | SEX 30/10 | SEG 02/11 | 1 | 1 | 3 |
+| 3 | CIR2 Urologia | 26/10 | SEX 30/10 | DOM 01/11 | SEG 02/11 | QUI 05/11 | 2 | 1 | 3 |
+| 4 | CIR2 Cicatrização de Feridas e Queimaduras | 03/11 | SEG 09/11 | QUA 11/11 | SEX 13/11 | SEG 16/11 | 2 | 2 | 3 |
+| 5 | CIR2 Cirurgia Pediátrica | 03/11 | SEG 09/11 | QUA 11/11 | SEX 13/11 | SEG 16/11 | 2 | 2 | 3 |
+| 6 | CIR3 Preparo Pré-operatório e Risco Cirúrgico | 03/11 | SEG 09/11 | QUA 11/11 | SEX 13/11 | SEG 16/11 | 2 | 2 | 3 |
+| 7 | CIR3 Hérnias da Parede Abdominal | 03/11 | SEG 09/11 | QUA 11/11 | SEX 13/11 | SEG 16/11 | 2 | 2 | 3 |
+| 8 | CIR4 Especialidade Cirúrgica | 10/11 | DOM 15/11 | SEG 16/11 | TER 17/11 | SEX 20/11 | 1 | 1 | 3 |
+| 9 | CIR4 Especialidade Cirúrgica | 10/11 | DOM 15/11 | TER 17/11 | QUA 18/11 | DOM 22/11 | 2 | 1 | 4 |
+| 10 | NEF1 Glomerulopatias I | 10/11 | QUA 11/11 | SEX 13/11 | DOM 15/11 | QUA 18/11 | 2 | 2 | 3 |
+| 11 | GIN1 Ciclo Menstrual e Anticoncepção | 10/11 | SEX 13/11 | DOM 15/11 | TER 17/11 | SEX 20/11 | 2 | 2 | 3 |
+| 12 | NEF1 Glomerulopatias II | 17/11 | QUA 18/11 | QUI 19/11 | SEX 20/11 | SEG 23/11 | 1 | 1 | 3 |
+| 13 | GIN1 Amenorreia e Ovário Policístico | 17/11 | SEX 20/11 | DOM 22/11 | SEG 23/11 | QUI 26/11 | 2 | 1 | 3 |
+| 14 | NEF2 Distúrbio Hidroeletrolítico | 17/11 | DOM 22/11 | SEG 23/11 | TER 24/11 | SEX 27/11 | 1 | 1 | 3 |
+| 15 | OBS1 Diagnóstico de Gravidez e Modificações do Organismo | 17/11 | DOM 22/11 | TER 24/11 | QUA 25/11 | DOM 29/11 | 2 | 1 | 4 |
+| 16 | NEF3 Insuficiência Renal | 24/11 | QUA 25/11 | QUI 26/11 | SEX 27/11 | SEG 30/11 | 1 | 1 | 3 |
+| 17 | NEF2 Distúrbio Ácido-Básico | 24/11 | SEX 27/11 | DOM 29/11 | SEG 30/11 | QUI 03/12 | 2 | 1 | 3 |
+| 18 | PRE1 Medidas de Saúde Coletiva | 24/11 | DOM 29/11 | SEG 30/11 | TER 01/12 | SEX 04/12 | 1 | 1 | 3 |
+| 19 | PED1 Neonatologia I | 24/11 | DOM 29/11 | TER 01/12 | QUA 02/12 | DOM 06/12 | 2 | 1 | 4 |
+| 20 | PRE2 Estudos Epidemiológicos | 01/12 | QUA 02/12 | QUI 03/12 | SEX 04/12 | SEG 07/12 | 1 | 1 | 3 |
+| 21 | ANAT Bônus Anatomia | 01/12 | SEX 04/12 | DOM 06/12 | SEG 07/12 | QUI 10/12 | 2 | 1 | 3 |
+| 22 | REU1 Intro à Reumatologia + Artrites | 01/12 | DOM 06/12 | SEG 07/12 | TER 08/12 | SEX 11/12 | 1 | 1 | 3 |
+| 23 | PED1 Neonatologia II | 01/12 | DOM 06/12 | TER 08/12 | QUA 09/12 | SÁB 12/12 | 2 | 1 | 3 |
+| 24 | REU1 Gota | 08/12 | QUA 09/12 | SEX 11/12 | SÁB 12/12 | TER 15/12 | 2 | 1 | 3 |
+| 25 | PRE2 Epidemiologia Clínica | 08/12 | QUI 10/12 | SÁB 12/12 | DOM 13/12 | QUA 16/12 | 2 | 1 | 3 |
+| 26 | OBS2 Assistência Clínica ao Parto e Parto Prematuro | 08/12 | DOM 13/12 | TER 15/12 | QUA 16/12 | SÁB 19/12 | 2 | 1 | 3 |
+| 27 | PRE3 Vigilância da Saúde | 08/12 | SEX 11/12 | SÁB 12/12 | DOM 13/12 | QUA 16/12 | 1 | 1 | 3 |
+| 28 | REU2 Colagenoses | 15/12 | TER 15/12 | QUA 16/12 | QUI 17/12 | DOM 20/12 | 1 | 1 | 3 |
+| 29 | PRE3 Saúde do Trabalhador + Ética Médica | 15/12 | QUI 17/12 | SÁB 19/12 | DOM 20/12 | QUA 23/12 | 2 | 1 | 3 |
+| 30 | REU2 Vasculites | 15/12 | TER 15/12 | QUA 16/12 | QUI 17/12 | DOM 20/12 | 1 | 1 | 3 |
+| 31 | PED2 Aleitamento Materno | 15/12 | QUI 17/12 | SÁB 19/12 | DOM 20/12 | QUA 23/12 | 2 | 1 | 3 |
+| 32 | HEM1 Anemias I | 15/12 | QUI 17/12 | SÁB 19/12 | DOM 20/12 | QUA 23/12 | 2 | 1 | 3 |
+| 33 | PED2 Crescimento e Desenvolvimento Normais | 22/12 | TER 22/12 | QUA 23/12 | QUI 24/12 | DOM 27/12 | 1 | 1 | 3 |
+| 34 | HEM1 Anemia II | 22/12 | TER 22/12 | QUA 23/12 | SEX 25/12 | SEG 28/12 | 1 | 2 | 3 |
+| 35 | HEM2 Leucemias Agudas e Crônicas | 22/12 | DOM 27/12 | SEG 28/12 | QUA 30/12 | SEX 01/01 | 1 | 2 | 2 |
+| 36 | HEM2 Linfomas e Mieloma Múltiplo | 22/12 | DOM 27/12 | SEG 28/12 | QUA 30/12 | SEX 01/01 | 1 | 2 | 2 |
+
+Fora das faixas (aula→questões 1–2 · questões→apostila 1–2 · apostila→selagem 2–5): nenhum.
+
+Ideais: questões→apostila em 1 dia 27/36 · apostila→selagem em 3 dias 31/36 · aula→questões em 1 dia 15/36 (o plantão longo do dia seguinte à aula força 2 dias em várias semanas). Nenhum módulo com duas etapas no mesmo dia; nada em plantão longo (27/10, 03/11, 10/11, 12/11) nem em sexta de simulado; nenhuma aula no dia leve previsto nem em 24/25/31/12; 01/01 só selagem.
+
+### A.7 · 20–25/10 sem etapa nenhuma e histórico até 19/10 idêntico
+
+- **20–25/10:** nenhuma etapa, áudio, revisão, PLAN, 🌿 ou simulado em nenhum dos 6 dias — conferido pela tela (TR0, TR0b, S7b, intervalsTrilha "nenhuma etapa em 20–25/10") e também com o app chegando com a semana de 20/10 congelada pela versão anterior e um dia editado com etapa antiga (TR16: a edição de 22/10 vai para o arquivo e o dia fica de transição). Cada dia: TER 20/10 plantão longo (🚑 só Anki no trajeto) · QUA 21/10 plantão 13h–18h · QUI 22/10 plantão 06h–12h · SEX 23/10 plantão 05h30–17h (sem simulado) · SÁB 24/10 Anki e lazer · DOM 25/10 Anki, academia e "dormir ~21h45" (plantão 06h de 26/10).
+- **Histórico:** `historico.js` compara o app de antes da Trilha (git 11c65b8) com o novo, dia a dia de 07/01 a 19/10, em três modos — relógio na quarta de cada semana, relógio em 21/10 (agora transição) e **relógio em 26/10 (hoje)** navegando ◀ até a Sem.1. Única diferença, a de sempre: a TER 20/10 não está na Sem.41 (é o 1º dia pós-curso). Resultado na §A.10.
+
+### A.8 · Passagem pelos oito
+
+| | Veto? | Por quê |
+|---|---|---|
+| 🧠 Psiquiatria | não | Nenhum horário de medicação em nenhum dos 74 dias (6 de transição + 68 da Trilha), nem no bloco 04h30 ("janela do estimulante a validar com a psiquiatra"). A T1 começa leve (3 módulos em 8 dias); um dia leve previsto por semana (na T1: SÁB 31/10), nunca com aula nova. |
+| 📚 Pedagogia | não | Cadeia completa e dentro das faixas da decisão 40 em todos os 36; a fila não muda; nenhuma etapa antes de 26/10. |
+| 😴 Sono | não | Nenhum dia acima de 14,5h (prévia, varredura de 64 datas e simulação progressiva). Plantão longo sem etapa de mesa; vésperas mantidas, inclusive nos dias de transição (21, 22 e 25/10). |
+| 🩺 Clínica/ordem | não | Cirurgia primeiro; CIR1 · Trauma I hoje, na tarde livre depois do plantão de 06h–12h. |
+| 🏃 Corpo | não | Academia nos dias de transição como nos demais (sábado sem treino — ver §A.9). |
+| 🧩 TDAH/funções executivas | não | Uma tela por dia, a nota de transição diz o que esperar; nada de ⏳ herdado da semana descartada; as 8 abas e as duas segundas distinguíveis. |
+| 💬 Autonomia | não | Nada decidido por ela além do pedido; os pontos abertos estão em §A.9. |
+| ⚙️ Dados/engenharia | não | Nada apagado: semana de 20/10 em `trilhaDescartes`, edições no arquivo, `trail_v1` intocado; migração idempotente; histórico idêntico. |
+
+### A.9 · Para você decidir (nada aplicado)
+
+1. **Cota da T1 (8 dias):** ficou **3** (a forma "começar leve" e a sua conta de 36). Alternativa medida: **4** → alcance **37**, nenhum dia acima de 14,5h, mas a QUI 05/11 vai a **14,5h** (no limite) e a semana de 8 dias deixa de ser leve. Sugestão da equipe: manter 3.
+2. **SÁB 24/10 (transição):** a sua lista dizia "plantão, Anki, academia e lazer"; a regra de sempre tira o treino do sábado (descanso do treino), então o sábado ficou com Anki e lazer. É um dia passado; se quiser academia no sábado de transição, é uma linha.
+3. **(Informação)** O 1º acesso é o dia em que ela abre a versão nova. Se, em vez de hoje, ela abrir só amanhã, a T1 continua com 3 (7 de 8 dias, round 2,625); a partir de 28/10, 2.
+
+### A.10 · Bateria e `cmp`
+
+(preenchido abaixo)
+
 
 ## 0 · Decisões da paciente e aval (20/10/2026)
 

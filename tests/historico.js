@@ -1,8 +1,9 @@
-// HISTÓRICO INTACTO (⚙️, Trilha 20/10): compara o app ANTES da Trilha (PLANNER_BASE ou o commit HIST_REF) com o novo (PLANNER_FILE),
-// semanas 1–41, dia a dia (07/01–19/10), lendo os BLOCOS da tela. Dois modos:
+// HISTÓRICO INTACTO (⚙️, fim do curso 19/10 · pós-curso 20/10 · Trilha 26/10): compara o app ANTES da Trilha (PLANNER_BASE ou o commit HIST_REF)
+// com o novo (PLANNER_FILE), semanas 1–41, dia a dia (07/01–19/10), lendo os BLOCOS da tela. Três modos:
 //   A · relógio na quarta de cada semana (semana corrente = a comparada)
-//   B · relógio em 21/10 (já na Trilha), navegando ◀ até a Sem.1
-// Diferença aceita (lista explícita): a TER 20/10 sai da Sem.41 (vira o 1º dia da Trilha) — e só ela.
+//   B · relógio em 21/10 (transição, Sem.42), navegando ◀ até a Sem.1
+//   C · relógio em 26/10 (hoje: 1º dia da Trilha, Sem.43), navegando ◀ até a Sem.1 — a base está na sua Sem.42 (21–27/10): ◀1 na base, ◀2 no novo
+// Diferença aceita (lista explícita): a TER 20/10 sai da Sem.41 (vira o 1º dia pós-curso — a transição) — e só ela.
 const H = require('./harness.js');
 const { execSync } = require('child_process');
 const fs = require('fs'), os = require('os'), path = require('path');
@@ -15,7 +16,7 @@ if (!BASE) {
 }
 const START = '2026-01-07', LCW = 41;
 const addDays = (iso, k) => { const d = new Date(iso + 'T12:00:00'); d.setDate(d.getDate() + k); return d.toISOString().slice(0, 10); };
-const ALLOWED = new Set(['20/10']); // TER 20/10: deixou a Sem.41 (1º dia da Trilha)
+const ALLOWED = new Set(['20/10']); // TER 20/10: deixou a Sem.41 (1º dia pós-curso / transição)
 const norm = (d) => JSON.stringify({ title: d.title, venv: d.venv, warn: d.warn, simBtn: d.simBtn, weekBadge: d.weekBadge, light: d.light, lightBadge: d.lightBadge, breatherBadge: d.breatherBadge, blocks: d.blocks.map(b => ({ tag: b.tag, text: b.text, time: b.time, mod: b.mod, mods: b.mods, tasks: b.tasks, done: b.done, pctInputs: b.pctInputs })) });
 async function readWeek(page) { const out = {}; for (const t of await H.listDayTabs(page)) { await H.clickDate(page, t.date); out[t.date] = await H.readDay(page); } return out; }
 async function openWith(browser, file, dateISO) { // openPlanner com arquivo explícito (o harness lê FILE na carga do módulo)
@@ -37,7 +38,7 @@ function compareWeek(tag, w, base, neu) {
     }
     Object.keys(neu).forEach(d => { if (!(d in base)) diffs.push(d + ' só no novo'); });
     const expectN = w === LCW ? dates.length - 1 : dates.length;
-    H.check(tag + ' Sem.' + w + ': ' + same + '/' + expectN + ' dias idênticos ao histórico' + (w === LCW ? ' (TER 20/10 saiu: 1º dia da Trilha)' : ''), !diffs.length && same === expectN, diffs.join(', ') || 'ok');
+    H.check(tag + ' Sem.' + w + ': ' + same + '/' + expectN + ' dias idênticos ao histórico' + (w === LCW ? ' (TER 20/10 saiu: 1º dia de transição; Trilha em 26/10)' : ''), !diffs.length && same === expectN, diffs.join(', ') || 'ok');
     if (diffs.length) diffs.slice(0, 2).forEach(d => { const k = d.slice(0, 5); if (base[k] && neu[k]) { console.log('      BASE ' + k + ':\n' + H.fmt(base[k])); console.log('      NOVO ' + k + ':\n' + H.fmt(neu[k])); } });
 }
 (async () => {
@@ -55,11 +56,23 @@ function compareWeek(tag, w, base, neu) {
         }
     }
     if (!process.argv[3] || process.argv[3] === 'B') {
-        console.log('\n══════════ MODO B · relógio em 21/10 (Trilha), navegando ◀ ══════════');
+        console.log('\n══════════ MODO B · relógio em 21/10 (transição), navegando ◀ ══════════');
         const b = await openWith(browser, BASE, '2026-10-21'), n = await openWith(browser, NEW, '2026-10-21');
         await H.navWeek(b.page, -1); await H.navWeek(n.page, -1);
         for (let w = LCW; w >= 1; w--) {
             if (!weeks.length || weeks.includes(w)) { const wb = await readWeek(b.page), wn = await readWeek(n.page); compareWeek('B', w, wb, wn); }
+            if (w > 1) { await H.navWeek(b.page, -1); await H.navWeek(n.page, -1); }
+        }
+        await b.ctx.close(); await n.ctx.close();
+    }
+    if (!process.argv[3] || process.argv[3] === 'C') {
+        console.log('\n══════════ MODO C · relógio em 26/10 (1º dia da Trilha), navegando ◀ ══════════');
+        const b = await openWith(browser, BASE, '2026-10-26'), n = await openWith(browser, NEW, '2026-10-26');
+        await H.navWeek(b.page, -1); await H.navWeek(n.page, -2); // base: Sem.42 (21–27/10) → 41 · novo: Sem.43 (T1) → 42 (transição) → 41
+        const hb = await H.headerWeek(b.page), hn = await H.headerWeek(n.page);
+        H.check('C · os dois chegam à Sem.41 (base ' + hb.range + ' · novo ' + hn.range + ')', hb.week === LCW && hn.week === LCW && hn.range === '14/10–19/10', JSON.stringify([hb, hn]));
+        for (let w = LCW; w >= 1; w--) {
+            if (!weeks.length || weeks.includes(w)) { const wb = await readWeek(b.page), wn = await readWeek(n.page); compareWeek('C', w, wb, wn); }
             if (w > 1) { await H.navWeek(b.page, -1); await H.navWeek(n.page, -1); }
         }
         await b.ctx.close(); await n.ctx.close();
