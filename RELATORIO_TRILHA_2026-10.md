@@ -211,7 +211,20 @@ Ideais: questões→apostila em 1 dia 27/36 · apostila→selagem em 3 dias 31/3
 
 ### A.10 · Bateria e `cmp`
 
-(preenchido abaixo)
+Rodada no código final (commit `b3e2cba`), todas com código de saída 0:
+
+| Suíte | Checks | O que cobre |
+|---|---|---|
+| audit | 396/396 | S0–S20 adaptados à Trilha, + S7b (sexta 23/10 de transição) |
+| trilha | 226/226 | transição, T1 de 8 dias (duas segundas, 360px), 1º acesso, plantões, simulados, adiantar, subida, recolocar, mover, migração (TR16–TR16f), revisão em dia cheio, semana final |
+| historico | 136/136 | semanas 1–41 dia a dia × app de antes da Trilha, modos A, B, C e D (D1–D4) |
+| coverage41 | 80/80 | todo módulo listado até 19/10 com aula, questões e apostila |
+| coverageTrilha | 8/8 | transição sem módulo nem etapa; prévia = congelado; cobertura até 01/01 |
+| intervalsTrilha | 11/11 | intervalos dos 36, carga dos 74 dias, nenhuma etapa em 20–25/10 |
+| intervals16 | 7/7 | Sem.38 (3 blocos) |
+| loads16 | 12/12 | cargas das Sem.38 e 39 |
+
+**876 checks, todos verdes.** `cmp planner_residencia_2026_offline.html index.html`: idênticos.
 
 ### A.11 · Revisão adversarial antes do merge (5 lentes + verificação de cada achado)
 
