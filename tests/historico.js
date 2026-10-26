@@ -6,7 +6,8 @@
 //   D · dias 20 e 21/10 gravados depois do curso não mudam a Sem.41 (o dia leve histórico lê a TER 20/10): D1 gravados pela versão de 20/10 (Trilha
 //       desde 20/10, com etapas e ✓); D2 ela marca ✓ nos dias de transição na versão nova; D3 uma edição de 20/10 feita no tempo do curso (no app de
 //       antes da Trilha, em 15/10) continua valendo, também depois de uma aba antiga apagar o registro (D3b) ou de um "↺" na versão de 20/10 (D5);
-//       D4 nada gravado na 1ª carga e depois a TER 20/10 só com um bloco dela; D6 o mesmo feito na versão de 20/10 — sempre × o app de antes da Trilha
+//       D4 nada gravado na 1ª carga e depois a TER 20/10 só com um bloco dela; D6 o mesmo feito na versão de 20/10; D7 a TER 20/10 esvaziada depois do curso
+//       (lista vazia não prova nada: vale o gerado); D8 bloco criado na noite de 19/10 conta como do curso em qualquer fuso — sempre × o app de antes da Trilha
 // Diferença aceita (lista explícita): a TER 20/10 sai da Sem.41 (vira o 1º dia pós-curso — a transição) — e só ela.
 const H = require('./harness.js');
 const { execSync } = require('child_process');
@@ -23,8 +24,8 @@ const addDays = (iso, k) => { const d = new Date(iso + 'T12:00:00'); d.setDate(d
 const ALLOWED = new Set(['20/10']); // TER 20/10: deixou a Sem.41 (1º dia pós-curso / transição)
 const norm = (d) => JSON.stringify({ title: d.title, venv: d.venv, warn: d.warn, simBtn: d.simBtn, weekBadge: d.weekBadge, light: d.light, lightBadge: d.lightBadge, breatherBadge: d.breatherBadge, blocks: d.blocks.map(b => ({ tag: b.tag, text: b.text, time: b.time, mod: b.mod, mods: b.mods, tasks: b.tasks, done: b.done, pctInputs: b.pctInputs })) });
 async function readWeek(page) { const out = {}; for (const t of await H.listDayTabs(page)) { await H.clickDate(page, t.date); out[t.date] = await H.readDay(page); } return out; }
-async function openWith(browser, file, dateISO, seeds) { // openPlanner com arquivo explícito (o harness lê FILE na carga do módulo)
-    const ctx = await browser.newContext({ viewport: { width: 420, height: 900 }, locale: 'pt-BR', timezoneId: 'America/Bahia' });
+async function openWith(browser, file, dateISO, seeds, tz) { // openPlanner com arquivo explícito (o harness lê FILE na carga do módulo)
+    const ctx = await browser.newContext({ viewport: { width: 420, height: 900 }, locale: 'pt-BR', timezoneId: tz || 'America/Bahia' });
     const page = await ctx.newPage();
     page.on('pageerror', e => H.results.push({ id: 'pageerror (' + path.basename(file) + ' ' + dateISO + '): ' + e.message, ok: false, evidence: '' }));
     await page.addInitScript((dd) => { const F = new Date(dd + 'T12:00:00').getTime(); const O = Date; class M extends O { constructor(...a) { a.length === 0 ? super(F) : super(...a); } static now() { return F; } } window.Date = M; }, dateISO);
@@ -141,6 +142,22 @@ function compareWeek(tag, w, base, neu, sameLen) {
         H.check('D6 · bloco criado em 20/10 (versão de 20/10) não vira edição do curso: trilhaLegacyOv[20/10] = null', lo6['2026-10-20'] === null, JSON.stringify(lo6));
         await toS41(n6.page, 2); compareWeek('D6', LCW, wb, await readWeek(n6.page));
         await n6.ctx.close();
+        // D7 · na versão de 20/10 ela esvaziou a TER 20/10 (lista vazia) — com e sem "↺" depois: lista vazia não prova edição do curso, vale o gerado
+        for (const [tag, sd] of [['D7a (↺: [] no arquivo)', { medplanner_schedule_archive_v1: { '2026-10-20': [{ at: '2026-10-20', list: [] }] } }], ['D7b ([] gravado)', { medplanner_schedule_v1: { '2026-10-20': [] } }]]) {
+            const n7 = await openWith(browser, NEW, '2026-10-26', { medplanner_config_v1: { startDate: START, manualWeek: null }, ...sd });
+            const lo7 = ((await H.getLS(n7.page, 'medplanner_config_v1')) || {}).trilhaLegacyOv || {};
+            H.check(tag.slice(0, 3) + ' · TER 20/10 esvaziada depois do curso ' + tag.slice(3) + ': trilhaLegacyOv[20/10] = null', lo7['2026-10-20'] === null, JSON.stringify(lo7));
+            await toS41(n7.page, 2); compareWeek(tag.slice(0, 3), LCW, wb, await readWeek(n7.page));
+            await n7.ctx.close();
+        }
+        // D8 · bloco que ela criou no tempo do curso, na noite de 19/10 (23h30 em Salvador = 00h30 de 20/10 em Fernando de Noronha): é do curso em qualquer fuso
+        const own19 = [{ id: 'c-1792463400000', d: 'EXTRA', color: '#0EA5E9', text: 'Plano da semana (meu, 19/10 à noite)', time: '2h' }];
+        for (const tz of ['America/Bahia', 'America/Noronha']) {
+            const n8 = await openWith(browser, NEW, '2026-10-26', { medplanner_config_v1: { startDate: START, manualWeek: null }, medplanner_schedule_v1: { '2026-10-20': own19 } }, tz);
+            const lo8 = ((await H.getLS(n8.page, 'medplanner_config_v1')) || {}).trilhaLegacyOv || {};
+            H.check('D8 · bloco criado em 19/10 às 23h30 (Salvador) conta como edição do curso com o aparelho em ' + tz, JSON.stringify(lo8['2026-10-20']) === JSON.stringify(own19), JSON.stringify(lo8));
+            await n8.ctx.close();
+        }
         // D4 · 1ª carga da versão nova sem 20 e 21/10 gravados; depois ela tira tudo de TER 20/10 e deixa só um bloco dela: ao abrir de novo, a Sem.41 não muda
         const m4 = await openWith(browser, NEW, '2026-10-26');
         const lo4 = ((await H.getLS(m4.page, 'medplanner_config_v1')) || {}).trilhaLegacyOv || {};

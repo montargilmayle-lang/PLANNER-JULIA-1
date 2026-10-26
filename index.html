@@ -1489,9 +1489,9 @@ function trilhaMigrateStart(cfg, hoje) {
 function trilhaArchiveDays(sov, days, hoje, why) { // guarda as listas em medplanner_schedule_archive_v1 (como o ↺ Voltar ao padrão); false se não conseguiu
     try { const k = STORAGE_PREFIX + "schedule_archive_v1"; const arc = JSON.parse(localStorage.getItem(k) || "{}"); if (!arc || typeof arc !== "object" || Array.isArray(arc)) return false; days.forEach(d => { if (arc[d] !== undefined && !Array.isArray(arc[d])) throw new Error("arquivo"); }); days.forEach(d => { arc[d] = (arc[d] || []).concat([{ at: hoje || todayISO(), why, list: sov[d] }]); }); localStorage.setItem(k, JSON.stringify(arc)); return true; } catch (e) { return false; }
 }
-// Dias de transição (20–25/10) gravados (ela marcou um ✓, moveu ou editou — em qualquer versão): a lista vira a do dia de transição, com os ✓ dela no
-// Anki, na academia, no plantão e no lazer e os blocos que ela mesma acrescentou; o original vai para o arquivo. Roda a cada carga e é idempotente (a lista
-// limpa não muda). Devolve também as listas originais de 20 e 21/10 que ainda não estavam guardadas, para o dia leve histórico da Sem.41 (listLeg).
+// Dias de transição (20–25/10) gravados por uma versão anterior (sem a nota da transição) ou ainda com etapa: a lista vira a do dia de transição, com os ✓
+// dela no Anki, na academia, no plantão, no lazer e na nota e os blocos que ela mesma acrescentou; o original vai para o arquivo. Roda a cada carga e é
+// idempotente; o que ela editou nesta versão fica. Devolve também o registro de 20 e 21/10 para o dia leve histórico da Sem.41 (listLeg).
 const TRANS_KEEP_DONE = ["ANKI", "GYM", "LAZER", "AMB"];
 function trilhaTransList(iso, saved) {
     const gen = trilhaListFor(iso, {}).map((a, i) => ({ ...a, id: "g-" + iso + "-" + i }));
@@ -1501,8 +1501,15 @@ function trilhaTransList(iso, saved) {
 }
 // Lista gravada no tempo do curso (versão de antes da Trilha: ids "g-<semana>-<dia>-<i>" e "c-<hora>", sem campo da trilha). Só ela conta para o dia leve
 // histórico da Sem.41 em 20 e 21/10 — uma lista gravada depois do curso (Trilha desde 20/10, transição) nunca muda o histórico até 19/10.
-const POS_CURSO_MS = new Date(POS_CURSO + "T00:00:00").getTime(); // bloco criado ("adicionar": id c-<hora>) a partir de 20/10 já não é do tempo do curso
-function trilhaCourseList(l) { return Array.isArray(l) && !l.some(a => { if (!a) return false; const id = String(a.id || ""), m = id.match(/^c-(\d{12,})/); return a.tm != null || a.ts || a.au || a.pc || a.gh || /^(g-\d{4}-|t-)/.test(id) || (!!m && Number(m[1]) >= POS_CURSO_MS); }); }
+const POS_CURSO_MS = Date.parse(POS_CURSO + "T00:00:00-03:00"); // bloco criado ("adicionar": id c-<hora>) a partir de 20/10 (meia-noite em Salvador — o mesmo corte em qualquer aparelho) já não é do tempo do curso
+// Prova positiva: lista não vazia, sem campo da trilha, sem bloco criado a partir de 20/10, e com ao menos um bloco do curso (gerado "g-<semana>-<dia>-<i>" ou
+// criado "c-<hora>" antes de 20/10). Lista vazia ou só com blocos de origem desconhecida não conta (vale o gerado).
+function trilhaCourseList(l) {
+    if (!Array.isArray(l) || !l.length) return false;
+    const msOf = (id) => { const m = id.match(/^c-(\d{12,})/); return m ? Number(m[1]) : null; };
+    if (l.some(a => { if (!a) return false; const id = String(a.id || ""), ms = msOf(id); return a.tm != null || a.ts || a.au || a.pc || a.gh || /^(g-\d{4}-|t-)/.test(id) || (ms != null && ms >= POS_CURSO_MS); })) return false;
+    return l.some(a => { if (!a) return false; const id = String(a.id || ""), ms = msOf(id); return /^g-\d{1,2}-\d+-\d+$/.test(id) || (ms != null && ms < POS_CURSO_MS); });
+}
 // A edição do tempo do curso que a versão de 20/10 tirou da tela com "↺ Voltar ao padrão" (ou que esta versão arquivou) continua no arquivo: a 1ª lista do curso guardada
 function trilhaArchivedCourseList(d) { try { const arc = JSON.parse(localStorage.getItem(STORAGE_PREFIX + "schedule_archive_v1") || "{}"); const e = (arc[d] || []).find(x => x && trilhaCourseList(x.list)); return e ? e.list : null; } catch (e) { return null; } }
 function trilhaSanitizeTransition(sov, cfg, hoje) {
@@ -1510,7 +1517,10 @@ function trilhaSanitizeTransition(sov, cfg, hoje) {
     // daí em diante o histórico nunca lê a lista viva desses dias (nem uma que ela edite depois, num dia de transição)
     const have = (cfg && cfg.trilhaLegacyOv) || {}, legacy = {};
     [POS_CURSO, addDaysISO(POS_CURSO, 1)].forEach(d => { if (have[d] === undefined) legacy[d] = trilhaCourseList((sov || {})[d]) ? sov[d] : trilhaArchivedCourseList(d); }); // null = sem edição do tempo do curso (vale o gerado)
-    const days = Object.keys(sov || {}).filter(d => isTransDay(d) && Array.isArray(sov[d])).filter(d => JSON.stringify(trilhaTransList(d, sov[d])) !== JSON.stringify(sov[d]));
+    // refaz só o que não veio desta versão (sem a nota da transição) ou que ainda traz etapa/áudio/linha "↷"; um dia de transição que ela editou nesta
+    // versão (tirou, mudou ou reordenou blocos) fica como ela deixou — "dia editado continua valendo"
+    const stale = (l) => !l.some(a => a && a.pc) || l.some(a => a && (a.tm != null || a.au || a.gh));
+    const days = Object.keys(sov || {}).filter(d => isTransDay(d) && Array.isArray(sov[d]) && stale(sov[d])).filter(d => JSON.stringify(trilhaTransList(d, sov[d])) !== JSON.stringify(sov[d]));
     if (!days.length) return Object.keys(legacy).length ? { sov: null, legacy } : null;
     if (!trilhaArchiveDays(sov, days, hoje, "dia de transição (a trilha começa em " + fmtBR(TRILHA_START) + ")")) return Object.keys(legacy).length ? { sov: null, legacy } : false; // sem arquivo, os dias ficam como estão (tenta de novo na próxima carga) — o registro de 20 e 21/10 vale já
     const out = { ...sov }; days.forEach(d => { out[d] = trilhaTransList(d, sov[d]); });
@@ -1924,7 +1934,7 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, trail, P, onSa
     const resetDay = (dayIdx) => {
         const iso = dateFor(dayIdx);
         if (iso >= POS_CURSO && scheduleOv[iso]) { // dia da Trilha (ou de transição): a edição dela fica guardada (medplanner_schedule_archive_v1) — nada se perde (⚙️)
-            try { const k = STORAGE_PREFIX + "schedule_archive_v1"; const arc = JSON.parse(localStorage.getItem(k) || "{}"); arc[iso] = (arc[iso] || []).concat([{ at: hojeT, list: scheduleOv[iso] }]); localStorage.setItem(k, JSON.stringify(arc)); } catch (e) { }
+            if (!trilhaArchiveDays(scheduleOv, [iso], hojeT, "↺ Voltar ao padrão")) { alert("Não consegui guardar a edição deste dia no arquivo do app, então o dia continua como está — nada foi apagado. Faça um backup na aba Sono e tente de novo."); return; }
         }
         const next = { ...scheduleOv };
         delete next[iso];
