@@ -1462,8 +1462,8 @@ function trilhaFinalPlan(P, cfg, trail, hoje, edited) { // 📦 semana final (29
 // Início em 26/10 (paciente, 26/10: ela não começou em 20/10 — nada foi executado). Ao carregar, a semana congelada de 20/10 (trilhaWeeks e trilhaPlan
 // daquela semana, inclusive Adiantar e 🔓) sai do plano e o 1º acesso volta a ser registrado a partir de 26/10. Nada se perde (⚙️): o que sai fica em
 // config.trilhaDescartes. O registro trail_v1 não é tocado: módulo com etapa marcada volta à fila com o que já fez (nada reabre), módulo fechado não volta.
-// As escolhas por semana gravadas com chaves que deixaram de ser início de semana (20/10 = transição; 27/10 caiu dentro da T1) também vão para o registro;
-// a que cai em dia da T1 passa para ela (rampa da semana de 27/10 · dia sem remédio que aponta para 26/10–02/11), se a T1 ainda não tiver a sua.
+// As escolhas por semana gravadas com chaves que deixaram de ser início de semana (20/10 = transição; 27/10 caiu dentro da T1) também vão para o registro,
+// sem passar para a T1: a decisão mais recente (26/10) recalculou a rampa e põe a 1ª aula hoje — o relatório apresenta o que ficou guardado.
 function trilhaMigrateStart(cfg, hoje) {
     if (!cfg) return null;
     const wks = cfg.trilhaWeeks || {}, plan = cfg.trilhaPlan || {}, ramp = cfg.trilhaRamp || {}, light = cfg.lightDayOverrides || {}, dis = cfg.trilhaDismiss || {};
@@ -1479,16 +1479,15 @@ function trilhaMigrateStart(cfg, hoje) {
     if (oldW.length) { const nw = { ...wks }; oldW.forEach(k => { rec.trilhaWeeks[k] = wks[k]; delete nw[k]; }); out.trilhaWeeks = nw; }
     if (oldP.length) { const np = { ...plan }; oldP.forEach(id => { rec.trilhaPlan[id] = plan[id]; delete np[id]; }); out.trilhaPlan = np; }
     if (oldF) delete out.trilhaFirstOpen;
-    const t1 = TRILHA_START, t1End = weekEndISO(trilhaW1());
-    if (oldR.length) { const nr = { ...ramp }; rec.trilhaRamp = {}; oldR.forEach(k => { rec.trilhaRamp[k] = ramp[k]; delete nr[k]; if (k > t1 && k <= t1End && nr[t1] === undefined) nr[t1] = ramp[k]; }); out.trilhaRamp = nr; } // a semana de 27/10 virou a T1
-    if (oldL.length) { const nl = { ...light }; rec.lightDayOverrides = {}; oldL.forEach(k => { rec.lightDayOverrides[k] = light[k]; delete nl[k]; const v = light[k]; if (v === undefined || v === null || v === "" || !(Number(v) >= 0)) return; const d = addDaysISO(k, Number(v)); if (d >= t1 && d <= t1End && nl[t1] === undefined) nl[t1] = diffDays(t1, d); }); out.lightDayOverrides = nl; } // o dia sem remédio escolhido continua o mesmo dia
+    if (oldR.length) { const nr = { ...ramp }; rec.trilhaRamp = {}; oldR.forEach(k => { rec.trilhaRamp[k] = ramp[k]; delete nr[k]; }); out.trilhaRamp = nr; }
+    if (oldL.length) { const nl = { ...light }; rec.lightDayOverrides = {}; oldL.forEach(k => { rec.lightDayOverrides[k] = light[k]; delete nl[k]; }); out.lightDayOverrides = nl; }
     if (oldD.length) { const nd = { ...dis }; rec.trilhaDismiss = {}; oldD.forEach(k => { rec.trilhaDismiss[k] = dis[k]; delete nd[k]; }); out.trilhaDismiss = nd; }
     if (allOld) ["trilhaRevFull", "trilhaFinalAutoAt", "trilhaFinalLog"].forEach(k => { if (cfg[k] !== undefined) { rec[k] = cfg[k]; delete out[k]; } }); // marcas do plano antigo (dia cheio, semana final)
     out.trilhaDescartes = (Array.isArray(cfg.trilhaDescartes) ? cfg.trilhaDescartes : []).concat([rec]);
     return out;
 }
 function trilhaArchiveDays(sov, days, hoje, why) { // guarda as listas em medplanner_schedule_archive_v1 (como o ↺ Voltar ao padrão); false se não conseguiu
-    try { const k = STORAGE_PREFIX + "schedule_archive_v1"; const arc = JSON.parse(localStorage.getItem(k) || "{}"); days.forEach(d => { arc[d] = (arc[d] || []).concat([{ at: hoje || todayISO(), why, list: sov[d] }]); }); localStorage.setItem(k, JSON.stringify(arc)); return true; } catch (e) { return false; }
+    try { const k = STORAGE_PREFIX + "schedule_archive_v1"; const arc = JSON.parse(localStorage.getItem(k) || "{}"); if (!arc || typeof arc !== "object" || Array.isArray(arc)) return false; days.forEach(d => { if (arc[d] !== undefined && !Array.isArray(arc[d])) throw new Error("arquivo"); }); days.forEach(d => { arc[d] = (arc[d] || []).concat([{ at: hoje || todayISO(), why, list: sov[d] }]); }); localStorage.setItem(k, JSON.stringify(arc)); return true; } catch (e) { return false; }
 }
 // Dias de transição (20–25/10) gravados (ela marcou um ✓, moveu ou editou — em qualquer versão): a lista vira a do dia de transição, com os ✓ dela no
 // Anki, na academia, no plantão e no lazer e os blocos que ela mesma acrescentou; o original vai para o arquivo. Roda a cada carga e é idempotente (a lista
@@ -1502,15 +1501,18 @@ function trilhaTransList(iso, saved) {
 }
 // Lista gravada no tempo do curso (versão de antes da Trilha: ids "g-<semana>-<dia>-<i>" e "c-<hora>", sem campo da trilha). Só ela conta para o dia leve
 // histórico da Sem.41 em 20 e 21/10 — uma lista gravada depois do curso (Trilha desde 20/10, transição) nunca muda o histórico até 19/10.
-function trilhaCourseList(l) { return Array.isArray(l) && !l.some(a => a && (a.tm != null || a.ts || a.au || a.pc || a.gh || /^(g-\d{4}-|t-)/.test(String(a.id || "")))); }
+const POS_CURSO_MS = new Date(POS_CURSO + "T00:00:00").getTime(); // bloco criado ("adicionar": id c-<hora>) a partir de 20/10 já não é do tempo do curso
+function trilhaCourseList(l) { return Array.isArray(l) && !l.some(a => { if (!a) return false; const id = String(a.id || ""), m = id.match(/^c-(\d{12,})/); return a.tm != null || a.ts || a.au || a.pc || a.gh || /^(g-\d{4}-|t-)/.test(id) || (!!m && Number(m[1]) >= POS_CURSO_MS); }); }
+// A edição do tempo do curso que a versão de 20/10 tirou da tela com "↺ Voltar ao padrão" (ou que esta versão arquivou) continua no arquivo: a 1ª lista do curso guardada
+function trilhaArchivedCourseList(d) { try { const arc = JSON.parse(localStorage.getItem(STORAGE_PREFIX + "schedule_archive_v1") || "{}"); const e = (arc[d] || []).find(x => x && trilhaCourseList(x.list)); return e ? e.list : null; } catch (e) { return null; } }
 function trilhaSanitizeTransition(sov, cfg, hoje) {
     // 20 e 21/10 (o dia leve histórico da Sem.41 lê esses dois): na 1ª carga da versão nova guarda a edição do tempo do curso, ou null — gravado ou não o dia;
     // daí em diante o histórico nunca lê a lista viva desses dias (nem uma que ela edite depois, num dia de transição)
     const have = (cfg && cfg.trilhaLegacyOv) || {}, legacy = {};
-    [POS_CURSO, addDaysISO(POS_CURSO, 1)].forEach(d => { if (have[d] === undefined) legacy[d] = trilhaCourseList((sov || {})[d]) ? sov[d] : null; }); // null = sem edição do tempo do curso (vale o gerado)
+    [POS_CURSO, addDaysISO(POS_CURSO, 1)].forEach(d => { if (have[d] === undefined) legacy[d] = trilhaCourseList((sov || {})[d]) ? sov[d] : trilhaArchivedCourseList(d); }); // null = sem edição do tempo do curso (vale o gerado)
     const days = Object.keys(sov || {}).filter(d => isTransDay(d) && Array.isArray(sov[d])).filter(d => JSON.stringify(trilhaTransList(d, sov[d])) !== JSON.stringify(sov[d]));
     if (!days.length) return Object.keys(legacy).length ? { sov: null, legacy } : null;
-    if (!trilhaArchiveDays(sov, days, hoje, "dia de transição (a trilha começa em " + fmtBR(TRILHA_START) + ")")) return false; // sem arquivo, nada muda (tenta de novo na próxima carga)
+    if (!trilhaArchiveDays(sov, days, hoje, "dia de transição (a trilha começa em " + fmtBR(TRILHA_START) + ")")) return Object.keys(legacy).length ? { sov: null, legacy } : false; // sem arquivo, os dias ficam como estão (tenta de novo na próxima carga) — o registro de 20 e 21/10 vale já
     const out = { ...sov }; days.forEach(d => { out[d] = trilhaTransList(d, sov[d]); });
     return { sov: out, legacy };
 }

@@ -5,8 +5,8 @@
 //   C · relógio em 26/10 (hoje: 1º dia da Trilha, Sem.43), navegando ◀ até a Sem.1 — a base está na sua Sem.42 (21–27/10): ◀1 na base, ◀2 no novo
 //   D · dias 20 e 21/10 gravados depois do curso não mudam a Sem.41 (o dia leve histórico lê a TER 20/10): D1 gravados pela versão de 20/10 (Trilha
 //       desde 20/10, com etapas e ✓); D2 ela marca ✓ nos dias de transição na versão nova; D3 uma edição de 20/10 feita no tempo do curso (no app de
-//       antes da Trilha, em 15/10) continua valendo; D4 nada gravado na 1ª carga e depois a TER 20/10 só com um bloco dela — sempre comparado com o app
-//       de antes da Trilha
+//       antes da Trilha, em 15/10) continua valendo, também depois de uma aba antiga apagar o registro (D3b) ou de um "↺" na versão de 20/10 (D5);
+//       D4 nada gravado na 1ª carga e depois a TER 20/10 só com um bloco dela; D6 o mesmo feito na versão de 20/10 — sempre × o app de antes da Trilha
 // Diferença aceita (lista explícita): a TER 20/10 sai da Sem.41 (vira o 1º dia pós-curso — a transição) — e só ela.
 const H = require('./harness.js');
 const { execSync } = require('child_process');
@@ -120,16 +120,36 @@ function compareWeek(tag, w, base, neu, sameLen) {
         compareWeek('D3', LCW, wb3, await readWeek(n.page));
         const cfg3 = await H.getLS(n.page, 'medplanner_config_v1'), sov3 = await H.getLS(n.page, 'medplanner_schedule_v1');
         H.check('D3 · a edição do curso fica em trilhaLegacyOv[20/10] e a TER 20/10 vira dia de transição', JSON.stringify((cfg3.trilhaLegacyOv || {})['2026-10-20']) === JSON.stringify(l20) && (sov3['2026-10-20'] || []).some(a => a.pc), JSON.stringify(Object.keys(cfg3.trilhaLegacyOv || {})));
+        // D3b · uma aba da versão de 20/10 que ficou aberta regrava a config sem trilhaLegacyOv: ao abrir de novo, a edição do curso volta do arquivo
+        await n.page.evaluate(() => { const c = JSON.parse(localStorage.getItem('medplanner_config_v1')); delete c.trilhaLegacyOv; delete c.trilhaInicio; c.manualWeek = null; localStorage.setItem('medplanner_config_v1', JSON.stringify(c)); });
+        const r3 = await H.reopen(browser, n.ctx, n.page, '2026-10-26'); n = r3;
+        const lo3b = ((await H.getLS(n.page, 'medplanner_config_v1')) || {}).trilhaLegacyOv || {};
+        H.check('D3b · trilhaLegacyOv apagado por uma aba antiga: a edição do curso de 20/10 volta do arquivo', JSON.stringify(lo3b['2026-10-20']) === JSON.stringify(l20), JSON.stringify(lo3b['2026-10-20'] || null).slice(0, 120));
+        await toS41(n.page, 2); compareWeek('D3b', LCW, wb3, await readWeek(n.page));
         await b.ctx.close(); await n.ctx.close();
+        // D5 · a versão de 20/10 tirou a edição do curso de 20/10 com "↺ Voltar ao padrão" (o original foi para o arquivo): a Sem.41 que ela via continua a mesma
+        const seedsR = { medplanner_config_v1: { startDate: START, manualWeek: null }, medplanner_schedule_archive_v1: { '2026-10-20': [{ at: '2026-10-20', list: l20 }] } };
+        const n5 = await openWith(browser, NEW, '2026-10-26', seedsR);
+        const lo5 = ((await H.getLS(n5.page, 'medplanner_config_v1')) || {}).trilhaLegacyOv || {};
+        H.check('D5 · ↺ na versão de 20/10: a edição do curso vem do arquivo para trilhaLegacyOv[20/10]', JSON.stringify(lo5['2026-10-20']) === JSON.stringify(l20) && lo5['2026-10-21'] === null, JSON.stringify(Object.keys(lo5)));
+        await toS41(n5.page, 2); compareWeek('D5', LCW, wb3, await readWeek(n5.page));
+        await n5.ctx.close();
+        // D6 · na versão de 20/10 ela tirou tudo de TER 20/10 e deixou só um bloco dela (id c-<hora> de 20/10): não é edição do curso
+        const seeds6 = { medplanner_config_v1: { startDate: START, manualWeek: null }, medplanner_schedule_v1: { '2026-10-20': [{ id: 'c-1792508400000', d: 'EXTRA', color: '#0EA5E9', text: 'Revisar anotações do plantão (meu)', time: '3h' }] } };
+        const n6 = await openWith(browser, NEW, '2026-10-26', seeds6);
+        const lo6 = ((await H.getLS(n6.page, 'medplanner_config_v1')) || {}).trilhaLegacyOv || {};
+        H.check('D6 · bloco criado em 20/10 (versão de 20/10) não vira edição do curso: trilhaLegacyOv[20/10] = null', lo6['2026-10-20'] === null, JSON.stringify(lo6));
+        await toS41(n6.page, 2); compareWeek('D6', LCW, wb, await readWeek(n6.page));
+        await n6.ctx.close();
         // D4 · 1ª carga da versão nova sem 20 e 21/10 gravados; depois ela tira tudo de TER 20/10 e deixa só um bloco dela: ao abrir de novo, a Sem.41 não muda
         const m4 = await openWith(browser, NEW, '2026-10-26');
         const lo4 = ((await H.getLS(m4.page, 'medplanner_config_v1')) || {}).trilhaLegacyOv || {};
         H.check('D4 · 1ª carga da versão nova (nada gravado em 20 e 21/10): trilhaLegacyOv = { 20/10: null, 21/10: null }', lo4['2026-10-20'] === null && lo4['2026-10-21'] === null, JSON.stringify(lo4));
-        await m4.page.evaluate(() => { const s = JSON.parse(localStorage.getItem('medplanner_schedule_v1') || '{}'); s['2026-10-20'] = [{ id: 'c-1761000000000', d: 'EXTRA', color: '#0EA5E9', text: 'Revisar anotações do plantão (meu)', time: '3h' }]; localStorage.setItem('medplanner_schedule_v1', JSON.stringify(s)); });
+        await m4.page.evaluate(() => { const s = JSON.parse(localStorage.getItem('medplanner_schedule_v1') || '{}'); s['2026-10-20'] = [{ id: 'c-1793026800000', d: 'EXTRA', color: '#0EA5E9', text: 'Revisar anotações do plantão (meu)', time: '3h' }]; localStorage.setItem('medplanner_schedule_v1', JSON.stringify(s)); });
         const r4 = await H.reopen(browser, m4.ctx, m4.page, '2026-10-26');
         await toS41(r4.page, 2); compareWeek('D4', LCW, wb, await readWeek(r4.page));
         const s4 = (await H.getLS(r4.page, 'medplanner_schedule_v1')) || {};
-        H.check('D4 · a TER 20/10 vira dia de transição com o bloco dela', (s4['2026-10-20'] || []).some(a => a.pc) && (s4['2026-10-20'] || []).some(a => a.id === 'c-1761000000000'), JSON.stringify((s4['2026-10-20'] || []).map(a => a.id)));
+        H.check('D4 · a TER 20/10 vira dia de transição com o bloco dela', (s4['2026-10-20'] || []).some(a => a.pc) && (s4['2026-10-20'] || []).some(a => a.id === 'c-1793026800000'), JSON.stringify((s4['2026-10-20'] || []).map(a => a.id)));
         await r4.ctx.close();
     }
     await browser.close();
