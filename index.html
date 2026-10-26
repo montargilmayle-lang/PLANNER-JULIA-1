@@ -1180,10 +1180,10 @@ function trilhaListFor(iso, X) {
     const isSim = dw === 5 && simForCfg(cfg, iso);
     const AC = (d, color, text, time) => ({ d, color, text, time });
     if (isTransDay(iso)) { // 20–25/10 (paciente, 26/10): dia de TRANSIÇÃO — sem etapa da trilha, sem revisão, sem simulado e sem o motor antigo
-        let tr = [AC("ANKI", "#0369A1", "Anki + Meditação 15min", "35min"), { ...AC("EXTRA", "#475569", "🗓️ A trilha começa em " + fmtBR(TRILHA_START) + " (" + DOW_FULL[dowOf(TRILHA_START)].toLowerCase() + ") — hoje sem etapa de módulo", ""), pc: 1 }]; // pc = lista pós-curso (o dia leve histórico da Sem.41 não a usa)
+        let tr = [AC("ANKI", "#0369A1", "Anki + Meditação 15min", "35min"), { ...AC("EXTRA", "#475569", "🗓️ A trilha começa em " + fmtBR(TRILHA_START) + " (" + DOW_FULL[dowOf(TRILHA_START)].toLowerCase() + ") — hoje sem etapa de módulo", ""), tn: 1 }]; // pc = lista pós-curso (o dia leve histórico da Sem.41 não a usa)
         if (dw !== 6) tr.push(AC("GYM", "#1D4ED8", "Academia — horário livre", "1h"));
         const vt = vesperaTxt(iso); tr.push(AC("LAZER", "#6B7280", vt ? "Noite leve — " + vt : "Lazer à noite ❤️", "livre"));
-        return sh ? buildShiftDayT(sh, iso, tr) : tr;
+        return (sh ? buildShiftDayT(sh, iso, tr) : tr).map(a => ({ ...a, pc: 1 })); // pc = bloco gerado do dia de transição (lista pós-curso: o dia leve histórico da Sem.41 não a lê); tn = a nota
     }
     let acts = [AC("ANKI", "#0369A1", "Anki + Meditação 15min", "35min")];
     if (isSim) acts.push(AC("D7", "#0F766E", "D7 · SIMULADO NA ÍNTEGRA (quinzenal): " + (sh ? "fora do horário do plantão" : "manhã") + ", cronometrado", "5h"), AC("D7", "#0F766E", "D7 · CORREÇÃO DO SIMULADO: erro → entender → caderno → tema fraco", "3h"));
@@ -1495,9 +1495,9 @@ function trilhaArchiveDays(sov, days, hoje, why) { // guarda as listas em medpla
 const TRANS_KEEP_DONE = ["ANKI", "GYM", "LAZER", "AMB"];
 function trilhaTransList(iso, saved) {
     const gen = trilhaListFor(iso, {}).map((a, i) => ({ ...a, id: "g-" + iso + "-" + i }));
-    const done = new Set((saved || []).filter(b => b && b.done && TRANS_KEEP_DONE.includes(b.d)).map(b => b.d)), noteDone = (saved || []).some(b => b && b.pc && b.done);
+    const done = new Set((saved || []).filter(b => b && b.done && TRANS_KEEP_DONE.includes(b.d)).map(b => b.d)), noteDone = (saved || []).some(b => b && b.tn && b.done);
     const mine = (saved || []).filter(b => b && b.tm == null && !b.gh && !b.au && !b.pc && !/^↷ /.test(b.text || "") && !/^[gt]-/.test(String(b.id || "")) && (b.d === "EXTRA" || /^c-\d+$/.test(String(b.id || "")))); // os que ela criou ("adicionar": id c-<hora>, qualquer etiqueta); nunca um bloco gerado
-    return gen.map(a => (a.pc ? noteDone : done.has(a.d)) ? { ...a, done: true } : a).concat(mine);
+    return gen.map(a => (a.tn ? noteDone : done.has(a.d)) ? { ...a, done: true } : a).concat(mine);
 }
 // Lista gravada no tempo do curso (versão de antes da Trilha: ids "g-<semana>-<dia>-<i>" e "c-<hora>", sem campo da trilha). Só ela conta para o dia leve
 // histórico da Sem.41 em 20 e 21/10 — uma lista gravada depois do curso (Trilha desde 20/10, transição) nunca muda o histórico até 19/10.
@@ -1517,9 +1517,11 @@ function trilhaSanitizeTransition(sov, cfg, hoje) {
     // daí em diante o histórico nunca lê a lista viva desses dias (nem uma que ela edite depois, num dia de transição)
     const have = (cfg && cfg.trilhaLegacyOv) || {}, legacy = {};
     [POS_CURSO, addDaysISO(POS_CURSO, 1)].forEach(d => { if (have[d] === undefined) legacy[d] = trilhaCourseList((sov || {})[d]) ? sov[d] : trilhaArchivedCourseList(d); }); // null = sem edição do tempo do curso (vale o gerado)
-    // refaz só o que não veio desta versão (sem a nota da transição) ou que ainda traz etapa/áudio/linha "↷"; um dia de transição que ela editou nesta
-    // versão (tirou, mudou ou reordenou blocos) fica como ela deixou — "dia editado continua valendo"
-    const stale = (l) => !l.some(a => a && a.pc) || l.some(a => a && (a.tm != null || a.au || a.gh));
+    // refaz só a lista que traz etapa/áudio/linha "↷" ou um bloco que não é desta versão (sem a marca pc) nem dela (criado por ela: "c-<hora>" ou extra não
+    // gerado) — PLAN, revisão, simulado ou texto antigo; um dia de transição que ela editou nesta versão (tirou, moveu, reordenou blocos, esvaziou o dia)
+    // fica como ela deixou — "dia editado continua valendo"
+    const own = (a) => { const id = String(a.id || ""); return /^c-\d+$/.test(id) || (a.d === "EXTRA" && !/^[gt]-/.test(id)); };
+    const stale = (l) => l.some(a => a && (a.tm != null || a.au || a.gh || (!a.pc && !own(a))));
     const days = Object.keys(sov || {}).filter(d => isTransDay(d) && Array.isArray(sov[d]) && stale(sov[d])).filter(d => JSON.stringify(trilhaTransList(d, sov[d])) !== JSON.stringify(sov[d]));
     if (!days.length) return Object.keys(legacy).length ? { sov: null, legacy } : null;
     if (!trilhaArchiveDays(sov, days, hoje, "dia de transição (a trilha começa em " + fmtBR(TRILHA_START) + ")")) return Object.keys(legacy).length ? { sov: null, legacy } : false; // sem arquivo, os dias ficam como estão (tenta de novo na próxima carga) — o registro de 20 e 21/10 vale já
@@ -1934,7 +1936,7 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, trail, P, onSa
     const resetDay = (dayIdx) => {
         const iso = dateFor(dayIdx);
         if (iso >= POS_CURSO && scheduleOv[iso]) { // dia da Trilha (ou de transição): a edição dela fica guardada (medplanner_schedule_archive_v1) — nada se perde (⚙️)
-            if (!trilhaArchiveDays(scheduleOv, [iso], hojeT, "↺ Voltar ao padrão")) { alert("Não consegui guardar a edição deste dia no arquivo do app, então o dia continua como está — nada foi apagado. Faça um backup na aba Sono e tente de novo."); return; }
+            if (!trilhaArchiveDays(scheduleOv, [iso], hojeT, "↺ Voltar ao padrão")) { alert("O arquivo do app (onde as edições ficam guardadas) está ilegível, então não consegui guardar a edição deste dia: o dia continua como está e nada foi apagado. Faça um backup na aba Sono e avise a equipe para recuperar o arquivo."); return; }
         }
         const next = { ...scheduleOv };
         delete next[iso];

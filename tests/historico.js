@@ -166,7 +166,7 @@ function compareWeek(tag, w, base, neu, sameLen) {
         const r4 = await H.reopen(browser, m4.ctx, m4.page, '2026-10-26');
         await toS41(r4.page, 2); compareWeek('D4', LCW, wb, await readWeek(r4.page));
         const s4 = (await H.getLS(r4.page, 'medplanner_schedule_v1')) || {};
-        H.check('D4 · a TER 20/10 vira dia de transição com o bloco dela', (s4['2026-10-20'] || []).some(a => a.pc) && (s4['2026-10-20'] || []).some(a => a.id === 'c-1793026800000'), JSON.stringify((s4['2026-10-20'] || []).map(a => a.id)));
+        H.check('D4 · a TER 20/10 fica como ela deixou nesta versão (só o bloco dela — dia editado continua valendo)', JSON.stringify((s4['2026-10-20'] || []).map(a => a.id)) === '["c-1793026800000"]', JSON.stringify((s4['2026-10-20'] || []).map(a => a.id)));
         await r4.ctx.close();
     }
     await browser.close();
