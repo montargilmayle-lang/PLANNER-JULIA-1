@@ -232,12 +232,12 @@ Ideais: questões→apostila em 1 dia 27/36 · apostila→selagem em 3 dias 31/3
 
 ### A.10 · Bateria e `cmp`
 
-Rodada no código final (commit `c2dcdfe`), todas com código de saída 0:
+Rodada no código final (commit `819e994`), todas com código de saída 0:
 
 | Suíte | Checks | O que cobre |
 |---|---|---|
 | audit | 396/396 | S0–S20 adaptados à Trilha, + S7b (sexta 23/10 de transição) |
-| trilha | 236/236 | transição, T1 de 8 dias (duas segundas, 360px), 1º acesso, plantões, simulados, adiantar, subida, recolocar, mover, migração (TR16–TR16g), revisão em dia cheio, semana final |
+| trilha | 237/237 | transição, T1 de 8 dias (duas segundas, 360px), 1º acesso, plantões, simulados, adiantar, subida, recolocar, mover, migração (TR16–TR16g), revisão em dia cheio, semana final |
 | historico | 148/148 | semanas 1–41 dia a dia × app de antes da Trilha, modos A, B, C e D (D1–D8, D3b) |
 | coverage41 | 80/80 | todo módulo listado até 19/10 com aula, questões e apostila |
 | coverageTrilha | 8/8 | transição sem módulo nem etapa; prévia = congelado; cobertura até 01/01 |
@@ -246,11 +246,11 @@ Rodada no código final (commit `c2dcdfe`), todas com código de saída 0:
 | loads16 | 12/12 | cargas das Sem.38 e 39 |
 | simTrilha | 6/6 | uso real: as 64 datas de 1º acesso e a simulação progressiva a 50, 70 e 85% |
 
-**904 checks, todos verdes.** `cmp planner_residencia_2026_offline.html index.html`: idênticos.
+**905 checks, todos verdes.** `cmp planner_residencia_2026_offline.html index.html`: idênticos.
 
 ### A.11 · Revisão adversarial antes do merge (5 lentes + verificação de cada achado)
 
-Lentes: transição, calendário, migração, semana de 8 dias, docs/testes. Cada achado foi reproduzido (Playwright ou motor em node) e corrigido; depois, uma verificação final (2 agentes) refez o ataque sobre o último código e conferiu este relatório contra o pedido — os achados dela entraram na tabela e no texto (§A.5, §A.7, §A.9).
+Lentes: transição, calendário, migração, semana de 8 dias, docs/testes. Cada achado foi reproduzido (Playwright ou motor em node) e corrigido; depois, três verificações finais refizeram o ataque sobre o último código e conferiram este relatório contra o pedido — os achados delas entraram na tabela e no texto (§A.3, §A.5, §A.7, §A.9). As correções da 3ª verificação foram testadas (falham antes, passam depois), mas não passaram por uma 4ª verificação.
 
 | Achado | Correção | Teste |
 |---|---|---|

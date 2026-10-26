@@ -458,11 +458,11 @@ await page.waitForTimeout(1200); // aguardar React renderizar
 // QUA, QUI, SEX, SAB, DOM, SEG, TER — na Trilha as abas vão de TER a SEG; use H.listDayTabs/H.clickDate (por data)
 ```
 
-**Bateria completa (obrigatória antes de qualquer ✅) — 26/10/2026, Trilha com início em 26/10 (904 checks, todos verdes):**
+**Bateria completa (obrigatória antes de qualquer ✅) — 26/10/2026, Trilha com início em 26/10 (905 checks, todos verdes):**
 ```bash
 cd tests/   # PLANNER_FILE=/caminho/planner_residencia_2026_offline.html (padrão: o arquivo do repositório) · PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers
 node audit.js           # S0–S20 adaptados à Trilha (396 checks; + S7b transição 23/10, desde 26/10): aposentados S7, S8b, S15, S16b, S16g2, S19d2; reescritos na Trilha S8, S8c, S9, S9b, S12, S16e, S18f2, S19d; re-datados para antes de 20/10 S10, S16a/S16d/S16g, S16f, S18b/d/d2/g/h, S19b/b2/h, S20a/S20g
-node trilha.js          # TR0–TR16 (+TR0b transição, TR0c duas segundas, TR13b/c, TR15b–f, TR16b–g migração) + invariantes da Trilha (236 checks)
+node trilha.js          # TR0–TR16 (+TR0b transição, TR0c duas segundas, TR13b/c, TR15b–f, TR16b–g migração) + invariantes da Trilha (237 checks)
 node historico.js       # app de antes da Trilha (git 11c65b8 ou PLANNER_BASE) × novo, semanas 1–41 dia a dia, relógio na quarta, em 21/10 e em 26/10; modo D = 20 e 21/10 gravados depois do curso (D1–D8, D3b: versão de 20/10, ✓ na transição, edição do curso, aba antiga, "↺" na versão de 20/10, só um bloco dela, dia esvaziado, fuso) (148 checks)
 node coverage41.js      # semanas 1–41 com módulos: todo módulo listado tem aula+questões+apostila (80 checks)
 node coverageTrilha.js  # transição sem módulo; prévia = congelado (T1 26/10, T2 03/11); todo módulo NOVO com as 4 etapas até 01/01; dia editado → aviso + "↺ Voltar ao padrão" (8 checks)
