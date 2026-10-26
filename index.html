@@ -1504,11 +1504,14 @@ function trilhaTransList(iso, saved) {
 // histórico da Sem.41 em 20 e 21/10 — uma lista gravada depois do curso (Trilha desde 20/10, transição) nunca muda o histórico até 19/10.
 function trilhaCourseList(l) { return Array.isArray(l) && !l.some(a => a && (a.tm != null || a.ts || a.au || a.pc || a.gh || /^(g-\d{4}-|t-)/.test(String(a.id || "")))); }
 function trilhaSanitizeTransition(sov, cfg, hoje) {
+    // 20 e 21/10 (o dia leve histórico da Sem.41 lê esses dois): na 1ª carga da versão nova guarda a edição do tempo do curso, ou null — gravado ou não o dia;
+    // daí em diante o histórico nunca lê a lista viva desses dias (nem uma que ela edite depois, num dia de transição)
+    const have = (cfg && cfg.trilhaLegacyOv) || {}, legacy = {};
+    [POS_CURSO, addDaysISO(POS_CURSO, 1)].forEach(d => { if (have[d] === undefined) legacy[d] = trilhaCourseList((sov || {})[d]) ? sov[d] : null; }); // null = sem edição do tempo do curso (vale o gerado)
     const days = Object.keys(sov || {}).filter(d => isTransDay(d) && Array.isArray(sov[d])).filter(d => JSON.stringify(trilhaTransList(d, sov[d])) !== JSON.stringify(sov[d]));
-    if (!days.length) return null;
-    if (!trilhaArchiveDays(sov, days, hoje, "dia de transição (a trilha começa em " + fmtBR(TRILHA_START) + ")")) return false; // sem arquivo, nada muda
-    const out = { ...sov }, legacy = {}, have = (cfg && cfg.trilhaLegacyOv) || {};
-    days.forEach(d => { if ((d === POS_CURSO || d === addDaysISO(POS_CURSO, 1)) && have[d] === undefined) legacy[d] = trilhaCourseList(sov[d]) ? sov[d] : null; out[d] = trilhaTransList(d, sov[d]); }); // null = sem edição do tempo do curso (vale o gerado)
+    if (!days.length) return Object.keys(legacy).length ? { sov: null, legacy } : null;
+    if (!trilhaArchiveDays(sov, days, hoje, "dia de transição (a trilha começa em " + fmtBR(TRILHA_START) + ")")) return false; // sem arquivo, nada muda (tenta de novo na próxima carga)
+    const out = { ...sov }; days.forEach(d => { out[d] = trilhaTransList(d, sov[d]); });
     return { sov: out, legacy };
 }
 // Dias editados à mão de 26/10 em diante com etapa do plano antigo (de antes do início em 26/10): o original vai para o arquivo e o dia fica com o que é
@@ -3589,7 +3592,7 @@ function App() {
             if (hojeL >= POS_CURSO) {
                 const base0 = () => cfg0 || { startDate: DEFAULT_START, manualWeek: null };
                 const sT = trilhaSanitizeTransition(sov, cfg0, hojeL); // 20–25/10 gravados → dia de transição (o original vai para o arquivo)
-                if (sT) { sov = sT.sov; schDirty = true; if (Object.keys(sT.legacy).length) { cfg0 = { ...base0(), trilhaLegacyOv: { ...((cfg0 && cfg0.trilhaLegacyOv) || {}), ...sT.legacy } }; cfgDirty = true; } }
+                if (sT) { if (sT.sov) { sov = sT.sov; schDirty = true; } if (Object.keys(sT.legacy).length) { cfg0 = { ...base0(), trilhaLegacyOv: { ...((cfg0 && cfg0.trilhaLegacyOv) || {}), ...sT.legacy } }; cfgDirty = true; } }
                 if (!(cfg0 && cfg0.trilhaInicio === TRILHA_START)) { setModuleCfg(cfg0); setStartCfg(cfg0 && cfg0.startDate); const P0 = buildTrilhaPlan(cfg0 || {}, tr || {}, hojeL); const sM = trilhaMigrateSchedule(sov, hojeL, P0); if (sM !== false) { if (sM) { sov = sM; schDirty = true; } cfg0 = { ...base0(), trilhaInicio: TRILHA_START }; cfgDirty = true; } } // uma vez: dias ≥ 26/10 com etapa do plano antigo → arquivo
             }
             if (schDirty) await saveData("schedule_v1", sov);

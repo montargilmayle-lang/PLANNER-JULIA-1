@@ -5,7 +5,8 @@
 //   C · relógio em 26/10 (hoje: 1º dia da Trilha, Sem.43), navegando ◀ até a Sem.1 — a base está na sua Sem.42 (21–27/10): ◀1 na base, ◀2 no novo
 //   D · dias 20 e 21/10 gravados depois do curso não mudam a Sem.41 (o dia leve histórico lê a TER 20/10): D1 gravados pela versão de 20/10 (Trilha
 //       desde 20/10, com etapas e ✓); D2 ela marca ✓ nos dias de transição na versão nova; D3 uma edição de 20/10 feita no tempo do curso (no app de
-//       antes da Trilha, em 15/10) continua valendo — sempre comparado com o app de antes da Trilha
+//       antes da Trilha, em 15/10) continua valendo; D4 nada gravado na 1ª carga e depois a TER 20/10 só com um bloco dela — sempre comparado com o app
+//       de antes da Trilha
 // Diferença aceita (lista explícita): a TER 20/10 sai da Sem.41 (vira o 1º dia pós-curso — a transição) — e só ela.
 const H = require('./harness.js');
 const { execSync } = require('child_process');
@@ -120,6 +121,16 @@ function compareWeek(tag, w, base, neu, sameLen) {
         const cfg3 = await H.getLS(n.page, 'medplanner_config_v1'), sov3 = await H.getLS(n.page, 'medplanner_schedule_v1');
         H.check('D3 · a edição do curso fica em trilhaLegacyOv[20/10] e a TER 20/10 vira dia de transição', JSON.stringify((cfg3.trilhaLegacyOv || {})['2026-10-20']) === JSON.stringify(l20) && (sov3['2026-10-20'] || []).some(a => a.pc), JSON.stringify(Object.keys(cfg3.trilhaLegacyOv || {})));
         await b.ctx.close(); await n.ctx.close();
+        // D4 · 1ª carga da versão nova sem 20 e 21/10 gravados; depois ela tira tudo de TER 20/10 e deixa só um bloco dela: ao abrir de novo, a Sem.41 não muda
+        const m4 = await openWith(browser, NEW, '2026-10-26');
+        const lo4 = ((await H.getLS(m4.page, 'medplanner_config_v1')) || {}).trilhaLegacyOv || {};
+        H.check('D4 · 1ª carga da versão nova (nada gravado em 20 e 21/10): trilhaLegacyOv = { 20/10: null, 21/10: null }', lo4['2026-10-20'] === null && lo4['2026-10-21'] === null, JSON.stringify(lo4));
+        await m4.page.evaluate(() => { const s = JSON.parse(localStorage.getItem('medplanner_schedule_v1') || '{}'); s['2026-10-20'] = [{ id: 'c-1761000000000', d: 'EXTRA', color: '#0EA5E9', text: 'Revisar anotações do plantão (meu)', time: '3h' }]; localStorage.setItem('medplanner_schedule_v1', JSON.stringify(s)); });
+        const r4 = await H.reopen(browser, m4.ctx, m4.page, '2026-10-26');
+        await toS41(r4.page, 2); compareWeek('D4', LCW, wb, await readWeek(r4.page));
+        const s4 = (await H.getLS(r4.page, 'medplanner_schedule_v1')) || {};
+        H.check('D4 · a TER 20/10 vira dia de transição com o bloco dela', (s4['2026-10-20'] || []).some(a => a.pc) && (s4['2026-10-20'] || []).some(a => a.id === 'c-1761000000000'), JSON.stringify((s4['2026-10-20'] || []).map(a => a.id)));
+        await r4.ctx.close();
     }
     await browser.close();
     H.summary('historico');
