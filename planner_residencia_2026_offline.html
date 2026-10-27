@@ -750,23 +750,32 @@ function todayISO() {
 function parseISO(iso) { return new Date(iso + "T00:00:00"); }
 function addDaysISO(iso, n) { const d = parseISO(iso); d.setDate(d.getDate() + n); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); } // data local (⚙️: sem desvio de fuso)
 function diffDays(aISO, bISO) { return Math.round((parseISO(bISO) - parseISO(aISO)) / 86400000); }
-// ── CALENDÁRIO POR TRECHO (paciente, 19–20/10 — TRILHA AUTÔNOMA) ─────────────
-// Semanas do curso: QUA→TER a partir de config.startDate, até 19/10 — a semana que contém 19/10 termina nele (Sem.41 = 14–19/10, 6 dias).
-// A partir de 20/10: semanas da TRILHA, TERÇA→SEGUNDA (Sem.42 = T1 20–26/10 … Sem.52 = T11 29/12–01/01, 4 dias). Nenhum dia em duas semanas (⚙️).
-const TRILHA_START = "2026-10-20";
+// ── CALENDÁRIO POR TRECHO (paciente, 19–20/10 e 26/10 — TRILHA AUTÔNOMA) ─────────────
+// Semanas do curso: QUA→TER a partir de config.startDate, até 19/10 — a semana que contém 19/10 termina nele (Sem.41 = 14–19/10, 6 dias). O histórico fica intacto.
+// 20–25/10: semana de TRANSIÇÃO (Sem.42, TER→DOM, 6 dias) — sem etapa da trilha e sem o motor antigo: plantão, Anki, academia e lazer (paciente, 26/10: ela não começou em 20/10).
+// A partir de 26/10: semanas da TRILHA. A 1ª vai da segunda 26/10 à segunda 02/11 (8 dias: a segunda do início + a semana TER→SEG seguinte); depois TERÇA→SEGUNDA
+// (Sem.44 = 03–09/11 … Sem.52 = 29/12–01/01, 4 dias) — 10 semanas. Nenhum dia em duas semanas (⚙️).
+const POS_CURSO = "2026-10-20"; // 1º dia depois do curso: daqui em diante o motor antigo não atua e o registro é o da trilha
+const TRILHA_START = "2026-10-26"; // 1º dia da trilha (etapas, cota, 1º acesso)
+const TRILHA_GRID = "2026-11-03"; // 1ª terça da grade TER→SEG depois da 1ª semana da trilha
 const TRILHA_END = "2027-01-01"; // último dia de acesso à plataforma (04/01: novo cursinho)
+const POST_WEEKS = (() => { const a = []; if (POS_CURSO < TRILHA_START) a.push(POS_CURSO); a.push(TRILHA_START); for (let d = TRILHA_GRID; d <= TRILHA_END; d = addDaysISO(d, 7)) a.push(d); return a; })(); // início de cada semana depois do curso: transição, 1ª da trilha, grade
 function weekNumRaw(iso, s) { return Math.floor(diffDays(s || __START_ISO, iso) / 7) + 1; }
-function lcw(s) { return Math.max(1, weekNumRaw(addDaysISO(TRILHA_START, -1), s)); } // última semana do curso (41 com início em 07/01)
-function weekNumOf(iso, s) { return iso < TRILHA_START ? weekNumRaw(iso, s) : lcw(s) + 1 + Math.floor(diffDays(TRILHA_START, iso) / 7); }
+function lcw(s) { return Math.max(1, weekNumRaw(addDaysISO(POS_CURSO, -1), s)); } // última semana do curso (41 com início em 07/01)
+function postWeekIdx(iso) { const n = POST_WEEKS.length; if (iso > TRILHA_END) return n - 1 + Math.floor(diffDays(POST_WEEKS[n - 1], iso) / 7); let k = 0; while (k + 1 < n && POST_WEEKS[k + 1] <= iso) k++; return k; } // depois de 01/01 a contagem segue de 7 em 7 (weekOfISO limita à última)
+function weekNumOf(iso, s) { return iso < POS_CURSO ? weekNumRaw(iso, s) : lcw(s) + 1 + postWeekIdx(iso); }
 function lastWeek(s) { return weekNumOf(TRILHA_END, s); } // 52 com início em 07/01 — o acesso termina em 01/01
 function weekOfISO(iso, s) { return Math.min(Math.max(weekNumOf(iso, s), 1), lastWeek(s)); }
-function weekStartISO(w, s) { s = s || __START_ISO; const L = lcw(s); return w <= L ? addDaysISO(s, 7 * (w - 1)) : addDaysISO(TRILHA_START, 7 * (w - L - 1)); }
-function weekLen(w, s) { const L = lcw(s); if (w < L) return 7; const st = weekStartISO(w, s); if (w === L) return Math.max(1, Math.min(7, diffDays(st, TRILHA_START))); return Math.max(1, Math.min(7, diffDays(st, TRILHA_END) + 1)); }
+function weekStartISO(w, s) { s = s || __START_ISO; const L = lcw(s); if (w <= L) return addDaysISO(s, 7 * (w - 1)); const k = w - L - 1, n = POST_WEEKS.length; return k < n ? POST_WEEKS[k] : addDaysISO(POST_WEEKS[n - 1], 7 * (k - n + 1)); }
+function weekLen(w, s) { const L = lcw(s); if (w < L) return 7; const st = weekStartISO(w, s); if (w === L) return Math.max(1, Math.min(7, diffDays(st, POS_CURSO))); const k = w - L - 1; if (k + 1 < POST_WEEKS.length) return diffDays(st, POST_WEEKS[k + 1]); return Math.max(1, Math.min(7, diffDays(st, TRILHA_END) + 1)); } // transição = 6 · 1ª da trilha = 8 · última = 4
 function weekEndISO(w, s) { return addDaysISO(weekStartISO(w, s), weekLen(w, s) - 1); }
 function dayIdxOf(iso, s) { return diffDays(weekStartISO(weekOfISO(iso, s), s), iso); }
-function isTrilhaWeek(w, s) { return w > lcw(s); }
+function isTrilhaWeek(w, s) { return w > lcw(s); } // semana depois do curso (transição ou trilha): o motor antigo não atua
+function trilhaW1(s) { return weekNumOf(TRILHA_START, s); } // 1ª semana da trilha (43 com início em 07/01; a 42 é a transição)
+function isTransWeek(w, s) { return isTrilhaWeek(w, s) && w < trilhaW1(s); }
+function isTransDay(iso) { return iso >= POS_CURSO && iso < TRILHA_START; } // 20–25/10
 function isTrilhaDay(iso) { return iso >= TRILHA_START && iso <= TRILHA_END; }
-function trailOn(hoje) { return (hoje || todayISO()) >= TRILHA_START; }
+function trailOn(hoje) { return (hoje || todayISO()) >= POS_CURSO; } // registro da trilha (trail_v1) a partir de 20/10
 const DOW_TAB = ["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SAB"]; // rótulo da aba (sem acento, como sempre)
 const DOW_LBL = ["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SÁB"];
 const DOW_FULL = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
@@ -1101,7 +1110,7 @@ function computeReviews(progress, refISO, src) { // src: "trail" (registro da Tr
 // botão) · 😴 plantão longo sem etapa de mesa, 04h30 com 📚 a 5h · 🧠 dia leve protegido · 💬 ela decide (proposta + Aplicar) · ⚙️ registros separados.
 // Tudo aqui é determinístico (sem aleatoriedade, sem relógio nas decisões além de `hoje`) e só CALCULA — quem grava é o App (congelamento) ou o toque dela.
 const TRILHA_SURGERY = [5, 6, 14, 19, 24, 32, 34, 85, 86]; // 🩺: cirurgia primeiro; depois a ordem do curso
-const TRILHA_RAMP_DEFAULT = { "2026-10-20": 3, "2026-10-27": 4, "2026-11-03": 4, "2026-11-10": 4, "2026-11-17": 4, "2026-11-24": 4, "2026-12-01": 4, "2026-12-08": 4, "2026-12-15": 5, "2026-12-22": 4, "2026-12-29": 0 }; // módulos novos por semana (chave = terça)
+const TRILHA_RAMP_DEFAULT = { "2026-10-26": 3, "2026-11-03": 4, "2026-11-10": 4, "2026-11-17": 4, "2026-11-24": 4, "2026-12-01": 4, "2026-12-08": 4, "2026-12-15": 5, "2026-12-22": 4, "2026-12-29": 0 }; // módulos novos por semana (chave = 1º dia da semana: a 1ª da trilha começa na segunda 26/10, as outras na terça) — mesma forma aprovada em 20/10, com uma semana a menos (paciente, 26/10): começa leve, segura no bloco 04h30, pico em 15–21/12, zero na final
 const STAGES_T = ["aula", "quest", "apost", "seal"];
 const TS_FIELD = { aula: "aula", quest: "questoesD2", apost: "apostila", seal: "smartcard" };
 const STAMP_OF = { aula: "aulaAt", questoesD2: "questoesD2At", apostila: "apostilaAt", smartcard: "smartcardAt" }; // carimbo da etapa no registro da Trilha
@@ -1115,7 +1124,7 @@ const STUDY_WARN_HOLIDAY_H = 3;
 const LIGHT_TIE_H = 0.75; // cargas a ≤ 45min = empate (decisão 24/09)
 function studyWarnFor(iso) { if (HOLIDAY_LIGHT[iso]) return STUDY_WARN_HOLIDAY_H; const sh = shiftFor(iso); return (postNight(iso) || (sh && sh.kind === "madrugada")) ? STUDY_WARN_POSTNIGHT_H : STUDY_WARN_H; } // limiar 📚 do dia
 function simParity(fri) { return ((diffDays(SIMULADO_ANCHOR, fri) % 14) + 14) % 14 === 0; }
-function simForCfg(cfg, fri) { const ovr = ((cfg && cfg.simOverrides) || {})[fri]; if (ovr !== undefined) return ovr; if (shiftFor(fri)) return false; if (fri === TRILHA_END) return false; return simParity(fri); } // sexta de plantão e 01/01 (último dia de acesso): sem simulado pela regra — o botão religa
+function simForCfg(cfg, fri) { if (isTransDay(fri)) return false; const ovr = ((cfg && cfg.simOverrides) || {})[fri]; if (ovr !== undefined) return ovr; if (shiftFor(fri)) return false; if (fri === TRILHA_END) return false; return simParity(fri); } // sexta de plantão e 01/01 (último dia de acesso): sem simulado pela regra — o botão religa
 function dayOpenT(iso, cfg) { if (!isTrilhaDay(iso)) return false; const sh = shiftFor(iso); if (sh && sh.kind === "longo") return false; if (dowOf(iso) === 5 && simForCfg(cfg, iso)) return false; return !postNight(iso); } // dia que pode receber etapa de módulo
 function vesperaTxt(iso) { const nx = shiftFor(addDaysISO(iso, 1)); if (!nx || !nx.start) return null; if (nx.start <= "04:30") return "amanhã acorda " + (nx.wake || "03:30") + " (plantão " + nx.hours + "): dormir ~20h30"; if (nx.start <= "06:00") return "plantão " + nx.start.replace(/:00$/, "h").replace(":", "h") + " amanhã: dormir ~21h45"; return null; } // 😴 orientação, não meta
 function fmtShiftDur(h) { const hh = Math.floor(h + 1e-9), mm = Math.round((h - hh) * 60); return hh + "h" + (mm ? String(mm).padStart(2, "0") : ""); }
@@ -1128,7 +1137,7 @@ function trilhaStageBlock(m, ts) { // textos sem os gatilhos do motor antigo ("B
     return { d: "SEL", color: "#15803D", text: head + "selagem — 10 questões + smartcards + os 4 checks — registre o %", time: "40min" };
 }
 // Dia leve EFETIVO da semana (terça = chave): escolha manual dela (lightDayOverrides[terça] = índice a partir da terça) ou o previsto antes de distribuir
-function trilhaLightOf(cfg, P, tue) { const w = weekOfISO(tue); const ov = ((cfg && cfg.lightDayOverrides) || {})[tue]; if (ov !== undefined && ov !== null && ov !== "" && Number(ov) >= 0 && Number(ov) < weekLen(w)) return addDaysISO(tue, Number(ov)); const W = P && P.weeks && P.weeks[tue]; return W ? (W.light || null) : null; }
+function trilhaLightOf(cfg, P, tue) { if (tue < TRILHA_START) return null; const w = weekOfISO(tue); const ov = ((cfg && cfg.lightDayOverrides) || {})[tue]; if (ov !== undefined && ov !== null && ov !== "" && Number(ov) >= 0 && Number(ov) < weekLen(w)) return addDaysISO(tue, Number(ov)); const W = P && P.weeks && P.weeks[tue]; return W ? (W.light || null) : null; }
 function trilhaAudioTarget(iso, P, trail) { // plantão longo: a 1ª aula planejada depois dele cujas questões caiam até 2 dias depois (a aula em áudio vale como toque 1); a já marcada em áudio neste dia fica (identidade estável)
     const ids = Object.keys(P.plan);
     const keep = ids.find(id => (trail[id] || {}).aulaAudioAt === iso);
@@ -1147,7 +1156,7 @@ const REV_BLOCK_RE = /^Revisão adaptativa|revisão no tempo morto/;
 function trilhaRevRoom(iso, X) { const sh = shiftFor(iso); if (!isTrilhaDay(iso) || (sh && sh.kind === "longo") || (dowOf(iso) === 5 && simForCfg(X.cfg || {}, iso))) return false; const ed = X.ov && X.ov[iso]; return !trilhaRevOver(iso, ed ? ed.filter(a => !(a.d === "REV" && REV_BLOCK_RE.test(a.text || ""))) : trilhaListFor(iso, { ...X, noRev: true })); } // dia em que a revisão cabe inteira (pela lista REAL: dia editado à mão vale como ela deixou)
 function trilhaRevNext(iso, X) { for (let d = addDaysISO(iso, 1); d <= TRILHA_END; d = addDaysISO(d, 1)) if (trilhaRevRoom(d, X)) return d; return null; }
 function trilhaReviewTone(revs, X, hoje, future) { // o atraso de uma revisão da Trilha conta do 1º dia que tinha folga para ela (deslizar não é atraso); dia cheio = opcional, nunca "em atraso"
-    if (hoje > TRILHA_END) return revs; // depois de 01/01 não há dia da Trilha: a revisão volta ao texto de sempre
+    if (hoje > TRILHA_END || hoje < TRILHA_START) return revs; // depois de 01/01 (e na transição 20–25/10) não há dia da Trilha: a revisão volta ao texto de sempre
     const full = (X.cfg && X.cfg.trilhaRevFull) || {}; // dias que estavam cheios quando ela abriu o app (gravado no congelamento): o passado é julgado como foi, não pelo plano de hoje
     const room = (d) => d < hoje && full[d] ? false : trilhaRevRoom(d, X);
     return revs.map(r => {
@@ -1160,8 +1169,9 @@ function trilhaReviewTone(revs, X, hoje, future) { // o atraso de uma revisão d
 }
 function trilhaReviewStatus(a) { // linha de estado da revisão da Trilha (quebra linha: nunca cortada com reticências no celular)
     if (a.optToday) return (a.future ? "Opcional neste dia: o dia está cheio" : "Opcional hoje: o dia está cheio") + (a.next ? "; passa para " + DOW_LBL[dowOf(a.next)] + " " + fmtBR(a.next) : "; não há dia com folga até 01/01") + ".";
-    if (a.future) return a.slid && a.daysLate <= 0 ? "Passa para este dia (o dia em que venceu está cheio)." : a.daysLate > 0 ? "Venceu em " + DOW_LBL[dowOf(a.due)] + " " + fmtBR(a.due) + "." : "Vence neste dia.";
-    return a.daysLate > 0 ? a.daysLate + "d em atraso." : a.slid ? "Passou para hoje (o dia em que venceu estava cheio)." : "Vence hoje.";
+    const pre = a.slid && a.due < TRILHA_START; // venceu antes de a trilha começar (transição 20–25/10): não houve dia cheio — a trilha é que ainda não tinha dia
+    if (a.future) return a.slid && a.daysLate <= 0 ? (pre ? "Passa para este dia (venceu antes de a trilha começar)." : "Passa para este dia (o dia em que venceu está cheio).") : a.daysLate > 0 ? "Venceu em " + DOW_LBL[dowOf(a.due)] + " " + fmtBR(a.due) + "." : "Vence neste dia.";
+    return a.daysLate > 0 ? a.daysLate + "d em atraso." : a.slid ? (pre ? "Passou para hoje (venceu antes de a trilha começar)." : "Passou para hoje (o dia em que venceu estava cheio).") : "Vence hoje.";
 }
 // Lista GERADA de um dia da Trilha. X = { cfg, P, trail, hoje, base, keepDone, noRev }. base = o dia sem etapas e sem revisão (capacidade do agendador).
 function trilhaListFor(iso, X) {
@@ -1169,6 +1179,12 @@ function trilhaListFor(iso, X) {
     const sh = shiftFor(iso), dw = dowOf(iso), longo = !!sh && sh.kind === "longo";
     const isSim = dw === 5 && simForCfg(cfg, iso);
     const AC = (d, color, text, time) => ({ d, color, text, time });
+    if (isTransDay(iso)) { // 20–25/10 (paciente, 26/10): dia de TRANSIÇÃO — sem etapa da trilha, sem revisão, sem simulado e sem o motor antigo
+        let tr = [AC("ANKI", "#0369A1", "Anki + Meditação 15min", "35min"), { ...AC("EXTRA", "#475569", "🗓️ A trilha começa em " + fmtBR(TRILHA_START) + " (" + DOW_FULL[dowOf(TRILHA_START)].toLowerCase() + ") — hoje sem etapa de módulo", ""), tn: 1 }]; // pc = lista pós-curso (o dia leve histórico da Sem.41 não a usa)
+        if (dw !== 6) tr.push(AC("GYM", "#1D4ED8", "Academia — horário livre", "1h"));
+        const vt = vesperaTxt(iso); tr.push(AC("LAZER", "#6B7280", vt ? "Noite leve — " + vt : "Lazer à noite ❤️", "livre"));
+        return (sh ? buildShiftDayT(sh, iso, tr) : tr).map(a => ({ ...a, pc: 1 })); // pc = bloco gerado do dia de transição (lista pós-curso: o dia leve histórico da Sem.41 não a lê); tn = a nota
+    }
     let acts = [AC("ANKI", "#0369A1", "Anki + Meditação 15min", "35min")];
     if (isSim) acts.push(AC("D7", "#0F766E", "D7 · SIMULADO NA ÍNTEGRA (quinzenal): " + (sh ? "fora do horário do plantão" : "manhã") + ", cronometrado", "5h"), AC("D7", "#0F766E", "D7 · CORREÇÃO DO SIMULADO: erro → entender → caderno → tema fraco", "3h"));
     if (!X.base && P) {
@@ -1202,13 +1218,14 @@ function buildShiftDayT(sh, iso, acts) { // plantões da Trilha (😴): longo = 
     const trajeto = (a) => a.d === "ANKI" ? AC("ANKI", "#0369A1", "Anki no trajeto — 20min" + (sh.kind === "longo" ? " (meditação 10min no almoço ou à noite)" : ""), "20min") : a;
     if (sh.kind === "longo") {
         const ves = vesperaTxt(iso);
-        const out = [AC("AMB", "#6B7280", "🚑 Plantão " + sh.hours + " — sem etapa de mesa hoje: só Anki e áudio nos tempos mortos", dur)]
+        const out = [AC("AMB", "#6B7280", "🚑 Plantão " + sh.hours + " — sem etapa de mesa hoje: só Anki" + (isTransDay(iso) ? " no trajeto" : " e áudio nos tempos mortos"), dur)]
             .concat(acts.filter(a => a.d !== "LAZER").map(a => a.d === "GYM" ? AC("GYM", "#1D4ED8", "Academia — opcional, só se sobrar energia", "30min") : trajeto(a)));
         out.push(AC("LAZER", "#6B7280", "Jantar, banho, sono cedo" + (ves && /20h30/.test(ves) ? " — " + ves : " (plantão de 13h: dormir ~21h45)"), "livre"));
         return out;
     }
     const amb = sh.kind === "madrugada"
         ? AC("AMB", "#6B7280", "🚑 Plantão " + sh.hours + " (acorda " + (sh.wake || "03:30") + ") · estudo concentra à tarde · 📚 a partir de 5h", dur)
+        : isTransDay(iso) ? AC("AMB", "#6B7280", "🚑 Plantão " + sh.hours, dur) // transição: não há etapa para estudar antes ou depois
         : AC("AMB", "#6B7280", "🚑 Plantão " + sh.hours + " · estude antes ou depois · nos tempos mortos a aula pode ser em áudio (o visual precisa do vídeo depois)", dur);
     const out = acts.map(trajeto); const ia = out.findIndex(a => a.d === "ANKI");
     return out.slice(0, ia + 1).concat([amb], out.slice(ia + 1));
@@ -1216,6 +1233,7 @@ function buildShiftDayT(sh, iso, acts) { // plantões da Trilha (😴): longo = 
 function trilhaRow(iso, cfg) { // cabeçalho do dia da Trilha (rótulo pela data; tipo do dia numa linha 🗓️ — o 💊 nunca traz horário, 🧠)
     const dw = dowOf(iso), sh = shiftFor(iso), sim = dw === 5 && simForCfg(cfg, iso);
     let emoji = "📚", type;
+    if (isTransDay(iso)) { emoji = sh ? (sh.kind === "longo" ? "🚑" : "🏥") : "🗓️"; type = (sh ? "Plantão " + sh.hours + " · " : "") + "Transição — a trilha começa em " + fmtBR(TRILHA_START) + ": sem etapa de módulo hoje (só " + [sh && "o plantão", "Anki", dw !== 6 && "academia", "lazer"].filter(Boolean).join(", ").replace(/, (?=[^,]*$)/, " e ") + ")"; return { day: DOW_TAB[dw], full: DOW_FULL[dw], emoji, dayType: type, venv: null }; }
     if (iso === TRILHA_END) { emoji = "🏁"; type = "Último dia de acesso à plataforma — sem módulo novo" + (sim ? " · SIMULADO (sua escolha)" : " e sem simulado") + ": selagens pendentes + encerramento + balanço da trilha"; }
     else if (sh && sh.kind === "longo") { emoji = "🚑"; type = "Plantão " + sh.hours + ": só Anki + áudio — nenhuma etapa de mesa hoje"; }
     else if (sh && sh.kind === "madrugada") { emoji = "🌅"; type = "Acorda " + (sh.wake || "03:30") + " · plantão " + sh.hours + " · estudo à tarde · 📚 a partir de 5h"; }
@@ -1241,15 +1259,17 @@ function mergeOrder(saved, def) { // ordem salva por ela (↑↓) + módulos que
     def.forEach((id, i) => { if (has.has(id)) return; const later = new Set(def.slice(i + 1)); const j = out.findIndex(x => later.has(x)); if (j >= 0) out.splice(j, 0, id); else out.push(id); has.add(id); });
     return out;
 }
-function trilhaQueue(cfg) { // planejados (na ordem em que abriram) → fixados 📌 → o resto na ordem dela/padrão
+function trilhaQueue(cfg, trail) { // planejados (na ordem em que abriram) → começados (etapa marcada, sem plano — ex.: semana descartada no início em 26/10: o que ela fez continua logo, sem esperar a vez) → fixados 📌 → o resto na ordem dela/padrão
     const def = trilhaDefaultOrder();
     const base = Array.isArray(cfg && cfg.trilhaOrder) ? mergeOrder(cfg.trilhaOrder, def) : def;
     const plan = (cfg && cfg.trilhaPlan) || {}, weeks = (cfg && cfg.trilhaWeeks) || {};
     const pos = (id) => { const p = plan[id]; const W = weeks[p.wk] || {}; const seq = (W.mods || []).concat(W.rise || [], W.adv || []).map(Number); const k = seq.indexOf(Number(id)); return [p.wk || "", k < 0 ? 99 : k, base.indexOf(Number(id))]; };
     const planned = Object.keys(plan).map(Number).filter(id => modById(id)).sort((a, b) => { const x = pos(a), y = pos(b); for (let i = 0; i < 3; i++) if (x[i] !== y[i]) return x[i] < y[i] ? -1 : 1; return 0; });
-    const pset = new Set(planned); const rest = base.filter(id => !pset.has(id));
+    const pset = new Set(planned); const tr = trail || {};
+    const started = base.filter(id => !pset.has(id) && tr[id] && STAGES_T.some(ts => tr[id][TS_FIELD[ts]]) && !STAGES_T.every(ts => tr[id][TS_FIELD[ts]])); const sset = new Set(started);
+    const rest = base.filter(id => !pset.has(id) && !sset.has(id));
     const pins = (Array.isArray(cfg && cfg.trilhaPins) ? cfg.trilhaPins.map(Number) : []).filter((id, i, a) => rest.indexOf(id) >= 0 && a.indexOf(id) === i); const ps = new Set(pins);
-    return planned.concat(pins, rest.filter(id => !ps.has(id)));
+    return planned.concat(started, pins, rest.filter(id => !ps.has(id)));
 }
 // ── Rampa e regra de subida (🧠 😴 🩺): igual ou menor que a anterior vale sempre; maior só se a anterior fechou E a semana não toca o bloco 04h30 ──
 function rampBase(cfg, tue) { const r = (cfg && cfg.trilhaRamp) || {}; const v = r[tue] !== undefined ? r[tue] : TRILHA_RAMP_DEFAULT[tue]; return Math.max(0, Math.min(9, Number(v) || 0)); }
@@ -1313,18 +1333,18 @@ function trilhaPredictLight(tue, w, cfg) { // dia leve PREVISTO antes de distrib
 }
 function buildTrilhaPlan(cfg, trail, hoje, opts) { // → semanas (congeladas e prévia), plano efetivo, etapas por dia, fila, alcance, pendentes
     cfg = cfg || {}; trail = trail || {}; opts = opts || {};
-    const L = lcw(), LW = lastWeek();
-    const Q = trilhaQueue(cfg); const qpos = {}; Q.forEach((id, i) => { qpos[id] = i; });
+    const L = lcw(), LW = lastWeek(), W1 = trilhaW1();
+    const Q = trilhaQueue(cfg, trail); const qpos = {}; Q.forEach((id, i) => { qpos[id] = i; });
     const st = { load: {}, kinds: {}, cfg, capMemo: {} };
     const plan = {}, frozen = new Set();
     Object.keys(cfg.trilhaPlan || {}).forEach(id => { if (!modById(id)) return; plan[id] = { ...cfg.trilhaPlan[id] }; frozen.add(Number(id)); });
     Object.keys(plan).forEach(id => STAGES_T.forEach(ts => stAdd(st, stageLoadDay(plan[id], id, ts, trail), ts)));
     const firstOpen = cfg.trilhaFirstOpen || (hoje >= TRILHA_START && hoje <= TRILHA_END ? hoje : null);
-    const curW = hoje < TRILHA_START ? L + 1 : weekOfISO(hoje);
+    const curW = hoje < TRILHA_START ? W1 : weekOfISO(hoje); // antes de 26/10 (transição): a 1ª semana da trilha é a "atual" das regras
     // dias protegidos de TODAS as semanas antes de distribuir qualquer etapa (🧠): dia leve efetivo (escolha dela ou o previsto) + 24, 25 e 31/12 + 01/01
     const prot = {}; Object.keys(HOLIDAY_LIGHT).forEach(d => { prot[d] = "feriado"; }); prot[TRILHA_END] = "fim";
     const lightInfo = {};
-    for (let w = L + 1; w <= LW; w++) {
+    for (let w = W1; w <= LW; w++) {
         const tue = weekStartISO(w); const snap = (cfg.trilhaWeeks || {})[tue];
         const pred = snap && snap.light !== undefined ? snap.light : trilhaPredictLight(tue, w, cfg);
         const ov = (cfg.lightDayOverrides || {})[tue];
@@ -1332,7 +1352,7 @@ function buildTrilhaPlan(cfg, trail, hoje, opts) { // → semanas (congeladas e 
         lightInfo[tue] = { pred, light }; if (light && !prot[light]) prot[light] = "leve";
     }
     const weeks = {}; let prevQ = null, prevClosed = true, started = false, stNow = null, lastProp = null;
-    for (let w = L + 1; w <= LW; w++) {
+    for (let w = W1; w <= LW; w++) {
         const tue = weekStartISO(w), wEnd = weekEndISO(w);
         const snap = (cfg.trilhaWeeks || {})[tue];
         const pred = lightInfo[tue].pred, light = lightInfo[tue].light;
@@ -1384,12 +1404,13 @@ function buildTrilhaPlan(cfg, trail, hoje, opts) { // → semanas (congeladas e 
     const pending = []; // etapas de módulos congelados que ficaram para trás (ou num dia que virou simulado)
     frozen.forEach(id => { const p = plan[id]; STAGES_T.forEach(ts => { if ((trail[id] || {})[TS_FIELD[ts]]) return; const d = p[ts]; if (!d) return; if (d < hoje) pending.push({ id, ts, iso: d, why: "atrasada" }); else if (dowOf(d) === 5 && simForCfg(cfg, d)) pending.push({ id, ts, iso: d, why: "simulado" }); }); });
     pending.sort((a, b) => (qpos[a.id] || 0) - (qpos[b.id] || 0) || STAGES_T.indexOf(a.ts) - STAGES_T.indexOf(b.ts));
-    return { L, LW, Q, qpos, plan, frozen, weeks, byDay, ghosts, pending, closed, reach, N: reach.length, openNoChain, prot, stNow, curW, firstOpen, hoje };
+    return { L, LW, W1, Q, qpos, plan, frozen, weeks, byDay, ghosts, pending, closed, reach, N: reach.length, openNoChain, prot, stNow, curW, firstOpen, hoje };
 }
 // ── Propostas (💬: só gravam com "Aplicar") ──
 function trilhaNextIds(P, trail, n, skip) { const out = []; for (const id of P.Q) { if (out.length >= n) break; if (P.frozen.has(id) || moduleCompleteP(trail, id) || (skip && skip.indexOf(id) >= 0)) continue; out.push(id); } return out; } // o próximo da FILA (módulos só na prévia das semanas futuras se deslocam)
 function trilhaFixedOf(trail, id, fallback) { const t = (trail || {})[id] || {}; const fixed = {}; STAGES_T.forEach(ts => { const f = TS_FIELD[ts]; if (t[f]) fixed[ts] = t[STAMP_OF[f]] || fallback; }); return fixed; }
 function trilhaProposeAdvance(P, cfg, trail, hoje) { // ⏩ (A) cabe até o fim da semana · (B) começa agora, etapas finais na semana seguinte · (C) não cabe
+    if (hoje < TRILHA_START) return { kind: "C", why: "antes" }; // transição (20–25/10): nada a adiantar antes de a trilha começar
     const w = weekOfISO(hoje); const wEnd = weekEndISO(w);
     if (w >= P.LW) return { kind: "C", why: "final" };
     const id = trilhaNextIds(P, trail, 1)[0]; if (id == null) return { kind: "C", why: "fila" };
@@ -1401,6 +1422,7 @@ function trilhaProposeAdvance(P, cfg, trail, hoje) { // ⏩ (A) cabe até o fim 
     return { kind: "C", id, why: placeChain(st, ["aula"], {}, hoje, wEnd, wEnd, { prot: P.prot }) ? "fim" : "semdia" };
 }
 function trilhaProposeRise(P, cfg, trail, hoje, n) { // 🔓 a semana passada fechou depois do congelamento: os próximos módulos, um a um, nos dias que restam
+    if (hoje < TRILHA_START) return [];
     const w = weekOfISO(hoje); const wEnd = weekEndISO(w); const st = cloneSt(P.stNow); const out = [];
     trilhaNextIds(P, trail, n).forEach(id => { const fixed = trilhaFixedOf(trail, id, hoje); const rem = STAGES_T.filter(ts => !fixed[ts]); const ch = placeChain(st, rem, fixed, hoje, wEnd, TRILHA_END, { prot: P.prot }); if (ch) rem.forEach(ts => stAdd(st, ch[ts], ts)); out.push({ id, rem, days: ch ? { ...fixed, ...ch } : null }); });
     return out;
@@ -1437,12 +1459,95 @@ function trilhaFinalPlan(P, cfg, trail, hoje, edited) { // 📦 semana final (29
     }
     return { patch, log: { at: hoje, moved, compressed, nocabe } };
 }
+// Início em 26/10 (paciente, 26/10: ela não começou em 20/10 — nada foi executado). Ao carregar, a semana congelada de 20/10 (trilhaWeeks e trilhaPlan
+// daquela semana, inclusive Adiantar e 🔓) sai do plano e o 1º acesso volta a ser registrado a partir de 26/10. Nada se perde (⚙️): o que sai fica em
+// config.trilhaDescartes. O registro trail_v1 não é tocado: módulo com etapa marcada volta à fila com o que já fez (nada reabre), módulo fechado não volta.
+// As escolhas por semana gravadas com chaves que deixaram de ser início de semana (20/10 = transição; 27/10 caiu dentro da T1) também vão para o registro,
+// sem passar para a T1: a decisão mais recente (26/10) recalculou a rampa e põe a 1ª aula hoje — o relatório apresenta o que ficou guardado.
+function trilhaMigrateStart(cfg, hoje) {
+    if (!cfg) return null;
+    const wks = cfg.trilhaWeeks || {}, plan = cfg.trilhaPlan || {}, ramp = cfg.trilhaRamp || {}, light = cfg.lightDayOverrides || {}, dis = cfg.trilhaDismiss || {};
+    const stale = (k) => k >= POS_CURSO && k <= TRILHA_END && POST_WEEKS.indexOf(k) < 1; // chave pós-curso que não é início de semana da trilha
+    const badWk = (k) => !!k && (k < TRILHA_START || POST_WEEKS.indexOf(k) < 1); // semana do calendário antigo (20/10, 27/10)
+    const oldF = cfg.trilhaFirstOpen && cfg.trilhaFirstOpen < TRILHA_START;
+    const marked = oldF || Object.keys(wks).some(badWk) || Object.keys(plan).some(id => badWk((plan[id] || {}).wk));
+    const allOld = marked && cfg.trilhaInicio !== TRILHA_START; // a versão nova nunca rodou nesta config: tudo o que a trilha gravou veio do calendário antigo (inclusive semanas de 03/11 em diante, se a antiga ficou aberta mais dias)
+    const oldW = Object.keys(wks).filter(k => allOld || badWk(k)), oldP = Object.keys(plan).filter(id => { const p = plan[id] || {}; return allOld || badWk(p.wk); });
+    const oldR = Object.keys(ramp).filter(stale).sort(), oldL = Object.keys(light).filter(stale).sort(), oldD = Object.keys(dis).filter(k => stale(k.split("|")[0]));
+    if (!oldW.length && !oldP.length && !oldF && !oldR.length && !oldL.length && !oldD.length) return null;
+    const out = { ...cfg }, rec = { at: hoje || todayISO(), why: "início da trilha em " + fmtBR(TRILHA_START), trilhaWeeks: {}, trilhaPlan: {}, trilhaFirstOpen: cfg.trilhaFirstOpen || null };
+    if (oldW.length) { const nw = { ...wks }; oldW.forEach(k => { rec.trilhaWeeks[k] = wks[k]; delete nw[k]; }); out.trilhaWeeks = nw; }
+    if (oldP.length) { const np = { ...plan }; oldP.forEach(id => { rec.trilhaPlan[id] = plan[id]; delete np[id]; }); out.trilhaPlan = np; }
+    if (oldF) delete out.trilhaFirstOpen;
+    if (oldR.length) { const nr = { ...ramp }; rec.trilhaRamp = {}; oldR.forEach(k => { rec.trilhaRamp[k] = ramp[k]; delete nr[k]; }); out.trilhaRamp = nr; }
+    if (oldL.length) { const nl = { ...light }; rec.lightDayOverrides = {}; oldL.forEach(k => { rec.lightDayOverrides[k] = light[k]; delete nl[k]; }); out.lightDayOverrides = nl; }
+    if (oldD.length) { const nd = { ...dis }; rec.trilhaDismiss = {}; oldD.forEach(k => { rec.trilhaDismiss[k] = dis[k]; delete nd[k]; }); out.trilhaDismiss = nd; }
+    if (allOld) ["trilhaRevFull", "trilhaFinalAutoAt", "trilhaFinalLog"].forEach(k => { if (cfg[k] !== undefined) { rec[k] = cfg[k]; delete out[k]; } }); // marcas do plano antigo (dia cheio, semana final)
+    out.trilhaDescartes = (Array.isArray(cfg.trilhaDescartes) ? cfg.trilhaDescartes : []).concat([rec]);
+    return out;
+}
+function trilhaArchiveDays(sov, days, hoje, why) { // guarda as listas em medplanner_schedule_archive_v1 (como o ↺ Voltar ao padrão); false se não conseguiu
+    try { const k = STORAGE_PREFIX + "schedule_archive_v1"; const arc = JSON.parse(localStorage.getItem(k) || "{}"); if (!arc || typeof arc !== "object" || Array.isArray(arc)) return false; days.forEach(d => { if (arc[d] !== undefined && !Array.isArray(arc[d])) throw new Error("arquivo"); }); days.forEach(d => { arc[d] = (arc[d] || []).concat([{ at: hoje || todayISO(), why, list: sov[d] }]); }); localStorage.setItem(k, JSON.stringify(arc)); return true; } catch (e) { return false; }
+}
+// Dias de transição (20–25/10) gravados por uma versão anterior (sem a nota da transição) ou ainda com etapa: a lista vira a do dia de transição, com os ✓
+// dela no Anki, na academia, no plantão, no lazer e na nota e os blocos que ela mesma acrescentou; o original vai para o arquivo. Roda a cada carga e é
+// idempotente; o que ela editou nesta versão fica. Devolve também o registro de 20 e 21/10 para o dia leve histórico da Sem.41 (listLeg).
+const TRANS_KEEP_DONE = ["ANKI", "GYM", "LAZER", "AMB"];
+function trilhaTransList(iso, saved) {
+    const gen = trilhaListFor(iso, {}).map((a, i) => ({ ...a, id: "g-" + iso + "-" + i }));
+    const done = new Set((saved || []).filter(b => b && b.done && TRANS_KEEP_DONE.includes(b.d)).map(b => b.d)), noteDone = (saved || []).some(b => b && b.tn && b.done);
+    const mine = (saved || []).filter(b => b && b.tm == null && !b.gh && !b.au && !b.pc && !/^↷ /.test(b.text || "") && !/^[gt]-/.test(String(b.id || "")) && (b.d === "EXTRA" || /^c-\d+$/.test(String(b.id || "")))); // os que ela criou ("adicionar": id c-<hora>, qualquer etiqueta); nunca um bloco gerado
+    return gen.map(a => (a.tn ? noteDone : done.has(a.d)) ? { ...a, done: true } : a).concat(mine);
+}
+// Lista gravada no tempo do curso (versão de antes da Trilha: ids "g-<semana>-<dia>-<i>" e "c-<hora>", sem campo da trilha). Só ela conta para o dia leve
+// histórico da Sem.41 em 20 e 21/10 — uma lista gravada depois do curso (Trilha desde 20/10, transição) nunca muda o histórico até 19/10.
+const POS_CURSO_MS = Date.parse(POS_CURSO + "T00:00:00-03:00"); // bloco criado ("adicionar": id c-<hora>) a partir de 20/10 (meia-noite em Salvador — o mesmo corte em qualquer aparelho) já não é do tempo do curso
+// Prova positiva: lista não vazia, sem campo da trilha, sem bloco criado a partir de 20/10, e com ao menos um bloco do curso (gerado "g-<semana>-<dia>-<i>" ou
+// criado "c-<hora>" antes de 20/10). Lista vazia ou só com blocos de origem desconhecida não conta (vale o gerado).
+function trilhaCourseList(l) {
+    if (!Array.isArray(l) || !l.length) return false;
+    const msOf = (id) => { const m = id.match(/^c-(\d{12,})/); return m ? Number(m[1]) : null; };
+    if (l.some(a => { if (!a) return false; const id = String(a.id || ""), ms = msOf(id); return a.tm != null || a.ts || a.au || a.pc || a.gh || /^(g-\d{4}-|t-)/.test(id) || (ms != null && ms >= POS_CURSO_MS); })) return false;
+    return l.some(a => { if (!a) return false; const id = String(a.id || ""), ms = msOf(id); return /^g-\d{1,2}-\d+-\d+$/.test(id) || (ms != null && ms < POS_CURSO_MS); });
+}
+// A edição do tempo do curso que a versão de 20/10 tirou da tela com "↺ Voltar ao padrão" (ou que esta versão arquivou) continua no arquivo: a 1ª lista do curso guardada
+function trilhaArchivedCourseList(d) { try { const arc = JSON.parse(localStorage.getItem(STORAGE_PREFIX + "schedule_archive_v1") || "{}"); const e = (arc[d] || []).find(x => x && trilhaCourseList(x.list)); return e ? e.list : null; } catch (e) { return null; } }
+function trilhaSanitizeTransition(sov, cfg, hoje) {
+    // 20 e 21/10 (o dia leve histórico da Sem.41 lê esses dois): na 1ª carga da versão nova guarda a edição do tempo do curso, ou null — gravado ou não o dia;
+    // daí em diante o histórico nunca lê a lista viva desses dias (nem uma que ela edite depois, num dia de transição)
+    const have = (cfg && cfg.trilhaLegacyOv) || {}, legacy = {};
+    [POS_CURSO, addDaysISO(POS_CURSO, 1)].forEach(d => { if (have[d] === undefined) legacy[d] = trilhaCourseList((sov || {})[d]) ? sov[d] : trilhaArchivedCourseList(d); }); // null = sem edição do tempo do curso (vale o gerado)
+    // refaz só a lista que traz etapa/áudio/linha "↷" ou um bloco que não é desta versão (sem a marca pc) nem dela (criado por ela: "c-<hora>" ou extra não
+    // gerado) — PLAN, revisão, simulado ou texto antigo; um dia de transição que ela editou nesta versão (tirou, moveu, reordenou blocos, esvaziou o dia)
+    // fica como ela deixou — "dia editado continua valendo"
+    const own = (a) => { const id = String(a.id || ""); return /^c-\d+$/.test(id) || (a.d === "EXTRA" && !/^[gt]-/.test(id)); };
+    const stale = (l) => l.some(a => a && (a.tm != null || a.au || a.gh || (!a.pc && !own(a))));
+    const days = Object.keys(sov || {}).filter(d => isTransDay(d) && Array.isArray(sov[d]) && stale(sov[d])).filter(d => JSON.stringify(trilhaTransList(d, sov[d])) !== JSON.stringify(sov[d]));
+    if (!days.length) return Object.keys(legacy).length ? { sov: null, legacy } : null;
+    if (!trilhaArchiveDays(sov, days, hoje, "dia de transição (a trilha começa em " + fmtBR(TRILHA_START) + ")")) return Object.keys(legacy).length ? { sov: null, legacy } : false; // sem arquivo, os dias ficam como estão (tenta de novo na próxima carga) — o registro de 20 e 21/10 vale já
+    const out = { ...sov }; days.forEach(d => { out[d] = trilhaTransList(d, sov[d]); });
+    return { sov: out, legacy };
+}
+// Dias editados à mão de 26/10 em diante com etapa do plano antigo (de antes do início em 26/10): o original vai para o arquivo e o dia fica com o que é
+// dela (blocos que ela acrescentou, os ✓, a ordem) — saem só as etapas, o áudio e as linhas "↷" do plano antigo, e entram as etapas do plano novo daquele dia.
+// Roda UMA vez (config.trilhaInicio) — depois disso uma etapa num dia editado é do plano novo.
+function trilhaMigrateSchedule(sov, hoje, P) {
+    const old = (a) => a && (a.tm != null || a.au || a.gh);
+    const days = Object.keys(sov || {}).filter(d => d >= TRILHA_START && Array.isArray(sov[d]) && sov[d].some(old));
+    if (!days.length) return null;
+    if (!trilhaArchiveDays(sov, days, hoje, "início da trilha em " + fmtBR(TRILHA_START))) return false; // sem arquivo, nada muda (tenta de novo na próxima carga)
+    const out = { ...sov };
+    days.forEach(d => { let cur = sov[d].filter(a => !old(a));
+        ((P && P.byDay[d]) || []).forEach(({ id, ts }) => { const m = modById(id); if (!m) return; const b = { id: "t-" + id + "-" + ts, ...trilhaStageBlock(m, ts), tm: id, ts }; const li = cur.map(x => x.d).lastIndexOf("LAZER"); cur = li >= 0 ? cur.slice(0, li).concat([b], cur.slice(li)) : cur.concat([b]); }); // como o putIntoT: antes do LAZER
+        out[d] = cur; });
+    return out;
+}
 function trilhaFreezePatch(cfg, trail, hoje, P, scheduleOv) { // o que o App grava (um único saveConfig): 1º acesso, semanas a congelar, semana final
     const patch = {}; let changed = false;
-    if (!cfg.trilhaFirstOpen) { patch.trilhaFirstOpen = hoje; changed = true; }
+    if (!cfg.trilhaFirstOpen && hoje >= TRILHA_START && hoje <= TRILHA_END) { patch.trilhaFirstOpen = hoje; changed = true; } // 1º acesso só a partir de 26/10 (nunca num dia de transição)
     if (!(cfg.trilhaRevFull || {})[hoje] && computeReviews(trail, hoje).length && !trilhaRevRoom(hoje, { cfg, P, trail, hoje, ov: scheduleOv })) { patch.trilhaRevFull = { ...(cfg.trilhaRevFull || {}), [hoje]: true }; changed = true; } // decisão 73: o dia em que a revisão ficou opcional fica registrado como cheio
     const weeksAll = { ...(cfg.trilhaWeeks || {}) }, planAll = { ...(cfg.trilhaPlan || {}) }; let froze = false;
-    for (let w = P.L + 1; w <= P.curW; w++) { // semana corrente + semanas sem app aberto (congelam como estavam planejadas; as etapas viram pendentes ⏳)
+    for (let w = P.W1; w <= P.curW; w++) { // semana corrente + semanas sem app aberto (congelam como estavam planejadas; as etapas viram pendentes ⏳)
         const tue = weekStartISO(w); const W = P.weeks[tue];
         if (!W || W.frozen || W.pre) continue;
         weeksAll[tue] = { q: W.q, base: W.base, held: !!W.held, why: W.why || null, mods: W.mods.slice(), adv: [], rise: [], short: W.short || 0, light: W.light || null, at: hoje }; if (W.prop) weeksAll[tue].prop = { ...W.prop };
@@ -1590,13 +1695,21 @@ function EventNote({ value, onCommit }) {
 function Schedule({ config, effWeek, scheduleOv, events, reviews, trail, P, onSaveSchedule, onSaveEvents, onUpdateProgress, onUpdateTrail, onReviewDone, onGoTrilha }) {
     const startISO = config.startDate;
     const week = effWeek;
-    const WL = weekLen(week, startISO); // dias da semana visível (Sem.41 = 6, semanas da Trilha = 7, Sem.52 = 4)
-    const isTW = isTrilhaWeek(week, startISO); // semana da Trilha (TER→SEG, a partir de 20/10)
+    const WL = weekLen(week, startISO); // dias da semana visível (Sem.41 = 6, transição = 6, 1ª da Trilha = 8, as outras = 7, Sem.52 = 4)
+    const isTW = isTrilhaWeek(week, startISO); // semana depois do curso (a partir de 20/10): transição (20–25/10) ou Trilha
+    const isTransW = isTransWeek(week, startISO); // 20–25/10: sem etapa, sem cota (a trilha começa em 26/10)
     const hojeT = todayISO();
-    // Dia ativo guardado como DIA DA SEMANA (getDay): navegar entre semanas mantém o dia; o índice sai da data (nunca do template)
-    const [activeDow, setActiveDow] = useState(() => dowOf(weekDayISO(startISO, effWeek, todayDayIdx(effWeek, startISO))));
-    const activeIdx = (() => { for (let i = 0; i < WL; i++) if (dowOf(weekDayISO(startISO, week, i)) === activeDow) return i; return Math.min(todayDayIdx(week, startISO), WL - 1); })();
-    const setActiveIdx = (i) => setActiveDow(dowOf(weekDayISO(startISO, week, i)));
+    // Dia ativo guardado como DIA DA SEMANA (getDay): navegar entre semanas mantém o dia; o índice sai da data (nunca do template).
+    // A 1ª semana da Trilha tem duas segundas (26/10 e 02/11): a 2ª ocorrência do mesmo dia da semana guarda +7 (numa semana com uma só, vale a última).
+    // Navegando de outra semana para uma com duas ocorrências do dia, vale a mais perto do dia que ela via (de 09/11 ◀ → 02/11; de 19/10 ▶▶ → 26/10).
+    const dayKeyOf = (w, i) => { const g = dowOf(weekDayISO(startISO, w, i)); let n = 0; for (let j = 0; j < i; j++) if (dowOf(weekDayISO(startISO, w, j)) === g) n++; return g + 7 * n; };
+    const [activeDow, setActiveDow] = useState(() => { const i0 = todayDayIdx(effWeek, startISO); return { k: dayKeyOf(effWeek, i0), w: effWeek, iso: weekDayISO(startISO, effWeek, i0) }; });
+    const activeIdx = (() => { const cands = []; let exact = -1; for (let i = 0; i < WL; i++) { const k = dayKeyOf(week, i); if (k === activeDow.k) exact = i; if (k % 7 === activeDow.k % 7) cands.push(i); }
+        if (activeDow.w === week && exact >= 0) return exact;
+        if (cands.length > 1) return cands.reduce((b, i) => Math.abs(diffDays(activeDow.iso, weekDayISO(startISO, week, i))) < Math.abs(diffDays(activeDow.iso, weekDayISO(startISO, week, b))) ? i : b, cands[0]);
+        if (cands.length) return cands[0];
+        return Math.min(todayDayIdx(week, startISO), WL - 1); })();
+    const setActiveIdx = (i) => setActiveDow({ k: dayKeyOf(week, i), w: week, iso: weekDayISO(startISO, week, i) });
     const [editMode, setEditMode] = useState(false);
     const [adding, setAdding] = useState(false);
     const [newAct, setNewAct] = useState({ d: "EXTRA", text: "", time: "" });
@@ -1654,7 +1767,7 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, trail, P, onSa
         const week = ctx.week, wkPh = ctx.wkPh, prevPh = ctx.prevPh, prevIds = ctx.prevIds, plan = ctx.plan, prevPlan = ctx.prevPlan, extras = ctx.extras, prevExtras = ctx.prevExtras, prev2Extras = ctx.prev2Extras, prev3Extras = ctx.prev3Extras, prevIdsFor = ctx.prevIdsFor;
         const wdi = (wk, i) => ctx.legacyCal ? addDaysISO(startISO, (wk - 1) * 7 + i) : weekDayISO(startISO, wk, i); // legacyCal: calendário antigo (QUA→TER) — só para o dia leve histórico da Sem.41
         const iso = wdi(week, dayIdx);
-        if (iso >= TRILHA_START && !ctx.legacy) return trilhaGen(iso, keepDone); // a partir de 20/10: dia da Trilha
+        if (iso >= POS_CURSO && !ctx.legacy) return trilhaGen(iso, keepDone); // a partir de 20/10: dia da Trilha (20–25/10 = transição, sem etapa)
         let acts = schedFor(iso)[dayIdx].activities;
         if (iso >= AMB_START) {
             if (dayIdx >= 2) { // SEX…TER (P3: a terça recebe o D6-B em semana de simulado)
@@ -1772,7 +1885,7 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, trail, P, onSa
     const isCustom = (dayIdx) => !!scheduleOv[dateFor(dayIdx)];
     const isoAt = (d) => addDaysISO(dateFor(0), d); // dia absoluto d: 0–6 esta semana, 7–27 até 3 semanas à frente
     // Lista REAL de qualquer data (editada à mão ou gerada) — resolve a semana pela data (semanas do curso de 7 dias, Sem.41 de 6, Trilha TER→SEG). Depois de 01/01: null.
-    const listAtISO = (iso, keepDone) => { if (iso > TRILHA_END) return null; if (scheduleOv[iso]) return scheduleOv[iso]; if (iso >= TRILHA_START) return trilhaGen(iso, keepDone); const w2 = weekOfISO(iso, startISO); const k = w2 - week; const di = dayIdxOf(iso, startISO); if (k === 0) return genActivities(di, null, keepDone); return genForCtx(ctxAt(k), di, null, true); };
+    const listAtISO = (iso, keepDone) => { if (iso > TRILHA_END) return null; if (scheduleOv[iso]) return scheduleOv[iso]; if (iso >= POS_CURSO) return trilhaGen(iso, keepDone); const w2 = weekOfISO(iso, startISO); const k = w2 - week; const di = dayIdxOf(iso, startISO); if (k === 0) return genActivities(di, null, keepDone); return genForCtx(ctxAt(k), di, null, true); };
     const listAt = (d) => { if (d < -7 || d > 27) return null; if (d >= 0 && d < WL) return listFor(d); return listAtISO(isoAt(d), true); }; // lista do dia (editada à mão ou gerada); −7…−1 = semana passada (espaçamento)
     const loadMemo = {};
     const loadAt = (d) => { if (!(d in loadMemo)) { const l = listAt(d); loadMemo[d] = l ? { study: studyHours(l), total: dayLoadHours(l) } : null; } return loadMemo[d]; }; // carga do dia (estudo / total); null além de 3 semanas
@@ -1792,7 +1905,7 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, trail, P, onSa
             return;
         const act = listFor(fromIdx)[idx];
         const destHrs = dayLoadHours(listFor(toIdx)) + actHours(act);
-        const capMsg = destHrs > DAY_CAP_H ? "⚠️ " + (DOW_LBL[dowOf(dateFor(toIdx))] || "O dia") + " ficaria com ~" + destHrs.toFixed(1).replace(".", ",") + "h de atividades — acima do tempo hábil (~" + String(DAY_CAP_H).replace(".", ",") + "h). Nada será apagado nem trocado." : "";
+        const capMsg = destHrs > DAY_CAP_H ? "⚠️ " + ((DOW_LBL[dowOf(dateFor(toIdx))] + (WL > 7 ? " " + fmtBR(dateFor(toIdx)) : "")) || "O dia") + " ficaria com ~" + destHrs.toFixed(1).replace(".", ",") + "h de atividades — acima do tempo hábil (~" + String(DAY_CAP_H).replace(".", ",") + "h). Nada será apagado nem trocado." : "";
         const an = analyzeMove(act, fromIdx, idx, toIdx); // bloco ligado a módulo: intervalos na posição nova (decisão 38/40, 24/09)
         if (!an) { // bloco sem módulo (Anki, PLAN, academia, lazer, plantão): como antes — só a checagem de carga
             if (capMsg && !window.confirm(capMsg + " Manter TUDO nesse dia mesmo assim?")) return; // cancela apenas o movimento
@@ -1822,8 +1935,8 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, trail, P, onSa
     };
     const resetDay = (dayIdx) => {
         const iso = dateFor(dayIdx);
-        if (iso >= TRILHA_START && scheduleOv[iso]) { // dia da Trilha: a edição dela fica guardada (medplanner_schedule_archive_v1) — nada se perde (⚙️)
-            try { const k = STORAGE_PREFIX + "schedule_archive_v1"; const arc = JSON.parse(localStorage.getItem(k) || "{}"); arc[iso] = (arc[iso] || []).concat([{ at: hojeT, list: scheduleOv[iso] }]); localStorage.setItem(k, JSON.stringify(arc)); } catch (e) { }
+        if (iso >= POS_CURSO && scheduleOv[iso]) { // dia da Trilha (ou de transição): a edição dela fica guardada (medplanner_schedule_archive_v1) — nada se perde (⚙️)
+            if (!trilhaArchiveDays(scheduleOv, [iso], hojeT, "↺ Voltar ao padrão")) { alert("O arquivo do app (onde as edições ficam guardadas) está ilegível, então não consegui guardar a edição deste dia: o dia continua como está e nada foi apagado. Faça um backup na aba Sono e avise a equipe para recuperar o arquivo."); return; }
         }
         const next = { ...scheduleOv };
         delete next[iso];
@@ -1899,7 +2012,7 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, trail, P, onSa
     // Se a menor carga passar de STUDY_WARN_H (8h), não há pausa nessa semana: o menos pesado vira DIA DE RESPIRO (🌬️, COM Venvanse).
     // Override por semana em config.lightDayOverrides (escolha manual = dia sem remédio, com selo de validação).
     // O selo 🌿 NÃO altera os blocos do dia — "faça só o leve, mova o pesado". Pausa de medicação: validar com a psiquiatra.
-    const showLight = weekEndISO(week, startISO) >= G2_START; // semanas totalmente históricas (antes de 10/09) não mostram o seletor
+    const showLight = weekEndISO(week, startISO) >= G2_START && !isTransWeek(week, startISO); // semanas totalmente históricas (antes de 10/09) e a de transição (20–25/10, sem etapa) não mostram o seletor
     // Desempate (decisão da paciente, 24/09): cargas a ≤ 45min entre si são "parecidas" — a escolha por minutos seria arbitrária. Ordem:
     // (a) dia sem aula da faculdade/presencial (bloco AULA) · (b) não véspera de plantão nem de dia-motor (segunda) · (c) menos etapas que dependem de
     // continuidade no dia seguinte · (d) o mais distante de um plantão · empate final: o 1º dia. A interface avisa e ela pode trocar no seletor.
@@ -1907,12 +2020,13 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, trail, P, onSa
     // Sem.41 (truncada em 19/10): o dia leve histórico é calculado com os 7 dias ORIGINAIS — TER 20/10 (e a QUA 21/10, para os elos) pelo calendário antigo.
     // Se ele cair em 20/10, nenhum 🌿 aparece em 14–19/10 (⚙️ histórico intacto; decisão aprovada em 20/10).
     const legacyMemo = {};
-    const listLeg = (d) => { const iso = isoAt(d); if (iso < TRILHA_START || iso > addDaysISO(TRILHA_START, 1)) return listAt(d);
+    const listLeg = (d) => { const iso = isoAt(d); if (iso < POS_CURSO || iso > addDaysISO(POS_CURSO, 1)) return listAt(d);
         if (!(iso in legacyMemo)) {
             const kL = LCW - week; const c41 = kL === 0 ? curCtx : ctxAt(kL);
-            if (iso === TRILHA_START) legacyMemo[iso] = scheduleOv[iso] || genForCtx({ ...c41, legacy: true }, 6, null, kL !== 0);
+            const LO = (config && config.trilhaLegacyOv) || {}; const ovL = LO[iso] !== undefined ? LO[iso] : (trilhaCourseList(scheduleOv[iso]) ? scheduleOv[iso] : null); // só a edição do tempo do curso (guardada em trilhaLegacyOv quando o dia virou transição); lista gravada depois do curso não conta
+            if (iso === POS_CURSO) legacyMemo[iso] = ovL || genForCtx({ ...c41, legacy: true }, 6, null, kL !== 0);
             else { const w41 = weekDayISO(startISO, LCW, 0), w42 = addDaysISO(w41, 7), ids41 = kL === 0 ? wkIds : idsAt(kL);
-                legacyMemo[iso] = scheduleOv[iso] || genForCtx({ week: LCW + 1, wkPh: "G2", prevPh: "G2", prevIds: ids41, plan: fioPlanAll[w42] || {}, prevPlan: fioPlanAll[w41] || {}, extras: fioExtraAll[w42] || [], prevExtras: fioExtraAll[w41] || [], prev2Extras: fioExtraAll[addDaysISO(w41, -7)] || [], prev3Extras: fioExtraAll[addDaysISO(w41, -14)] || [], prevIdsFor: () => ids41, cur: false, legacy: true, legacyCal: true }, 0, null, true); }
+                legacyMemo[iso] = ovL || genForCtx({ week: LCW + 1, wkPh: "G2", prevPh: "G2", prevIds: ids41, plan: fioPlanAll[w42] || {}, prevPlan: fioPlanAll[w41] || {}, extras: fioExtraAll[w42] || [], prevExtras: fioExtraAll[w41] || [], prev2Extras: fioExtraAll[addDaysISO(w41, -7)] || [], prev3Extras: fioExtraAll[addDaysISO(w41, -14)] || [], prevIdsFor: () => ids41, cur: false, legacy: true, legacyCal: true }, 0, null, true); }
         }
         return legacyMemo[iso]; };
     const distToShift = (iso) => shiftDates.length ? Math.min(...shiftDates.map(d => Math.abs(diffDays(d, iso)))) : 99;
@@ -2018,12 +2132,12 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, trail, P, onSa
     const pinDismissed = (((config && config.fillDismissed) || {})[dateFor(0) + "|pin"] || "") === pinSig;
     const showPin = !showFill && pinWait.length > 0 && !pinDismissed;
     const stageWord = (t) => /toque 1/.test(t) ? "a aula" : /toque 2/.test(t) ? "as questões" : /toque 3/.test(t) ? "a apostila" : "a selagem";
-    const dayName = (d) => DOW_LBL[dowOf(isoAt(d))] + " " + fmtBR(addDaysISO(dateFor(0), d)) + (d >= 21 ? " (em 3 semanas)" : d >= 14 ? " (em 2 semanas)" : d >= 7 ? " (sem. seguinte)" : "");
+    const dayName = (d) => DOW_LBL[dowOf(isoAt(d))] + " " + fmtBR(addDaysISO(dateFor(0), d)) + (d >= 21 ? " (em 3 semanas)" : d >= 14 ? " (em 2 semanas)" : d >= Math.max(7, WL) ? " (sem. seguinte)" : "");
     const FILL_HRS = { aula: 1.7, quest: 2, apost: 1.5, seal: 40 / 60 };
     // Candidatos (decisão da paciente, 24/09): só o pós-noturno é proteção rígida (recuperação de sono); o dia leve (🌿/🌬️) de cada semana é a última
     // preferência (depois dos dias com ⚠️) e vem sempre com aviso; SÁB é um dia como os outros; a carga só ordena a preferência e marca o ⚠️. Vale para esta semana e as 3 seguintes.
     const postN = (d) => postNight(isoAt(d));
-    const open = (d) => d > todayIdxW && d <= 27 && !postN(d) && isoAt(d) < TRILHA_START; // motor antigo: só dias do curso (até 19/10)
+    const open = (d) => d > todayIdxW && d <= 27 && !postN(d) && isoAt(d) < POS_CURSO; // motor antigo: só dias do curso (até 19/10)
     const lightOf = (d) => { const L = lightAtWeek(Math.floor(d / 7)); return L && L.idx != null && L.idx === d % 7 ? L : null; };
     const fitsAt = (d, hrs) => { const l = loadAt(d); return !!l && l.study + hrs <= studyWarnFor(isoAt(d)) + 1e-9 && l.total + hrs <= DAY_CAP_H + 1e-9; }; // preferência, não veto
     const weekWord = (k) => k === 0 ? "desta semana" : k === 1 ? "da sem. seguinte" : "de " + k + " semanas à frente";
@@ -2046,7 +2160,7 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, trail, P, onSa
         // 0) dia normal que cabe · 1) dia normal com ⚠️ · 2) dia leve que cabe · 3) dia leve com ⚠️.
         const scan = (lo, hi, hrs, pass) => { for (let d = Math.max(lo, todayIdxW + 1); d <= Math.min(hi, 27); d++) { if (!open(d)) continue; if (!!lightOf(d) !== (pass >= 2)) continue; if (pass % 2 === 0 && !fitsAt(d, hrs)) continue; return d; } return null; };
         const thisWeek = (from, hrs, hi) => { for (let p = 0; p < 4; p++) { const d = scan(from, hi == null ? 6 : Math.min(hi, 6), hrs, p); if (d != null) return d; } return null; };
-        const nextOk = (from, hrs) => { const lo2 = Math.max(from, 7), hi2 = Math.floor(lo2 / 7) * 7 + 6; for (let p = 0; p < 4; p++) { const a = scan(from, 6, hrs, p); if (a != null) return a; const b = scan(lo2, hi2, hrs, p); if (b != null) return b; } let x = lo2; while (postN(x)) x++; return isoAt(x) >= TRILHA_START ? null : x; }; // esta semana, depois a semana onde a etapa cai; além de 3 semanas, 1º dia não pós-noturno (carga não avaliada) — nunca um dia da Trilha (20/10+)
+        const nextOk = (from, hrs) => { const lo2 = Math.max(from, 7), hi2 = Math.floor(lo2 / 7) * 7 + 6; for (let p = 0; p < 4; p++) { const a = scan(from, 6, hrs, p); if (a != null) return a; const b = scan(lo2, hi2, hrs, p); if (b != null) return b; } let x = lo2; while (postN(x)) x++; return isoAt(x) >= POS_CURSO ? null : x; }; // esta semana, depois a semana onde a etapa cai; além de 3 semanas, 1º dia não pós-noturno (carga não avaliada) — nunca um dia da Trilha (20/10+)
         const slots = [];
         wkIds.slice(0, 4).forEach((id, k) => { const dd = slotDays(k + 1), ov = plan[String(k + 1)] || {}; slots.push({ label: k + 1, id, kind: "tpl", key: String(k + 1), days: { aula: ov.aula != null ? ov.aula : dd.aula, quest: ov.quest != null ? ov.quest : dd.quest, apost: ov.apost != null ? ov.apost : dd.apost, seal: ov.seal != null ? ov.seal : dd.seal } }); });
         extras.forEach((e, j) => slots.push({ label: e.label, id: e.id, kind: "extra", key: j, days: { aula: e.aula, quest: e.quest, apost: e.apost, seal: e.seal } }));
@@ -2128,7 +2242,7 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, trail, P, onSa
     };
     const stageMapFor = (modId, lists, fam) => { // stage → [{ d, a, done, past, abc }] nos dias −7…20 (semana passada, esta e as duas seguintes), só a cadeia `fam`
         const pg = reviews.progress || {}; const map = {};
-        for (let d = -7; d <= 20; d++) { if (isoAt(d) >= TRILHA_START) continue; const l = lists(d); if (!l) continue; const k = Math.floor(d / 7); // o motor antigo não chega aos dias da Trilha
+        for (let d = -7; d <= 20; d++) { if (isoAt(d) >= POS_CURSO) continue; const l = lists(d); if (!l) continue; const k = Math.floor(d / 7); // o motor antigo não chega aos dias da Trilha
             l.forEach(a => { if (fam && familyOf(a, k) !== fam) return; stagesOf(a, k).forEach(sg => { if (sg.mod.id !== modId) return; (map[sg.stage] = map[sg.stage] || []).push({ d, a, done: sg.field ? !!((pg[modId] || {})[sg.field]) : false, past: d <= pastAbs, abc: isAbcBlock(a.text) }); }); }); }
         return map;
     };
@@ -2226,7 +2340,7 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, trail, P, onSa
         return out;
     };
     const tDoneT = (t) => !!(((trail || {})[t.mod.id] || {})[t.field]);
-    const isBlockDoneAt = (a, iso) => { if (a.tm != null) { const tk = trailTasks(a, iso).filter(t => !t.extra); return tk.length ? tk.every(tDoneT) : !!a.done; } if (iso >= TRILHA_START) return !!a.done; return isBlockDone(a); };
+    const isBlockDoneAt = (a, iso) => { if (a.tm != null) { const tk = trailTasks(a, iso).filter(t => !t.extra); return tk.length ? tk.every(tDoneT) : !!a.done; } if (iso >= POS_CURSO) return !!a.done; return isBlockDone(a); };
     // ── mover etapa da Trilha (aviso de espaçamento, decisões 38/40/54): família = o módulo; pode cruzar semanas; grava no plano (trilhaPlan), sem materializar dias ──
     const reorganizeT = (st, fixedD, movable, D0) => {
         const prot = (P && P.prot) || {}; const EPS = 1e-9; const lo = addDaysISO(hojeT, 1);
@@ -2272,7 +2386,7 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, trail, P, onSa
     const moveToIso = (fromIdx, idx, toIso) => { // seletor "→ mover p/ dia" (valor = data)
         const act = listFor(fromIdx)[idx]; if (!act || !toIso) return;
         const fromIso = dateFor(fromIdx);
-        if (act.tm != null && !act.au && !act.gh) {
+        if (act.tm != null && !act.au && !act.gh && !isTransDay(fromIso)) { // num dia de transição, um bloco de etapa que sobrou é nota (move como bloco comum)
             if (!(P && P.frozen.has(act.tm))) { window.alert("Esta etapa ainda é prévia — a semana dela congela quando começar. Mova-a depois, já na semana dela."); return; }
             const an = analyzeMoveT(act, fromIso, toIso);
             const l = listAtISO(toIso) || []; const destHrs = dayLoadHours(l) + actHours(act);
@@ -2287,7 +2401,7 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, trail, P, onSa
     };
     const moveOptsFor = (act) => { // dias de destino: bloco de etapa da Trilha = esta semana e a seguinte (até 01/01); demais = os dias desta semana
         const out = [];
-        if (act && act.tm != null && !act.au && !act.gh) { const end = addDaysISO(dateFor(0), WL - 1 + 7); for (let d = dateFor(0); d <= end && d <= TRILHA_END; d = addDaysISO(d, 1)) if (d !== dayDate) out.push(d); return out; }
+        if (act && act.tm != null && !act.au && !act.gh && !isTransDay(dayDate)) { const end = weekEndISO(Math.min(week + 1, lastWeek(startISO)), startISO); for (let d = dateFor(0) < TRILHA_START ? TRILHA_START : dateFor(0); d <= end && d <= TRILHA_END; d = addDaysISO(d, 1)) if (d !== dayDate) out.push(d); return out; } // esta semana e a seguinte (a 1ª da Trilha tem 8 dias), nunca um dia de transição
         for (let i = 0; i < WL; i++) if (i !== activeIdx) out.push(dateFor(i));
         return out;
     };
@@ -2302,7 +2416,7 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, trail, P, onSa
     const isCurTW = isTW && week === curWT && !!P;
     const Wcur = isTW && P ? P.weeks[dateFor(0)] : null;
     const pendT = isCurTW ? P.pending : [];
-    const prevTueT = isCurTW && week - 1 > LCW ? weekStartISO(week - 1, startISO) : null;
+    const prevTueT = isCurTW && week - 1 >= P.W1 ? weekStartISO(week - 1, startISO) : null;
     const riseOk = isCurTW && !pendT.length && !!Wcur && !!Wcur.frozen && !!Wcur.held && Wcur.why === "fechamento" && Wcur.base > Wcur.q && !!prevTueT && trilhaWeekDone(P.plan, trail, prevTueT, weekEndISO(week - 1, startISO)) && !(((config && config.trilhaDismiss) || {})[dateFor(0) + "|rise"]);
     const inWeekT = (d) => d && d >= dateFor(0) && d <= dateFor(WL - 1);
     const weekAllMarked = isCurTW && Object.keys(P.plan).some(id => STAGES_T.some(x => inWeekT(P.plan[id][x]))) && Object.keys(P.plan).every(id => { const p = P.plan[id]; return STAGES_T.every(x => { const d = p[x]; return !inWeekT(d) || !!((trail || {})[id] || {})[TS_FIELD[x]]; }); }); // TODAS as etapas planejadas nos dias desta semana marcadas (inclusive as adiantadas) — e a semana tem alguma: semana vazia (ex.: 1º acesso numa segunda, cota proporcional 0) não oferece ⏩, como na aba Trilha
@@ -2316,7 +2430,7 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, trail, P, onSa
         if (!tProp) return "";
         if (tProp.kind === "pend") return tProp.jobs.map(j => !j.days ? (modById(j.id) || {}).code + ": não cabe até 01/01 sem quebrar os intervalos" : (modById(j.id) || {}).code + " · " + j.rem.map(x => TS_WORD[x] + " " + dayCostT(j.days[x], HRS_T[x]) + (j.before[x] && j.before[x] !== j.days[x] ? " (antes: " + dayNameT(j.before[x]) + gapWhy(j, x) + ")" : "")).join(" · ")).join(" | ") + ".";
         if (tProp.kind === "rise") return tProp.items.map(it => it.days ? "#" + ((P.qpos[it.id] || 0) + 1) + " " + modTxt(it.id) + ": " + chainTxt(it.days, it.rem) : modTxt(it.id) + ": não cabe até 01/01 sem quebrar os intervalos").join(" | ") + ".";
-        if (tProp.kind === "C") return tProp.why === "final" ? "Semana final: sem módulo novo — o acesso termina em 01/01/2027." : tProp.why === "fila" ? "A fila da Trilha está vazia — nada para adiantar 🎉" : tProp.why === "semdia" ? "Não sobrou dia livre nesta semana para a aula." : "Não cabe até 01/01/2027 sem quebrar os intervalos — o acesso termina em 01/01.";
+        if (tProp.kind === "C") return tProp.why === "antes" ? "A trilha começa em " + fmtBR(TRILHA_START) + " — nada a adiantar antes disso." : tProp.why === "final" ? "Semana final: sem módulo novo — o acesso termina em 01/01/2027." : tProp.why === "fila" ? "A fila da Trilha está vazia — nada para adiantar 🎉" : tProp.why === "semdia" ? "Não sobrou dia livre nesta semana para a aula." : "Não cabe até 01/01/2027 sem quebrar os intervalos — o acesso termina em 01/01.";
         const head = "#" + ((P.qpos[tProp.id] || 0) + 1) + " " + modTxt(tProp.id);
         if (tProp.kind === "A") return "Adiantar " + head + ": " + chainTxt(tProp.days, tProp.rem) + ".";
         const inW = (x) => tProp.days[x] && tProp.days[x] <= dateFor(WL - 1);
@@ -2364,7 +2478,12 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, trail, P, onSa
     const finalLogText = (lg) => { const code = (id) => (modById(id) || {}).code || "?"; const days = []; for (let d = weekStartISO(P.LW, startISO); d <= TRILHA_END; d = addDaysISO(d, 1)) { const l = listAtISO(d) || []; days.push(dayNameT(d) + " " + fmtHrs(studyHours(l))); }
         return "📦 Semana final (" + fmtBR(lg.at) + "): " + (lg.moved.length ? "recoloquei " + lg.moved.length + (lg.moved.length === 1 ? " etapa" : " etapas") + " para selar até 01/01 (" + lg.moved.map(m => code(m.id) + " " + TS_WORD[m.ts] + " → " + dayNameT(m.to)).join(", ") + ")." : "o que estava aberto já cabe até 01/01 nos dias planejados.") + (lg.compressed.length ? " Intervalos encurtados: " + [...new Set(lg.compressed)].map(code).join(", ") + "." : "") + (lg.nocabe.length ? " Não cabem até 01/01: " + lg.nocabe.map(x => code(x.id) + " " + TS_WORD[x.ts]).join(", ") + " — seguem no novo cursinho a partir de 04/01." : "") + " Carga dia a dia: " + days.join(" · ") + (simForCfg(config, TRILHA_END) ? "." : " (01/01 só selagem)."); };
     const KIND_LBL = { novo: ["NOVO", "#7E22CE"], adiantado: ["ADIANTADO", "#0369A1"], subida: ["SUBIDA", "#15803D"], continua: ["CONTINUA", "#475569"] };
-    const trailPanelEl = () => React.createElement("div", { "data-t": "trilha-panel", style: { background: "#0f172a", borderRadius: 8, padding: "10px 12px", marginBottom: 14 } },
+    const trailPanelEl = () => isTransW ? React.createElement("div", { "data-t": "trilha-panel", style: { background: "#0f172a", borderRadius: 8, padding: "10px 12px", marginBottom: 14 } }, // 20–25/10: transição (paciente, 26/10)
+        React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, marginBottom: 6 } },
+            React.createElement("div", { style: { color: "#64748b", fontSize: 10, lineHeight: 1.5 } }, "SEMANA DE TRANSIÇÃO · " + fmtBR(dateFor(0)) + "–" + fmtBR(dateFor(WL - 1))),
+            onGoTrilha && React.createElement("button", { onClick: onGoTrilha, style: { background: "#1e293b", border: "1px solid #334155", borderRadius: 6, color: "#94a3b8", fontSize: 10, fontWeight: 700, padding: "3px 8px", cursor: "pointer" } }, "🛤️ Fila e rampa")),
+        React.createElement("div", { style: { color: "#94a3b8", fontSize: 12, lineHeight: 1.5 } }, "🗓️ A trilha começa na " + DOW_FULL[dowOf(TRILHA_START)].toLowerCase() + " " + fmtBR(TRILHA_START) + " com o 1º módulo da fila. Estes dias não têm etapa de módulo: só o plantão (quando há), Anki, academia e lazer."))
+        : React.createElement("div", { "data-t": "trilha-panel", style: { background: "#0f172a", borderRadius: 8, padding: "10px 12px", marginBottom: 14 } },
         React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, marginBottom: 6 } },
             React.createElement("div", { style: { color: "#64748b", fontSize: 10, lineHeight: 1.5 } }, "MÓDULOS DESTA SEMANA DA TRILHA" + (Wcur && !Wcur.pre ? " · ritmo " + Wcur.q + (Wcur.prop ? " — 1º acesso: proporcional " + trilhaPropTxt(Wcur.prop) + " (a rampa previa " + Wcur.prop.full + ")" : "") + (Wcur.afterProp ? " · " + trilhaAfterPropTxt(Wcur.afterProp) : "") + (Wcur.held ? " — semana de manutenção do ritmo (" + (Wcur.why === "madrugada" ? "segura: bloco 04h30" : "segura: semana passada aberta") + ")" : "") : "") + (Wcur && Wcur.preview && !Wcur.pre ? " · prévia" : "")),
             onGoTrilha && React.createElement("button", { onClick: onGoTrilha, style: { background: "#1e293b", border: "1px solid #334155", borderRadius: 6, color: "#94a3b8", fontSize: 10, fontWeight: 700, padding: "3px 8px", cursor: "pointer" } }, "🛤️ Fila e rampa")),
@@ -2375,19 +2494,19 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, trail, P, onSa
                 React.createElement("div", { style: { color: "#64748b", fontSize: 10, paddingLeft: 4 } }, STAGES_T.map(x => TS_WORD[x] + " " + (p[x] ? fmtBR(p[x]) : "—") + (t[TS_FIELD[x]] ? " ✓" : "")).join(" · ") + (t.aulaAudio ? " · 🎧 aula em áudio" : ""))); }))
             : React.createElement("div", { style: { color: "#94a3b8", fontSize: 12 } }, Wcur && Wcur.pre ? "Semana anterior ao seu 1º acesso à Trilha." : "Nenhuma etapa de módulo nesta semana."));
     const dayDate = dateFor(activeIdx);
-    const isTDay = dayDate >= TRILHA_START; // dia da Trilha (registro próprio; blocos sem tm viram nota)
+    const isTDay = dayDate >= POS_CURSO; // dia da Trilha ou de transição (registro próprio; blocos sem tm viram nota)
     const day = isTDay ? trilhaRow(dayDate, config) : schedFor(dayDate)[activeIdx];
     const list = listFor(activeIdx);
-    const dayReviews = isTDay ? (P ? trilhaReviewTone(computeReviews(trail, dayDate, "trail"), { cfg: config, P, trail, hoje: todayISO(), ov: scheduleOv }, dayDate, dayDate > todayISO()) : computeReviews(trail, dayDate, "trail")) : computeReviews(reviews.progress, dayDate, "progress"); // a partir de 20/10 as revisões vêm só do registro da Trilha (decisão 2, 19/10)
+    const dayReviews = isTransDay(dayDate) ? [] : isTDay ? (P ? trilhaReviewTone(computeReviews(trail, dayDate, "trail"), { cfg: config, P, trail, hoje: todayISO(), ov: scheduleOv }, dayDate, dayDate > todayISO()) : computeReviews(trail, dayDate, "trail")) : computeReviews(reviews.progress, dayDate, "progress"); // a partir de 20/10 as revisões vêm só do registro da Trilha (decisão 2, 19/10)
     const doneCount = list.filter(a => isBlockDoneAt(a, dayDate)).length;
     return (React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 16 } },
         hojeT > TRILHA_END && P && React.createElement(TrilhaBalanco, { P, trail, closing: true }), // depois de 01/01: tela de encerramento com o balanço (paciente, 20/10)
         React.createElement("div", { style: { background: "#1e293b", borderRadius: 12, padding: 16 } },
             React.createElement("div", { style: { color: "#94a3b8", fontSize: 11, marginBottom: 10 } }, "ESTRUTURA DOS DIAS D"),
-            React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 6 } }, (dayDate >= TRILHA_START ? [
+            React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 6 } }, (dayDate >= POS_CURSO ? [
                 { d: "🛤️", label: "Trilha", desc: "Fila única (cirurgia primeiro, depois a ordem do curso) · cada módulo refaz a cadeia COMPLETA: aula 1,7h → questões 2h → apostila 1,5h → selagem 40min · registro próprio da Trilha", color: "#7E22CE" },
                 { d: "⏱️", label: "Intervalos", desc: "aula→questões 1–2 dias · questões→apostila 1–2 (ideal 1) · apostila→selagem 2–5 (ideal 3) · nunca duas etapas do módulo no mesmo dia", color: "#C2410C" },
-                { d: "📈", label: "Rampa", desc: "3 · 4 · 4 · 4 · 4 · 4 · 4 · 4 · 5 · 4 · 0 módulos novos por semana (terça) — sobe só se a semana passada fechou e fora do bloco 04h30 (a semana do 1º acesso conta pela cota cheia) · ⏩ Adiantar quando a semana fecha", color: "#B45309" },
+                { d: "📈", label: "Rampa", desc: Object.values(TRILHA_RAMP_DEFAULT).join(" · ") + " módulos novos por semana (a 1ª, de 26/10 a 02/11, tem 8 dias; as outras começam na terça) — sobe só se a semana passada fechou e fora do bloco 04h30 (a semana do 1º acesso conta pela cota cheia) · ⏩ Adiantar quando a semana fecha", color: "#B45309" },
                 { d: "🚑", label: "Plantões", desc: "Longo 06h–19h: só Anki + áudio · curto: etapas antes ou depois · 04h30 (16/11–11/12): estudo à tarde, 📚 a 5h · 🌿 dia leve previsto antes de distribuir (nunca aula nova) · 🎄 24, 25 e 31/12 mais leves", color: "#6B7280" },
             ] : dayDate >= FREE_START ? [
                 { d: "—", label: "Reta final", desc: "Sem ambulatório — dias 100% livres", color: "#6B7280" },
@@ -2422,7 +2541,7 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, trail, P, onSa
                     display: "flex", gap: 8, alignItems: "baseline" } },
                 React.createElement("span", { style: { color: "#0F766E", fontSize: 13, fontWeight: 800 } }, "D7"),
                 React.createElement("span", { style: { color: "#f1f5f9", fontSize: 10, fontWeight: 600 } }, (dayDate >= AMB_START ? "Sexta \u00B7" : "S\u00E1bado \u00B7")),
-                React.createElement("span", { style: { color: "#64748b", fontSize: 9 } }, dayDate >= TRILHA_START ? "Simulado quinzenal + correção, sem etapa de módulo (na janela: 06/11 e 18/12; sexta de plantão e 01/01 sem simulado pela regra — o botão religa)" : "Prova na \u00EDntegra (quinzenal) + corre\u00E7\u00E3o detalhada no caderno de erros")),
+                React.createElement("span", { style: { color: "#64748b", fontSize: 9 } }, dayDate >= POS_CURSO ? "Simulado quinzenal + correção, sem etapa de módulo (na janela: 06/11 e 18/12; sexta de plantão e 01/01 sem simulado pela regra — o botão religa)" : "Prova na \u00EDntegra (quinzenal) + corre\u00E7\u00E3o detalhada no caderno de erros")),
             React.createElement("div", { style: { marginTop: 10, paddingTop: 10, borderTop: "1px solid #0f172a",
                     color: "#64748b", fontSize: 10, lineHeight: 1.5 } },
                 "\u23F1\uFE0F ",
@@ -2495,23 +2614,23 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, trail, P, onSa
         showLight && React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", background: isBreather ? "#2a200a" : "#0f2e1a", border: "1px solid " + (isBreather ? "#b45309" : "#14532d"), borderRadius: 10, padding: "8px 12px" } },
             React.createElement("span", { style: { color: isBreather ? "#fbbf24" : "#86efac", fontSize: 11, fontWeight: 800, whiteSpace: "nowrap" } }, isBreather ? "🌬️ Respiro:" : "🌿 Sem remédio:"),
             React.createElement("select", { value: lightOv == null ? "auto" : String(lightOv), onChange: e => setLightOverride(e.target.value), title: "Dia sem Venvanse desta semana — Auto = menor carga entre os dias livres, sem dia padrão (empate a ≤45min resolvido por: sem aula fixa · não véspera de plantão/segunda · menos elos · longe de plantão; nunca pós-noturno) · validar com a psiquiatra", style: { background: "#0f172a", border: "1px solid " + (isBreather ? "#b45309" : "#14532d"), borderRadius: 8, color: isBreather ? "#fbbf24" : "#86efac", fontSize: 11, fontWeight: 700, padding: "5px 8px", cursor: "pointer" } },
-                React.createElement("option", { value: "auto" }, "Auto · " + (lightAuto.idx != null ? DOW_LBL[dowOf(isoAt(lightAuto.idx))] : "—")),
-                Array.from({ length: WL }, (_, i) => React.createElement("option", { key: i, value: String(i) }, DOW_LBL[dowOf(dateFor(i))]))),
+                React.createElement("option", { value: "auto" }, "Auto · " + (lightAuto.idx != null ? DOW_LBL[dowOf(isoAt(lightAuto.idx))] + (WL > 7 ? " " + fmtBR(isoAt(lightAuto.idx)) : "") : "—")),
+                Array.from({ length: WL }, (_, i) => React.createElement("option", { key: i, value: String(i) }, DOW_LBL[dowOf(dateFor(i))] + (WL > 7 ? " " + fmtBR(dateFor(i)) : "")))),
             lightDay.idx != null
                 ? (isBreather
                     ? React.createElement("span", { style: { color: "#fbbf24", fontSize: 10, fontWeight: 700, lineHeight: 1.4 } }, DOW_LBL[dowOf(isoAt(lightDay.idx))] + " " + fmtBR(isoAt(lightDay.idx)) + " · " + fmtHrs(lightDay.hours) + " de estudo · " + (isTW ? "o dia leve previsto ficou acima do limiar do dia" : "semana sem pausa: nenhum dia ficou abaixo de " + STUDY_WARN_H + "h") + " — dia de respiro COM Venvanse (o mais leve da semana)")
                     : React.createElement("span", { style: { color: "#64748b", fontSize: 10, lineHeight: 1.4 } }, DOW_LBL[dowOf(isoAt(lightDay.idx))] + " " + fmtBR(isoAt(lightDay.idx)) + " · " + fmtHrs(lightDay.hours) + " de estudo" + (lightDay.source === "manual" ? " · escolha manual" : isTW ? " · previsto antes de distribuir as etapas (menor carga entre os dias livres; nunca aula nova)" : " · menor carga entre os dias livres") + " · validar com a psiquiatra"))
                 : React.createElement("span", { style: { color: "#f5c518", fontSize: 10, fontWeight: 800, lineHeight: 1.4 } }, "🌿 Nenhum dia candidato esta semana (todos com plantão, pós-noturno, presencial ou simulado)"),
             lightDay.source === "auto" && lightAuto.tie && lightAuto.tie.length > 1 && React.createElement("span", { style: { color: "#86efac", fontSize: 10, fontWeight: 700, lineHeight: 1.4, width: "100%" } }, "🌿 Vários dias com carga parecida (" + lightAuto.tie.map(i => DOW_LBL[dowOf(isoAt(i))]).join(", ") + ") — escolhi " + DOW_LBL[dowOf(isoAt(lightAuto.idx))] + "; toque para trocar.")),
-        React.createElement("div", { style: { display: "flex", gap: 6, overflowX: "auto", paddingBottom: 4 } }, Array.from({ length: WL }, (_d, i) => {
+        React.createElement("div", { style: { display: "flex", gap: WL > 7 ? 4 : 6, overflowX: "auto", paddingBottom: 4 } }, Array.from({ length: WL }, (_d, i) => { // 8 abas (26/10–02/11): 8×36 + 7×4 = 316px, cabem num celular de 360px
             const dt = dateFor(i);
-            const d = dt >= TRILHA_START ? trilhaRow(dt, config) : schedFor(dt)[i]; // rótulo pela DATA (Sem.41 = 6 abas, Trilha TER→SEG, Sem.52 = 4)
+            const d = dt >= POS_CURSO ? trilhaRow(dt, config) : schedFor(dt)[i]; // rótulo pela DATA (Sem.41 = 6 abas, transição 20–25/10 = 6, 1ª da Trilha 26/10–02/11 = 8, TER→SEG = 7, Sem.52 = 4)
             const isToday = dt === todayISO();
             const active = activeIdx === i;
-            return (React.createElement("button", { key: i, onClick: () => { setActiveIdx(i); setAdding(false); }, style: { flex: 1, minWidth: 56, background: active ? "#f5c518" : "#1e293b",
+            return (React.createElement("button", { key: i, onClick: () => { setActiveIdx(i); setAdding(false); }, style: { flex: 1, minWidth: WL > 7 ? 36 : 56, background: active ? "#f5c518" : "#1e293b",
                     border: "1px solid", borderColor: active ? "#f5c518" : (isToday ? "#f5c518" : "#334155"),
                     borderRadius: 10, color: active ? "#0f172a" : "#94a3b8",
-                    padding: "8px 4px", cursor: "pointer", fontSize: 11, fontWeight: 700, transition: "all .2s" } },
+                    padding: WL > 7 ? "8px 2px" : "8px 4px", cursor: "pointer", fontSize: 11, fontWeight: 700, transition: "all .2s" } },
                 React.createElement("div", { style: { fontSize: 16 } }, d.emoji),
                 React.createElement("div", null, DOW_TAB[dowOf(dt)]),
                 React.createElement("div", { style: { fontSize: 8, color: active ? "#7c5a00" : "#64748b", marginTop: 1 } }, fmtBR(dt)),
@@ -2539,7 +2658,7 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, trail, P, onSa
                         : React.createElement("div", { style: { color: "#86efac", fontSize: 11, marginTop: 4, fontWeight: 700, lineHeight: 1.4 } }, "🌿 Hoje sem Venvanse — faça só o leve, mova o pesado (pausa variável: validar com a psiquiatra)"))),
                 React.createElement("div", { style: { textAlign: "right" } },
                     React.createElement(Badge, { label: `Sem.${week}`, color: "#92400e" }),
-                    isTW && React.createElement("div", { style: { marginTop: 4 } }, React.createElement(Badge, { label: "Trilha " + (week - LCW) + "/" + (lastWeek(startISO) - LCW), color: "#4c1d95" })),
+                    isTW && React.createElement("div", { style: { marginTop: 4 } }, React.createElement(Badge, { label: isTransW ? "Transição" : "Trilha " + (week - trilhaW1(startISO) + 1) + "/" + (lastWeek(startISO) - trilhaW1(startISO) + 1), color: "#4c1d95" })),
                     isTW && Wcur && Wcur.preview && !Wcur.pre && React.createElement("div", { style: { color: "#a78bfa", fontSize: 9, marginTop: 3 } }, "prévia — congela quando a semana começar"),
                     React.createElement("div", { style: { color: "#64748b", fontSize: 10, marginTop: 4 } },
                         doneCount,
@@ -2575,7 +2694,7 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, trail, P, onSa
                             React.createElement("button", { onClick: addMod, style: { background: "#166534", border: "1px solid #22c55e", borderRadius: 6, color: "#22c55e", fontSize: 11, fontWeight: 700, padding: "4px 10px", cursor: "pointer" } }, "+ Adicionar bloco")));
                 })()),
             React.createElement(EventNote, { value: events[dayDate], onCommit: (val) => onSaveEvents({ ...events, [dayDate]: val }) }),
-            (dowOf(dayDate) === 5 && dayDate >= AMB_START && dayDate <= TRILHA_END) && (() => {
+            (dowOf(dayDate) === 5 && dayDate >= AMB_START && dayDate <= TRILHA_END && !isTransDay(dayDate)) && (() => { // 20–25/10 (transição): sem simulado e sem o botão
                 const shiftFri = !!shiftFor(dayDate); // P8 (⚙️): sexta de plantão = sem simulado pela regra, mas o toque religa — o override manual sempre vence
                 const lastDay = dayDate === TRILHA_END; // 01/01: último dia de acesso, sem simulado pela regra (paciente, 20/10)
                 const par = (shiftFri || lastDay) ? false : simParity(dayDate);
@@ -2612,8 +2731,8 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, trail, P, onSa
                     !moveAsk.view && (moveAsk.issues.length > 0 || (moveAsk.missing || []).length > 0) && React.createElement("button", { onClick: () => setMoveAsk({ ...moveAsk, view: true }), style: { background: "#1e3a8a", border: "1px solid #3b82f6", borderRadius: 8, color: "#bfdbfe", fontSize: 11, fontWeight: 700, padding: "5px 10px", cursor: "pointer" } }, "Ver como reorganizar o fio"),
                     React.createElement("button", { onClick: () => setMoveAsk(null), style: { background: "#0f172a", border: "1px solid #334155", borderRadius: 8, color: "#94a3b8", fontSize: 11, fontWeight: 700, padding: "5px 10px", cursor: "pointer" } }, "Cancelar"))),
             React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 8 } }, list.map((act, i) => {
-                const isT = act.tm != null; // bloco da Trilha: identidade pelo módulo (tm) e etapa (ts); registro próprio (trail_v1)
-                const noteT = !isT && dayDate >= TRILHA_START; // bloco antigo num dia da Trilha (lista editada antes): vira nota, sem tarefa nem cartão
+                const isT = act.tm != null && !isTransDay(dayDate); // bloco da Trilha: identidade pelo módulo (tm) e etapa (ts); registro próprio (trail_v1) — num dia de transição, um bloco de etapa que sobrou vira nota
+                const noteT = !isT && dayDate >= POS_CURSO; // bloco antigo num dia da Trilha (ou de transição) (lista editada antes): vira nota, sem tarefa nem cartão
                 const mod = isT ? modById(act.tm) : noteT ? null : resolveBlock(act.text);
                 const isDesat = !isT && !noteT && blockRef(act.text) === "DESAT";
                 const act2 = mod && isDesat ? catchupAction(reviews.progress, mod.id) : null;
@@ -2720,11 +2839,11 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, trail, P, onSa
                 React.createElement("div", { style: { color: "#94a3b8", fontSize: 11, marginBottom: 8 } },
                     "REVIS\u00D5ES ESPA\u00C7ADAS \u2014 ",
                     fmtBR(dayDate)),
-                dayReviews.length > 0 ? React.createElement(ReviewRows, { alerts: dayReviews, onDone: onReviewDone }) : (React.createElement("div", { style: { color: "#475569", fontSize: 12, lineHeight: 1.5 } }, "Sem revis\u00F5es D+7/D+30 vencendo aqui. Ap\u00F3s aula/estudo, mantenha o D+1: 5 quest\u00F5es rel\u00E2mpago + reler palavras-chave antes de dormir.")))),
+                dayReviews.length > 0 ? React.createElement(ReviewRows, { alerts: dayReviews, onDone: onReviewDone }) : (React.createElement("div", { style: { color: "#475569", fontSize: 12, lineHeight: 1.5 } }, isTransDay(dayDate) ? "Dia de transição: sem revisão e sem etapa — a trilha começa em " + fmtBR(TRILHA_START) + "." : "Sem revis\u00F5es D+7/D+30 vencendo aqui. Ap\u00F3s aula/estudo, mantenha o D+1: 5 quest\u00F5es rel\u00E2mpago + reler palavras-chave antes de dormir.")))),
         React.createElement("div", { style: { background: "#1e293b", borderRadius: 12, padding: 16 } },
-            React.createElement("div", { style: { color: "#94a3b8", fontSize: 11, marginBottom: 12 } }, "ACADEMIA — 1 treino em 6 dos 7 dias · sem treino no dia pós-noturno"),
+            React.createElement("div", { style: { color: "#94a3b8", fontSize: 11, marginBottom: 12 } }, (WL > 7 || isTransW) ? "ACADEMIA — sem treino no sábado (descanso) nem no dia pós-noturno" : "ACADEMIA — 1 treino em 6 dos 7 dias · sem treino no dia pós-noturno"),
             React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(" + (dayDate >= AMB_START ? WL : 7) + ",1fr)", gap: 4 } }, (dayDate >= AMB_START
-                ? Array.from({ length: WL }, (_, i) => ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sab"][dowOf(dateFor(i))]).map((nm, i) => {
+                ? Array.from({ length: WL }, (_, i) => ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sab"][dowOf(dateFor(i))] + (WL > 7 ? " " + fmtBR(dateFor(i)).slice(0, 2) : "")).map((nm, i) => { // 1ª semana da Trilha: duas segundas — o dia leva a data
                     // Reflete a lista REAL do dia (template da fase + plantões datados + suas edições): sem horário fixo;
                     // SÁB = dia útil sem treino (descanso do treino) em todas as fases; pós-noturno = sem treino; plantão diurno = opcional
                     const dt = dateFor(i);
@@ -2770,7 +2889,7 @@ function ModuleTracker({ progress, onUpdate, effWeek, reviews, simResults, trail
     // Trilha (20/10): o card mostra e grava o registro da Trilha (carimbo = hoje); o histórico do curso aparece guardado ao lado, sem mudar (⚙️)
     const rec = trailMode ? (trail || {}) : progress;
     const prog = (id) => (rec === null || rec === void 0 ? void 0 : rec[id]) || {};
-    const hojeM = todayISO(); const curWM = trailMode && P && hojeM <= TRILHA_END ? weekOfISO(hojeM) : null;
+    const hojeM = todayISO(); const curWM = trailMode && P && hojeM >= TRILHA_START && hojeM <= TRILHA_END ? weekOfISO(hojeM) : null; // na transição não há semana da Trilha
     const curTueM = curWM ? weekStartISO(curWM) : null, curEndM = curWM ? weekEndISO(curWM) : null;
     const inTWeek = (id) => { const p = P && P.plan[id]; return !!p && !!curTueM && (p.wk === curTueM || STAGES_T.some(x => p[x] && p[x] >= curTueM && p[x] <= curEndM)); };
     const reachSet = new Set(P ? P.reach : []);
@@ -3180,7 +3299,7 @@ function TrilhaBalanco({ P, trail, closing }) {
     const pc = (v) => v == null || v === "" ? "—" : v + "%";
     const name = (id) => { const m = modById(id); return m ? m.code + " · " + m.title : String(id); };
     return React.createElement("div", { "data-t": "trilha-balanco", style: { background: "#1a1430", border: "1px solid #7c3aed", borderRadius: 12, padding: 14, display: "flex", flexDirection: "column", gap: 8 } },
-        React.createElement("div", { style: { color: "#c4b5fd", fontSize: 13, fontWeight: 800 } }, closing ? "🏁 Encerramento da Trilha (20/10/2026 → 01/01/2027)" : "🏁 Balanço da Trilha"),
+        React.createElement("div", { style: { color: "#c4b5fd", fontSize: 13, fontWeight: 800 } }, closing ? "🏁 Encerramento da Trilha (" + fmtBR(TRILHA_START) + "/2026 → 01/01/2027)" : "🏁 Balanço da Trilha"),
         React.createElement("div", { style: { color: "#ddd6fe", fontSize: 11, lineHeight: 1.5 } }, "Módulos fechados (as 4 etapas): " + closed.length + " · abertos sem selar: " + openNow.length + " · fora do alcance: " + out.length + (closing ? " — o acesso à plataforma terminou em 01/01; o cursinho novo começa em 04/01." : "")),
         closed.length > 0 && React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 3 } }, closed.map(id => { const p = t[id] || {}; return React.createElement("div", { key: id, "data-id": id, style: { color: "#e9d5ff", fontSize: 11, lineHeight: 1.4 } }, "✓ " + name(id) + " — D2 " + pc(p.accD2) + " · selagem " + pc(p.accSelagem) + (p.aulaAudio ? " · 🎧 aula em áudio" : "")); })),
         openNow.length > 0 && React.createElement("div", { style: { color: "#fbbf24", fontSize: 11, lineHeight: 1.5 } }, "Abertos sem selar: " + openNow.map(id => { const p = t[id] || {}; return ((modById(id) || {}).code || id) + " (falta " + STAGES_T.filter(x => !p[TS_FIELD[x]]).map(x => TS_WORD[x]).join(", ") + ")"; }).join(" · ")),
@@ -3222,15 +3341,16 @@ function TrilhaTab({ config, trail, progress, P, onSaveConfig, onUpdateTrail, on
     const editMod = (m, patch) => { if (m.custom) saveCfg({ customModules: (config.customModules || []).map(x => Number(x.id) === m.id ? { ...x, ...patch } : x) }); else saveCfg({ moduleEdits: { ...(config.moduleEdits || {}), [m.id]: { ...((config.moduleEdits || {})[m.id] || {}), ...patch } } }); };
     const addMod = () => { const code = newMod.code.trim().toUpperCase(), title = newMod.title.trim(); if (!code || !title) return; const cm = config.customModules || []; const id = Math.max(999, ...cm.map(x => Number(x.id) || 0), ...MODULES.map(x => x.id)) + 1; const wk = Number(newMod.week) || null; saveCfg({ customModules: cm.concat([{ id, week: wk, code, title }]) }); setNewMod({ code: "", title: "", week: "" }); };
     const removeMod = (m) => { if (!m.custom) return; const used = (t[m.id] && Object.keys(t[m.id]).length) || ((progress || {})[m.id] && Object.keys(progress[m.id]).length) || (config.trilhaPlan || {})[m.id]; if (used) { window.alert("Este bloco já tem registro ou está planejado na Trilha — nada é apagado. Se precisar, renomeie-o."); return; } if (!window.confirm("Remover o bloco " + m.code + " (adicionado por você, sem registros)?")) return; saveCfg({ customModules: (config.customModules || []).filter(x => Number(x.id) !== m.id), trilhaPins: pins.filter(x => x !== m.id) }); };
-    const tueList = []; for (let w = P.L + 1; w <= P.LW; w++) tueList.push(weekStartISO(w));
+    const tueList = []; for (let w = P.W1; w <= P.LW; w++) tueList.push(weekStartISO(w));
     const setRamp = (tue, v) => saveCfg({ trilhaRamp: { ...(config.trilhaRamp || {}), [tue]: Math.max(0, Math.min(9, v)) } });
     // pomodoros: aulas desta semana (só sugestão — nada muda no cronograma)
     const pomoIds = weekIds.filter(id => !(t[id] || {}).aula);
     const fmtMin = (x) => Math.floor(x / 60) + "h" + String(x % 60).padStart(2, "0");
     const showExport = hoje >= "2026-12-15" && hoje <= TRILHA_END;
     return React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 16 } },
+        isTransDay(hoje) && React.createElement("div", { "data-t": "trilha-transition", style: { background: "#0b1f33", border: "1px solid #1d4ed8", borderRadius: 10, padding: "8px 12px", color: "#93c5fd", fontSize: 11, fontWeight: 700, lineHeight: 1.45 } }, "🗓️ Dias de transição (" + fmtBR(POS_CURSO) + "–" + fmtBR(addDaysISO(TRILHA_START, -1)) + "): a trilha começa na " + DOW_FULL[dowOf(TRILHA_START)].toLowerCase() + " " + fmtBR(TRILHA_START) + " — a fila, a rampa e o alcance abaixo são a prévia."),
         React.createElement("div", { "data-t": "trilha-counts", style: card },
-            React.createElement("div", { style: { color: "#c4b5fd", fontSize: 13, fontWeight: 800, marginBottom: 8 } }, "🛤️ TRILHA AUTÔNOMA — 20/10/2026 → 01/01/2027"),
+            React.createElement("div", { style: { color: "#c4b5fd", fontSize: 13, fontWeight: 800, marginBottom: 8 } }, "🛤️ TRILHA AUTÔNOMA — " + fmtBR(TRILHA_START) + "/2026 → 01/01/2027"),
             React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 10, marginBottom: 10 } },
                 [["Fechados na Trilha", P.closed.length, "#22c55e"], ["Dentro do alcance até 01/01", N, "#f5c518"], ["Fora", Q.length - N, "#94a3b8"]].map(([l, v, c]) => React.createElement("div", { key: l, style: { background: "#0f172a", borderRadius: 10, padding: "12px 8px", textAlign: "center" } }, React.createElement("div", { style: { color: c, fontSize: 22, fontWeight: 700 } }, v), React.createElement("div", { style: { color: "#64748b", fontSize: 10 } }, l)))),
             React.createElement("div", { style: { color: "#f1f5f9", fontSize: 12, fontWeight: 700 } }, "No ritmo atual cabem " + N + " módulos até 01/01/2027."),
@@ -3246,7 +3366,7 @@ function TrilhaTab({ config, trail, progress, P, onSaveConfig, onUpdateTrail, on
             React.createElement("div", { style: { color: "#94a3b8", fontSize: 11, marginBottom: 8 } }, "RITMO DA SEMANA E RAMPA"),
             W && !W.pre && React.createElement("div", { style: { color: "#f1f5f9", fontSize: 12, marginBottom: 8, lineHeight: 1.5 } }, "Esta semana (" + fmtBR(curTue) + "–" + fmtBR(curEnd) + "): " + W.q + (W.q === 1 ? " módulo novo" : " módulos novos") + (W.prop ? " — semana do seu 1º acesso: cota proporcional " + trilhaPropTxt(W.prop) + " (a rampa previa " + W.prop.full + ")" : "") + (W.afterProp ? " · " + trilhaAfterPropTxt(W.afterProp) : "") + (W.held ? " — semana de manutenção do ritmo (" + (W.why === "madrugada" ? "travado: bloco 04h30" : "segura: semana passada aberta") + "; a rampa previa " + W.base + ")" : "") + ((W.adv || []).length ? " · +" + W.adv.length + " adiantado(s)" : "") + ((W.rise || []).length ? " · +" + W.rise.length + " pela subida" : "")),
             React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 4 } }, tueList.map((tue, k) => { const Wk = P.weeks[tue] || {}; const edit = !Wk.frozen && !Wk.pre; return React.createElement("div", { key: tue, "data-tue": tue, style: { display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", background: tue === curTue ? "#0b1f33" : "#0f172a", borderRadius: 8, padding: "5px 8px" } },
-                React.createElement("span", { style: { color: "#cbd5e1", fontSize: 11, minWidth: 110 } }, "T" + (k + 1) + " · " + fmtBR(tue) + "–" + fmtBR(weekEndISO(P.L + 1 + k))),
+                React.createElement("span", { style: { color: "#cbd5e1", fontSize: 11, minWidth: 110 } }, "T" + (k + 1) + " · " + fmtBR(tue) + "–" + fmtBR(weekEndISO(P.W1 + k))),
                 edit && React.createElement("button", { onClick: () => setRamp(tue, rampBase(config, tue) - 1), style: btnS(false) }, "−"),
                 React.createElement("span", { style: { color: "#f5c518", fontSize: 12, fontWeight: 800, minWidth: 16, textAlign: "center" } }, rampBase(config, tue)),
                 edit && React.createElement("button", { onClick: () => setRamp(tue, rampBase(config, tue) + 1), style: btnS(false) }, "+"),
@@ -3475,13 +3595,23 @@ function App() {
             setTrail(tr || {});
             setSleepData(s || {});
             setDopeData(d || DOPAMINE_DEFAULTS);
-            setConfig(c || { startDate: DEFAULT_START, manualWeek: null });
+            let cfg0 = c || null, cfgDirty = false, schDirty = false; const hojeL = todayISO();
+            const cM = trilhaMigrateStart(cfg0, hojeL); if (cM) { cfg0 = cM; cfgDirty = true; } // início em 26/10: a semana congelada de 20/10 sai do plano (guardada em trilhaDescartes)
             let sov = sc || {};
             if (!seeded) {
                 sov = { ...sov, ...WEEKEND_SEED }; // consolidação da semana da prova (uma vez)
                 await saveData("schedule_v1", sov);
                 await saveData(WEEKEND_SEED_FLAG, true);
             }
+            if (hojeL >= POS_CURSO) {
+                const base0 = () => cfg0 || { startDate: DEFAULT_START, manualWeek: null };
+                const sT = trilhaSanitizeTransition(sov, cfg0, hojeL); // 20–25/10 gravados → dia de transição (o original vai para o arquivo)
+                if (sT) { if (sT.sov) { sov = sT.sov; schDirty = true; } if (Object.keys(sT.legacy).length) { cfg0 = { ...base0(), trilhaLegacyOv: { ...((cfg0 && cfg0.trilhaLegacyOv) || {}), ...sT.legacy } }; cfgDirty = true; } }
+                if (!(cfg0 && cfg0.trilhaInicio === TRILHA_START)) { setModuleCfg(cfg0); setStartCfg(cfg0 && cfg0.startDate); const P0 = buildTrilhaPlan(cfg0 || {}, tr || {}, hojeL); const sM = trilhaMigrateSchedule(sov, hojeL, P0); if (sM !== false) { if (sM) { sov = sM; schDirty = true; } cfg0 = { ...base0(), trilhaInicio: TRILHA_START }; cfgDirty = true; } } // uma vez: dias ≥ 26/10 com etapa do plano antigo → arquivo
+            }
+            if (schDirty) await saveData("schedule_v1", sov);
+            if (cfgDirty) await saveData("config_v1", cfg0);
+            setConfig(cfg0 || { startDate: DEFAULT_START, manualWeek: null });
             setScheduleOv(sov);
             setEvents(ev || {});
             setLoaded(true);
@@ -3504,7 +3634,7 @@ function App() {
     }, [config, hoje]);
     const isManual = (config === null || config === void 0 ? void 0 : config.manualWeek) != null;
     const tOn = trailOn(hoje);
-    const reviews = useMemo(() => tOn ? computeReviews(trail, hoje, "trail") : computeReviews(progress, hoje, "progress"), [progress, trail, config, hoje]); // a partir de 20/10 as revisões vêm só do registro da Trilha (decisão 2, 19/10)
+    const reviews = useMemo(() => isTransDay(hoje) ? [] : tOn ? computeReviews(trail, hoje, "trail") : computeReviews(progress, hoje, "progress"), [progress, trail, config, hoje]); // a partir de 20/10 as revisões vêm só do registro da Trilha (decisão 2, 19/10); na transição (20–25/10) não há revisão — a vencida aparece a partir de 26/10
     const P = useMemo(() => (loaded && config && trail) ? buildTrilhaPlan(config, trail, hoje) : null, [loaded, config, trail, hoje]); // motor da Trilha (só calcula)
     const reviewsT = useMemo(() => tOn && P ? trilhaReviewTone(reviews, { cfg: config, P, trail, hoje, ov: scheduleOv }, hoje) : reviews, [reviews, P, config, trail, hoje, scheduleOv]); // decisão 73: revisão que deslizou (dia cheio, plantão longo, simulado) não aparece "em atraso"
     setPaceCfg((todayISO() >= CATCHUP_START && todayISO() < FREE_START) ? 2 : (config && config.catchupPace)); // ritmo primeiro: a projeção depende dele · P7: CATCHUP = 2
@@ -3658,7 +3788,7 @@ function App() {
                 React.createElement("div", { style: { color: "#94a3b8", fontSize: 11, marginBottom: 6 } }, "In\u00EDcio da Semana 1 (quarta-feira)"),
                 React.createElement("input", { type: "date", value: config.startDate, onChange: e => saveConfig({ ...config, startDate: e.target.value, manualWeek: null }), style: { background: "#1e293b", border: "1px solid #334155", borderRadius: 8, color: "#f1f5f9",
                         padding: "8px 12px", fontSize: 13, width: "100%", boxSizing: "border-box" } }),
-                React.createElement("div", { style: { color: "#64748b", fontSize: 10, marginTop: 8, lineHeight: 1.5 } }, "Ajuste se a data real do seu curso for outra \u2014 todas as semanas e revis\u00F5es recalculam sozinhas. A partir de 20/10 as semanas da Trilha vão de terça a segunda e não dependem desta data."),
+                React.createElement("div", { style: { color: "#64748b", fontSize: 10, marginTop: 8, lineHeight: 1.5 } }, "Ajuste se a data real do seu curso for outra \u2014 todas as semanas e revis\u00F5es recalculam sozinhas. A partir de 20/10 as semanas não dependem desta data: 20–25/10 é a transição, a 1ª semana da Trilha vai de 26/10 a 02/11 e as outras de terça a segunda."),
                 React.createElement("div", { style: { marginTop: 14, paddingTop: 14, borderTop: "1px solid #1e293b" } },
                     React.createElement("div", { style: { color: "#94a3b8", fontSize: 11, marginBottom: 8 } }, "BACKUP DOS DADOS"),
                     React.createElement("div", { style: { display: "flex", gap: 8 } },

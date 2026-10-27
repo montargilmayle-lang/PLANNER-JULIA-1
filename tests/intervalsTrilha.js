@@ -1,8 +1,8 @@
 // TRILHA — tabela de intervalos de todos os módulos planejados (prévia de 19/10, sem registros) + cargas por dia + invariantes.
-// Lida do cronograma renderizado (etiquetas data-tm/data-ts e a data da aba), Sem.42 a Sem.52.
+// Lida do cronograma renderizado (etiquetas data-tm/data-ts e a data da aba), Sem.42 (transição 20–25/10, sem etapa) a Sem.52 — a Trilha começa em 26/10 (paciente, 26/10).
 const H = require('./harness.js');
 const { openPlanner, readDay, check, listDayTabs, clickDate, navWeek } = H;
-const RAMP = [3, 4, 4, 4, 4, 4, 4, 4, 5, 4, 0];
+const RAMP = [3, 4, 4, 4, 4, 4, 4, 5, 4, 0]; // 10 semanas: T1 = 26/10–02/11 (8 dias), depois TER→SEG
 const STG = ['aula', 'quest', 'apost', 'seal'];
 const GAP = { quest: [1, 2], apost: [1, 2], seal: [2, 5] };
 const BLOCKED = ['2026-10-20', '2026-10-27', '2026-11-03', '2026-11-06', '2026-11-10', '2026-11-12', '2026-12-18']; // plantões longos e sextas de simulado
@@ -35,8 +35,11 @@ const VENV_TIME = /Venvanse[^.\n]{0,40}\d{1,2}(h|:\d\d)|\d{1,2}(h|:\d\d)[^.\n]{0
         STG.forEach((ts, i) => { if (!m[ts]) bad.push(id + ' sem ' + ts); if (m[ts + '_dup']) bad.push(id + ' ' + ts + ' duplicada'); if (i > 0 && m[ts] && m[STG[i - 1]]) { const x = dd(m[STG[i - 1]], m[ts]); if (x < GAP[ts][0] || x > GAP[ts][1]) bad.push(id + ' ' + STG[i - 1] + '→' + ts + ' ' + x + 'd'); } });
     });
     console.log(`   questões→apostila no ideal (1 dia): ${qp1}/${order.length} · apostila→selagem no ideal (3 dias): ${ps3}/${order.length} · aula→questões em 1 dia: ${aq1}/${order.length}`);
-    check('40 módulos planejados até 01/01 (prévia de 19/10)', order.length === 40, order.length);
-    check('aberturas por semana = rampa [' + RAMP.join(',') + ']', JSON.stringify(opens) === JSON.stringify(RAMP), JSON.stringify(opens));
+    check('36 módulos planejados até 01/01 (prévia de 19/10)', order.length === 36, order.length);
+    check('transição 20–25/10 sem abertura e aberturas por semana da Trilha = rampa [' + RAMP.join(',') + ']', opens[0] === 0 && JSON.stringify(opens.slice(1)) === JSON.stringify(RAMP), JSON.stringify(opens));
+    const trans = Object.entries(map).flatMap(([id, m]) => STG.filter(ts => m[ts] && m[ts] < '2026-10-26').map(ts => id + ' ' + ts + ' ' + br(m[ts])));
+    const transB = Object.entries(days).filter(([di]) => di < '2026-10-26').flatMap(([di, d]) => d.blocks.filter(H.transStage).map(b => br(di) + ' ' + b.tag + ' ' + (b.text || '').slice(0, 40)));
+    check('nenhuma etapa em 20–25/10 (transição): nem no plano lido, nem bloco de etapa/revisão/PLAN/simulado na tela (pela etiqueta e pelo texto — o app não põe data-tm nesses dias)', !trans.length && !transB.length && Object.keys(days).filter(di => di < '2026-10-26').length === 6, trans.concat(transB).join(', '));
     check('cadeia completa e dentro das faixas em todos (aula→questões 1–2 · questões→apostila 1–2 · apostila→selagem 2–5), nunca duas etapas do módulo no mesmo dia', !bad.length, bad.join(', '));
     const onBlocked = Object.entries(map).flatMap(([id, m]) => STG.filter(ts => BLOCKED.includes(m[ts])).map(ts => id + ' ' + ts + ' ' + br(m[ts])));
     check('nada em plantão longo (20/10, 27/10, 03/11, 10/11, 12/11) nem em sexta de simulado (06/11, 18/12)', !onBlocked.length, onBlocked.join(', '));
