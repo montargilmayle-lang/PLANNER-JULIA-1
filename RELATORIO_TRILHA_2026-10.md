@@ -214,6 +214,14 @@ Ideais: questões→apostila em 1 dia 27/36 · apostila→selagem em 3 dias 31/3
 
 ### A.9 · Para você decidir — o padrão está aplicado; a alternativa, não
 
+> **Decidido em 27/10 (aval do PR #17):**
+> 1. **T1 = 3** — o padrão fica: a rampa começa abaixo da capacidade de propósito, para instalar o hábito antes do volume; o caminho de volta é o 🔓 (etapa marcada até 09/11 devolve o 36) e o ⏩ (com a semana fechada, chega aos 37).
+> 2. **SÁB 24/10 sem academia** — a regra do sábado, que já era o comportamento do app (nenhuma mudança no código).
+> 3. **Interpretações da migração (itens 3–5 abaixo)** — confirmadas como implementadas.
+> 4. **Limite conhecido (§A.7)** — aceito e registrado.
+>
+> **Data do merge (27/10) — para você saber antes de abrir:** o 1º acesso à versão nova será em 27/10 ou depois (item 6). Abrindo **hoje, 27/10** (plantão longo): T1 = 3 (round 2,625), a aula de CIR1 · Trauma I vai para a QUA 28/10, alcance 36 — e a **QUI 05/11 fica em 14,5h**, no limite (o mesmo custo que pesou contra a T1 = 4; nenhum dia passa do teto). Abrindo **amanhã, 28/10**: T1 = 2 (proporcional), alcance 35, 05/11 em 13,0h. Abrir hoje ou amanhã fica com você; aberto hoje, a carga de 05/11 pode ser aliviada movendo uma etapa (o app avisa o espaçamento).
+
 1. **Cota da T1 (8 dias).** Padrão: **3**, a forma "começar leve" aprovada. Alternativa: **4**. Medido no motor:
 
    | | T1 = 3 (padrão) | T1 = 4 |
