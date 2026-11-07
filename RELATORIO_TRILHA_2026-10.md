@@ -187,7 +187,28 @@ Recusados pelos verificadores (comportamento pedido, sem perda):
 
 ### B.8 · Bateria e `cmp`
 
-(BATERIA)
+| Suíte | Checks |
+|---|---|
+| audit | 396 |
+| trilha (com TR17, TR17b–i: restauração) | 321 |
+| historico | 148 |
+| coverage41 | 80 |
+| coverageTrilha | 8 |
+| intervalsTrilha | 11 |
+| intervals16 | 7 |
+| loads16 | 12 |
+| simTrilha | 6 |
+
+**989 checks verdes.** `cmp planner_residencia_2026_offline.html index.html`: idênticos.
+
+Os testes novos da restauração (TR17, TR17b–i) mexem pela interface:
+- mover etapas e blocos, marcar no bloco e no card;
+- 📌, ↑, rampa, dia sem remédio, ⏩ e 🔓;
+- restaurar duas vezes, Desfazer, Refazer;
+- o plantão longo de 10/11, a semana final de 30/12 e a véspera de 28/12;
+- o arquivo ilegível e a gravação que não cabe.
+
+Cada um confere o plano, o registro, o arquivo e o que aparece na tela.
 
 ## A · Início em 26/10 (pedido de 26/10/2026) — decisão 74
 
