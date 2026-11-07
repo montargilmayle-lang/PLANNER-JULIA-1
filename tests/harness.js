@@ -6,7 +6,7 @@ const FILE = process.env.PLANNER_FILE || path.resolve('/home/user/PLANNER-JULIA-
 
 // seeds: { chave: valor } (JSON.stringify) · opts.raw = { chave: string } (cópia literal do localStorage — H.reopen)
 async function openPlanner(browser, dateISO, seeds = {}, opts = {}) {
-    const ctx = await browser.newContext({ viewport: { width: 420, height: 900 }, locale: 'pt-BR', timezoneId: 'America/Bahia', acceptDownloads: true });
+    const ctx = await browser.newContext({ viewport: { width: 420, height: 900 }, locale: 'pt-BR', timezoneId: 'America/Bahia', acceptDownloads: true, deviceScaleFactor: Number(process.env.PW_DSF) || 1 }); // PW_DSF=2 só para capturas de tela que uma pessoa vai ver
     const page = await ctx.newPage();
     page.on('pageerror', e => { console.log('  [pageerror]', e.message); results.push({ id: 'pageerror (' + dateISO + '): ' + e.message, ok: false, evidence: '' }); }); // erro de página = ❌ (a tela de erro não pode passar em verde)
     page.on('console', m => { if (m.type() === 'error' && !/favicon|net::ERR/.test(m.text())) { console.log('  [console.error]', m.text().slice(0, 300)); results.push({ id: 'console.error (' + dateISO + '): ' + m.text().slice(0, 160), ok: false, evidence: '' }); } });
