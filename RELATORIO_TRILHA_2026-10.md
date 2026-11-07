@@ -295,19 +295,33 @@ A conta usa a data efetiva: o carimbo, se marcada; a data do plano, se não. No 
 | Semana final e véspera | `trilhaFinalKeep` em `restorePlan` e `trilhaFinalPlan` | TR17e, TR17i |
 | Refazer | `trilhaRestoreRedo`, `restorePlan("redo")` | TR17, TR17c, TR17d, TR17h, TR17z 7b |
 | Texto de uso da equipe e backup novo no app | `restoreEl`, cartão "restore-done" | TR17 (cartão depois de aplicar) |
+| Aval: módulo com etapa marcada fora de ordem nunca fica sem proposta nem aviso; duas saídas | `trilhaProposeRecolocar` (`gap`, `reopen`), aviso `data-t="trilha-gap"` no ⏳ | TR9c (as duas saídas) |
+| Aval: código e título em toda linha da proposta | `modLbl` no texto do ⏳ e no topo quando o código se repete | TR9c, TR1, TR9 |
 
 **Limitações conhecidas.**
 1. **Os dados reais dela estão só no aparelho dela.** O diagnóstico com os números dela aparece na prévia, que ela pode fotografar antes de tocar em "Aplicar".
 2. **A restauração não muda o alcance por si.** As semanas 1 e 2 não fecharam, por isso o alcance está em 30, e era 36 no 1º acesso. Fechar a semana libera o 🔓. No bloco 04h30 (16/11 a 11/12), o ritmo não sobe.
-3. **"Ver como recolocar":**
-   - se ela marcar uma etapa posterior sem a anterior (questões sem a aula), ele não acha dia para a anterior e diz "não cabe" para aquele módulo. Marcar na ordem resolve;
-   - o intervalo com uma etapa feita há muitos dias fica fora da faixa, avisado ("fora de");
-   - a proposta nomeia o módulo só pelo código, então aparecem dois "CIR1".
+3. **"Ver como recolocar":** o intervalo com uma etapa feita há muitos dias fica fora da faixa, avisado ("fora de"). *(Os outros dois pontos desta linha — marca fora de ordem e nome só pelo código — foram corrigidos no aval, §B.12.)*
 4. **Prévias de Desfazer/Refazer em sequências longas** (restaurar, desfazer, refazer, misturadas com a recolocação diária da semana final): os textos são o melhor esforço. Os dados estão sempre certos e no arquivo.
 5. **"Manter os blocos" vira dia editado.** O dia regenerado com os blocos dela passa a ser um dia editado: a lista fica fixa, como qualquer dia editado.
 6. **Marca feita em 26/10 com 1º acesso em 26/10.** Quando a marca é do mesmo dia do 1º acesso, não dá para saber se foi antes ou depois da atualização. Conta como depois.
 7. **Restaurar a partir de 22/12.** As etapas dos dias anteriores ficam no bloco do dia e não entram na recolocação automática da semana final. O caminho para elas é o ⏳.
 8. **A restauração é inteira.** Não dá para escolher partes, com exceção dos blocos dela.
+
+### B.12 · Correções do aval (07/11)
+
+1. **Módulo com etapa marcada fora de ordem no "Ver como recolocar"** — por exemplo, questões marcadas e a aula não. O módulo nunca fica sem proposta nem sem aviso. Aparece:
+
+   `⚠️ CIR2 — Urologia tem questões marcadas, mas a aula não. Marque a aula se você a viu, ou o app propõe a aula primeiro.`
+
+   Há duas saídas, e o app não decide:
+   - **"Marquei a aula (carimbo SEX 30/10)"**: marca a aula com o dia planejado, desde que fique antes das questões; se não ficar, usa o dia anterior a elas. O módulo entra na proposta pelo que falta.
+   - **"Propor a aula primeiro"**: reabre a cadeia a partir da aula, de hoje em diante. As questões marcadas ficam como estão e contam só como posição na cadeia. A proposta diz isso.
+
+   Os outros módulos podem ser aplicados enquanto ela não escolhe; o aviso continua lá. Vale para qualquer etapa sem marca antes de uma marcada.
+2. **Código e título em toda linha da proposta.** Por exemplo, "CIR1 · Trauma I — Avaliação Inicial e Trauma de Tórax · aula …". No topo do ⏳, quando dois módulos pendentes têm o mesmo código, aparece o título, uma vez para as etapas seguidas do módulo.
+
+Testes: TR9c (os dois caminhos), com TR1 e TR9 ajustados ao novo texto.
 
 ## A · Início em 26/10 (pedido de 26/10/2026) — decisão 74
 

@@ -1427,12 +1427,21 @@ function trilhaProposeRise(P, cfg, trail, hoje, n) { // 🔓 a semana passada fe
     trilhaNextIds(P, trail, n).forEach(id => { const fixed = trilhaFixedOf(trail, id, hoje); const rem = STAGES_T.filter(ts => !fixed[ts]); const ch = placeChain(st, rem, fixed, hoje, wEnd, TRILHA_END, { prot: P.prot }); if (ch) rem.forEach(ts => stAdd(st, ch[ts], ts)); out.push({ id, rem, days: ch ? { ...fixed, ...ch } : null }); });
     return out;
 }
-function trilhaProposeRecolocar(P, cfg, trail, hoje) { // ⏳ para cada módulo: refaz a cadeia a partir da 1ª etapa pendente, ancorada no carimbo da anterior, de hoje em diante
+function trilhaProposeRecolocar(P, cfg, trail, hoje, opts) { // ⏳ para cada módulo: refaz a cadeia a partir da 1ª etapa pendente, ancorada no carimbo da anterior, de hoje em diante
+    const reopen = (opts && opts.reopen) || {};
     const st = cloneSt(P.stNow);
     const ids = [...new Set(P.pending.map(x => x.id))].sort((a, b) => (P.qpos[a] || 0) - (P.qpos[b] || 0));
-    const jobs = ids.map(id => { const p = P.plan[id]; const t = trail[id] || {}; const pend = new Set(P.pending.filter(x => x.id === id).map(x => x.ts)); const fi = STAGES_T.findIndex(ts => pend.has(ts)); const rem = STAGES_T.filter((ts, i) => i >= fi && !t[TS_FIELD[ts]]); const fixed = {}; STAGES_T.forEach((ts, i) => { if (rem.indexOf(ts) >= 0) return; const f = TS_FIELD[ts]; if (t[f]) fixed[ts] = t[STAMP_OF[f]] || p[ts]; else if (i < fi && p[ts]) fixed[ts] = p[ts]; }); return { id, rem, fixed, before: { ...p } }; });
+    const jobs = ids.map(id => { const p = P.plan[id]; const t = trail[id] || {};
+        // etapa sem marca antes de uma marcada (ex.: questões marcadas, aula não — paciente, 07/11): o app não decide. Sem escolha dela, o módulo vai para o
+        // aviso (marcar a etapa, ou reabrir a cadeia a partir dela com as marcadas preservadas); nunca fica de fora da proposta e do aviso
+        const gi = STAGES_T.findIndex((ts, i) => !t[TS_FIELD[ts]] && STAGES_T.some((y, j) => j > i && t[TS_FIELD[y]]));
+        if (gi >= 0) { const gap = { missing: STAGES_T.filter((ts, i) => !t[TS_FIELD[ts]] && STAGES_T.some((y, j) => j > i && t[TS_FIELD[y]])), marked: STAGES_T.filter((y, j) => j > gi && t[TS_FIELD[y]]) };
+            if (!reopen[id]) return { id, rem: [], fixed: {}, before: { ...p }, gap, wait: true };
+            const fixed = {}; STAGES_T.slice(0, gi).forEach(ts => { const f = TS_FIELD[ts]; if (t[f]) fixed[ts] = t[STAMP_OF[f]] || p[ts]; });
+            const chain = STAGES_T.slice(gi); return { id, rem: chain.filter(ts => !t[TS_FIELD[ts]]), chain, fixed, before: { ...p }, gap, reopen: true }; } // as marcadas contam só como posição na cadeia (o intervalo)
+        const pend = new Set(P.pending.filter(x => x.id === id).map(x => x.ts)); const fi = STAGES_T.findIndex(ts => pend.has(ts)); const rem = STAGES_T.filter((ts, i) => i >= fi && !t[TS_FIELD[ts]]); const fixed = {}; STAGES_T.forEach((ts, i) => { if (rem.indexOf(ts) >= 0) return; const f = TS_FIELD[ts]; if (t[f]) fixed[ts] = t[STAMP_OF[f]] || p[ts]; else if (i < fi && p[ts]) fixed[ts] = p[ts]; }); return { id, rem, fixed, before: { ...p } }; });
     jobs.forEach(j => j.rem.forEach(ts => stAdd(st, j.before[ts], ts, -1)));
-    return jobs.map(j => { const ch = placeChain(st, j.rem, j.fixed, hoje, addDaysISO(hoje, 6), TRILHA_END, { prot: P.prot }); if (ch) j.rem.forEach(ts => stAdd(st, ch[ts], ts)); return { ...j, days: ch }; });
+    return jobs.map(j => { if (j.wait) return { ...j, days: null }; const ch = placeChain(st, j.chain || j.rem, j.fixed, hoje, addDaysISO(hoje, 6), TRILHA_END, { prot: P.prot }); if (ch) j.rem.forEach(ts => stAdd(st, ch[ts], ts)); return { ...j, days: ch ? Object.fromEntries(j.rem.map(ts => [ts, ch[ts]])) : null }; });
 }
 function trilhaFinalPlan(P, cfg, trail, hoje, edited) { // 📦 semana final (29/12–01/01): recoloca SOZINHA (pedido dela) o que estiver aberto para selar até 01/01 — limiar do dia como limite, nunca em dia editado
     const st = cloneSt(P.stNow); const patch = {}; const moved = [], compressed = [], nocabe = [];
@@ -2615,6 +2624,7 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, trail, P, onSa
         return "Reorganizar " + (ask.mod ? ask.mod.code + " " + ask.mod.title : "") + ": " + parts.join(" · ") + "." + (notes.length ? " " + notes.join(" · ") : ""); };
     // ── Decisões no topo da semana corrente, uma por vez (🧩 💬): ⏳ pendentes > 🔓 desbloqueio > ⏩ Adiantar; 📦 e avisos de carga só informam ──
     const [tView, setTView] = useState(null); // "pend" | "rise" | "adv"
+    const [reopenT, setReopenT] = useState({}); // ⏳ módulos que ela pediu para reabrir a partir da etapa sem marca
     const curWT = (hojeT >= TRILHA_START && hojeT <= TRILHA_END) ? weekOfISO(hojeT, startISO) : null;
     const isCurTW = isTW && week === curWT && !!P;
     const Wcur = isTW && P ? P.weeks[dateFor(0)] : null;
@@ -2624,14 +2634,21 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, trail, P, onSa
     const inWeekT = (d) => d && d >= dateFor(0) && d <= dateFor(WL - 1);
     const weekAllMarked = isCurTW && Object.keys(P.plan).some(id => STAGES_T.some(x => inWeekT(P.plan[id][x]))) && Object.keys(P.plan).every(id => { const p = P.plan[id]; return STAGES_T.every(x => { const d = p[x]; return !inWeekT(d) || !!((trail || {})[id] || {})[TS_FIELD[x]]; }); }); // TODAS as etapas planejadas nos dias desta semana marcadas (inclusive as adiantadas) — e a semana tem alguma: semana vazia (ex.: 1º acesso numa segunda, cota proporcional 0) não oferece ⏩, como na aba Trilha
     const advOk = isCurTW && !!Wcur && !!Wcur.frozen && weekAllMarked && !pendT.length && !riseOk;
-    const tProp = !isCurTW || !tView ? null : tView === "pend" ? { kind: "pend", jobs: trilhaProposeRecolocar(P, config, trail, hojeT) } : tView === "rise" ? { kind: "rise", items: trilhaProposeRise(P, config, trail, hojeT, Math.max(0, (Wcur.base || 0) - (Wcur.q || 0))) } : { kind: "adv", ...trilhaProposeAdvance(P, config, trail, hojeT) };
+    const tProp = !isCurTW || !tView ? null : tView === "pend" ? { kind: "pend", jobs: trilhaProposeRecolocar(P, config, trail, hojeT, { reopen: reopenT }) } : tView === "rise" ? { kind: "rise", items: trilhaProposeRise(P, config, trail, hojeT, Math.max(0, (Wcur.base || 0) - (Wcur.q || 0))) } : { kind: "adv", ...trilhaProposeAdvance(P, config, trail, hojeT) };
     const modTxt = (id) => { const m = modById(id); return m ? m.code + " " + m.title : "módulo " + id; };
+    const modLbl = (id) => { const m = modById(id); return m ? m.code + " · " + m.title : "módulo " + id; }; // código e título: dois módulos com o mesmo código não se confundem
+    const TS_ART = { aula: ["a aula", "viu"], quest: ["as questões", "fez"], apost: ["a apostila", "fez"], seal: ["a selagem", "fez"] };
+    const gapMsgT = (j) => { const m = modById(j.id), g = j.gap, mk = g.marked.map(x => TS_WORD[x]), plural = g.marked.length > 1 || g.marked[0] === "quest", miss = g.missing.map(x => TS_ART[x][0]).join(" e "), one = g.missing.length === 1 ? g.missing[0] : null;
+        return "⚠️ " + (m ? m.code + " — " + m.title : "módulo " + j.id) + " tem " + mk.join(" e ") + (plural ? " marcadas" : " marcada") + ", mas " + miss + " não. Marque " + miss + " se você " + (one ? (one === "quest" ? "as " : "a ") + TS_ART[one][1] : "as fez") + ", ou o app propõe " + miss + " primeiro."; };
+    const gapStampsT = (j) => { const t = (trail || {})[j.id] || {}, p = P.plan[j.id] || {}, out = {}; // o carimbo de cada etapa marcada agora: o dia planejado, se ficar antes da etapa marcada seguinte (e não depois de hoje); senão, o dia anterior a ela
+        j.gap.missing.forEach(ts => { const i = STAGES_T.indexOf(ts); const nx = STAGES_T.slice(i + 1).find(y => t[TS_FIELD[y]]); const lim = nx ? (t[STAMP_OF[TS_FIELD[nx]]] || p[nx]) : hojeT; let d = p[ts]; const prevS = Object.values(out).sort().pop(); if (!d || d >= lim || d > hojeT || (prevS && d <= prevS)) d = addDaysISO(lim, -1); out[ts] = d; }); return out; };
+    const markGapT = (j) => { const st = gapStampsT(j); let tr = trail || {}; j.gap.missing.forEach(ts => { tr = toggleProgressField(tr, j.id, TS_FIELD[ts], { stamp: st[ts] }); }); onUpdateTrail(tr); };
     const chainTxt = (days, rem) => STAGES_T.filter(x => days && days[x] && (!rem || rem.indexOf(x) >= 0)).map(x => TS_WORD[x] + " " + dayCostT(days[x], HRS_T[x])).join(" · ");
     const chainNotes = (days) => [...new Set(STAGES_T.map(x => days && days[x] ? lightNoteT(days[x]) : null).filter(Boolean))];
     const gapWhy = (job, x) => { const i = STAGES_T.indexOf(x); if (i <= 0) return ""; const pv = (job.days && job.days[STAGES_T[i - 1]]) || job.fixed[STAGES_T[i - 1]]; const g = pv && job.days && job.days[x] ? diffDays(pv, job.days[x]) : null; if (g == null) return ""; const r = GAP_T[x]; return g < r[0] || g > r[1] ? "; " + g + " dias após " + (STAGES_T[i - 1] === "aula" ? "a aula" : STAGES_T[i - 1] === "quest" ? "as questões" : "a apostila") + " — fora de " + r[0] + "–" + r[1] : ""; };
     const tPropText = (() => {
         if (!tProp) return "";
-        if (tProp.kind === "pend") return tProp.jobs.map(j => !j.days ? (modById(j.id) || {}).code + ": não cabe até 01/01 sem quebrar os intervalos" : (modById(j.id) || {}).code + " · " + j.rem.map(x => TS_WORD[x] + " " + dayCostT(j.days[x], HRS_T[x]) + (j.before[x] && j.before[x] !== j.days[x] ? " (antes: " + dayNameT(j.before[x]) + gapWhy(j, x) + ")" : "")).join(" · ")).join(" | ") + ".";
+        if (tProp.kind === "pend") return tProp.jobs.filter(j => !j.wait).map(j => !j.days ? modLbl(j.id) + ": não cabe até 01/01 sem quebrar os intervalos" : modLbl(j.id) + " · " + j.rem.map(x => TS_WORD[x] + " " + dayCostT(j.days[x], HRS_T[x]) + (j.before[x] && j.before[x] !== j.days[x] ? " (antes: " + dayNameT(j.before[x]) + gapWhy(j, x) + ")" : "")).join(" · ")).join(" | ") + ".";
         if (tProp.kind === "rise") return tProp.items.map(it => it.days ? "#" + ((P.qpos[it.id] || 0) + 1) + " " + modTxt(it.id) + ": " + chainTxt(it.days, it.rem) : modTxt(it.id) + ": não cabe até 01/01 sem quebrar os intervalos").join(" | ") + ".";
         if (tProp.kind === "C") return tProp.why === "antes" ? "A trilha começa em " + fmtBR(TRILHA_START) + " — nada a adiantar antes disso." : tProp.why === "final" ? "Semana final: sem módulo novo — o acesso termina em 01/01/2027." : tProp.why === "fila" ? "A fila da Trilha está vazia — nada para adiantar 🎉" : tProp.why === "semdia" ? "Não sobrou dia livre nesta semana para a aula." : "Não cabe até 01/01/2027 sem quebrar os intervalos — o acesso termina em 01/01.";
         const head = "#" + ((P.qpos[tProp.id] || 0) + 1) + " " + modTxt(tProp.id);
@@ -2765,13 +2782,19 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, trail, P, onSa
         coverageT.length > 0 && React.createElement("div", { "data-t": "trilha-coverage", style: { display: "flex", flexDirection: "column", gap: 4, background: "#2a1a0a", border: "1px solid #b45309", borderRadius: 10, padding: "8px 12px" } },
             coverageT.map((w, i) => React.createElement("div", { key: i, style: { color: "#fbbf24", fontSize: 11, fontWeight: 800, lineHeight: 1.4 } }, w))),
         isCurTW && pendT.length > 0 && React.createElement("div", { "data-t": "trilha-pending", style: tBanner },
-            React.createElement("span", { style: tHead }, "⏳ Ficaram para trás " + pendT.length + (pendT.length === 1 ? " etapa" : " etapas") + " (" + pendT.slice(0, 4).map(x => ((modById(x.id) || {}).code || "?") + " · " + TS_WORD[x.ts] + (x.why === "simulado" ? " de " + dayNameT(x.iso) + ", que virou simulado" : " de " + dayNameT(x.iso))).join(", ") + (pendT.length > 4 ? ", …" : "") + ") — sem culpa: posso propor novos dias."),
+            React.createElement("span", { style: tHead }, "⏳ Ficaram para trás " + pendT.length + (pendT.length === 1 ? " etapa" : " etapas") + " (" + pendT.slice(0, 4).map((x, i, a) => { const amb = pendT.some(y => y.id !== x.id && (modById(y.id) || {}).code === (modById(x.id) || {}).code); return (amb ? (i > 0 && a[i - 1].id === x.id ? "" : modLbl(x.id) + " · ") : ((modById(x.id) || {}).code || "?") + " · ") + TS_WORD[x.ts] + (x.why === "simulado" ? " de " + dayNameT(x.iso) + ", que virou simulado" : " de " + dayNameT(x.iso)); }).join(", ") + (pendT.length > 4 ? ", …" : "") + ") — sem culpa: posso propor novos dias."),
             tView !== "pend" ? React.createElement("div", { style: tRow }, React.createElement("button", { onClick: () => setTView("pend"), style: tBtnMain }, "Ver como recolocar"))
                 : React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6 } },
-                    React.createElement("span", { style: tProp_ }, "💡 " + tPropText + (tPropNotes.length ? " " + tPropNotes.join(" · ") : "")),
+                    tProp && tProp.jobs && tProp.jobs.some(j => !j.wait) && React.createElement("span", { style: tProp_ }, "💡 " + tPropText + (tPropNotes.length ? " " + tPropNotes.join(" · ") : "")),
+                    tProp && tProp.jobs && tProp.jobs.filter(j => j.wait).map(j => { const g = gapStampsT(j); return React.createElement("div", { key: "gap" + j.id, "data-t": "trilha-gap", "data-id": j.id, style: { display: "flex", flexDirection: "column", gap: 6, borderTop: "1px solid #334155", paddingTop: 6 } },
+                        React.createElement("span", { style: { ...tProp_, color: "#fbbf24" } }, gapMsgT(j)),
+                        React.createElement("div", { style: tRow },
+                            React.createElement("button", { onClick: () => markGapT(j), style: tBtnSec }, "Marquei " + j.gap.missing.map(x => TS_ART[x][0]).join(" e ") + " (carimbo " + j.gap.missing.map(x => dayNameT(g[x])).join(", ") + ")"),
+                            React.createElement("button", { onClick: () => setReopenT({ ...reopenT, [j.id]: true }), style: tBtnSec }, "Propor " + TS_ART[j.gap.missing[0]][0] + " primeiro"))); }),
+                    tProp && tProp.jobs && tProp.jobs.some(j => j.reopen && j.days) && React.createElement("span", { style: { ...tProp_, color: "#94a3b8" } }, "↺ " + tProp.jobs.filter(j => j.reopen && j.days).map(j => modLbl(j.id) + ": cadeia reaberta a partir " + (j.gap.missing[0] === "aula" ? "da aula" : "de " + TS_ART[j.gap.missing[0]][0]) + " — " + (() => { const pl = j.gap.marked.length > 1 || j.gap.marked[0] === "quest"; return j.gap.marked.map(x => TS_WORD[x]).join(" e ") + (pl ? " (já marcadas) ficam como estão" : " (já marcada) fica como está"); })()).join(" · ")),
                     React.createElement("div", { style: tRow },
-                        tProp && tProp.jobs && tProp.jobs.some(j => j.days) && React.createElement("button", { onClick: applyTProp, style: tBtnMain }, "Aplicar"),
-                        React.createElement("button", { onClick: () => setTView(null), style: tBtnSec }, "Cancelar")))),
+                        tProp && tProp.jobs && tProp.jobs.some(j => j.days) && React.createElement("button", { onClick: () => { applyTProp(); setReopenT({}); }, style: tBtnMain }, "Aplicar"),
+                        React.createElement("button", { onClick: () => { setTView(null); setReopenT({}); }, style: tBtnSec }, "Cancelar")))),
         riseOk && React.createElement("div", { "data-t": "trilha-rise", style: tBanner },
             React.createElement("span", { style: tHead }, "🔓 A semana passada fechou — o ritmo desta semana pode subir para " + Wcur.base + "."),
             tView !== "rise" ? React.createElement("div", { style: tRow }, React.createElement("button", { onClick: () => setTView("rise"), style: tBtnMain }, "Ver proposta"), React.createElement("button", { onClick: dismissRise, style: tBtnSec }, "Agora não"))

@@ -146,7 +146,7 @@ const DEFAULT12 = [5, 6, 14, 19, 24, 32, 34, 85, 86, 1, 2, 3];
         check('⏳ cita as 2 etapas da sexta que virou simulado (apostila de CIR1 · Trauma II e aula de CIR2)', !!pend && /Ficaram para trás 2 etapas/.test(pend.text) && /CIR1 · apostila de SEX 30\/10, que virou simulado/.test(pend.text) && /CIR2 · aula de SEX 30\/10, que virou simulado/.test(pend.text) && /sem culpa/.test(pend.text), pend && pend.text);
         await clickIn(page, 'trilha-pending', 'Ver como recolocar');
         const pv = await banner(page, 'trilha-pending'); console.log('   💡', pv.text.replace(/\n/g, ' '));
-        check('proposta de recolocar (nada gravado antes do Aplicar)', /💡 CIR1 · apostila/.test(pv.text) && pv.btns.includes('Aplicar') && pv.btns.includes('Cancelar') && (await getLS(page, CFG)).trilhaPlan[6].apost === '2026-10-30');
+        check('proposta de recolocar (nada gravado antes do Aplicar)', /💡 CIR1 · Trauma II — Abdome, Pelve e TCE · apostila/.test(pv.text) && pv.btns.includes('Aplicar') && pv.btns.includes('Cancelar') && (await getLS(page, CFG)).trilhaPlan[6].apost === '2026-10-30');
         await clickIn(page, 'trilha-pending', 'Aplicar');
         const cfg3 = await getLS(page, CFG); const p63 = cfg3.trilhaPlan[6], p143 = cfg3.trilhaPlan[14];
         check('Aplicar: apostila de CIR1 · Trauma II e aula de CIR2 saem de 30/10 (orig fica 30/10; hist "recolocar"); nada gravado em schedule_v1', p63.apost !== '2026-10-30' && p63.orig.apost === '2026-10-30' && p63.hist.some(h => h.why === 'recolocar' && h.from === '2026-10-30') && p143.aula !== '2026-10-30' && p143.orig.aula === '2026-10-30' && !(await getLS(page, SCH)), JSON.stringify([p63, p143]));
@@ -399,13 +399,44 @@ const DEFAULT12 = [5, 6, 14, 19, 24, 32, 34, 85, 86, 1, 2, 3];
         const pend = await banner(page, 'trilha-pending');
         check('⏳ "Ficaram para trás 1 etapa (CIR1 · apostila de QUI 29/10) — sem culpa: posso propor novos dias."', !!pend && /Ficaram para trás 1 etapa \(CIR1 · apostila de QUI 29\/10\) — sem culpa: posso propor novos dias\./.test(pend.text), pend && pend.text);
         await clickIn(page, 'trilha-pending', 'Ver como recolocar'); const pv = await banner(page, 'trilha-pending'); console.log('   💡', pv.text.replace(/\n/g, ' '));
-        check('a proposta diz o dia novo, o antigo e o intervalo fora da faixa (o SÁB 31/10 é o dia leve)', /CIR1 · apostila DOM 01\/11 \([\d,]+h\) \(antes: QUI 29\/10; 4 dias após as questões — fora de 1–2\)/.test(pv.text) && !/TER 03\/11/.test(pv.text), pv.text);
+        check('a proposta diz o módulo (código e título), o dia novo, o antigo e o intervalo fora da faixa (o SÁB 31/10 é o dia leve)', /CIR1 · Trauma I — Avaliação Inicial e Trauma de Tórax · apostila DOM 01\/11 \([\d,]+h\) \(antes: QUI 29\/10; 4 dias após as questões — fora de 1–2\)/.test(pv.text) && !/TER 03\/11/.test(pv.text), pv.text);
         await clickIn(page, 'trilha-pending', 'Aplicar');
         const p5 = (await getLS(page, CFG)).trilhaPlan[5];
         check('Aplicar: apostila 01/11 (orig 29/10), selagem recolocada, hist "recolocar"; nada em 03/11 (plantão longo)', p5.apost === '2026-11-01' && p5.orig.apost === '2026-10-29' && p5.hist.every(h => h.why === 'recolocar') && p5.seal !== '2026-11-03' && dd(p5.apost, p5.seal) >= 2 && dd(p5.apost, p5.seal) <= 5, JSON.stringify(p5));
         await clickDate(page, '29/10'); const qi = await readDay(page);
         check('QUI 29/10 guarda a linha "↷ Trilha · CIR1 — apostila recolocada para DOM 01/11"', has(qi, /^↷ Trilha · CIR1 — apostila recolocada para DOM 01\/11$/));
         check('o ⏳ some depois de Aplicar', !(await banner(page, 'trilha-pending')));
+    });
+    // ── TR9c · ⏳ recolocar com etapa marcada fora de ordem (aval do PR #18): CIR2 · Urologia tem as questões marcadas e a aula não. O módulo nunca fica de
+    //    fora: aparece no aviso com as duas saídas (marcar a aula, ou o app propor a aula primeiro); cada linha da proposta traz código e título ──
+    const seedGap = { 14: { questoesD2: true, questoesD2At: '2026-11-01' } };
+    const gapCheck = async (page) => {
+        const pend = await banner(page, 'trilha-pending');
+        check('⏳: com dois módulos CIR1 pendentes, o topo nomeia o módulo com o título, uma vez para as etapas seguidas dele (o código sozinho confundiria)', !!pend && /Ficaram para trás \d+ etapas \(CIR1 · Trauma I — Avaliação Inicial e Trauma de Tórax · aula de SEG 26\/10, questões de QUA 28\/10, apostila de QUI 29\/10, selagem de DOM 01\/11, …\)/.test(pend.text), pend && pend.text.slice(0, 300));
+        await clickIn(page, 'trilha-pending', 'Ver como recolocar'); const pv = await banner(page, 'trilha-pending'); console.log('   💡', pv.text.replace(/\n/g, ' '));
+        const lines = ((pv.text.match(/💡 ([^\n]*)/) || [])[1] || '').split(' | ');
+        check('cada linha da proposta traz código e título (CIR1 · Trauma I — …, CIR1 · Trauma II — …)', lines.length >= 2 && lines.every(l => /^(CIR1 · Trauma I — Avaliação Inicial e Trauma de Tórax|CIR1 · Trauma II — Abdome, Pelve e TCE|CIR2 · [^·]+) · /.test(l)), JSON.stringify(lines.map(l => l.slice(0, 70))));
+        const gap = await page.evaluate(() => { const el = document.querySelector('[data-t="trilha-gap"]'); return el ? { id: el.getAttribute('data-id'), text: el.innerText, btns: [...el.querySelectorAll('button')].map(b => b.innerText.trim()) } : null; });
+        check('CIR2 · Urologia (questões marcadas, aula não) não some: aviso "⚠️ CIR2 — Urologia tem questões marcadas, mas a aula não. Marque a aula se você a viu, ou o app propõe a aula primeiro." com as duas saídas', !!gap && gap.id === '14' && /⚠️ CIR2 — Urologia tem questões marcadas, mas a aula não\. Marque a aula se você a viu, ou o app propõe a aula primeiro\./.test(gap.text) && gap.btns.includes('Marquei a aula (carimbo SEX 30/10)') && gap.btns.includes('Propor a aula primeiro') && !/CIR2 · Urologia ·/.test(lines.join(' | ')) && !/não cabe/.test(pv.text), JSON.stringify(gap));
+        return pv;
+    };
+    await scenario(browser, 'TR9c-recolocar-marca-fora-de-ordem-propor', '2026-10-26', {}, async (S) => {
+        await setLS(S.page, TRL, seedGap); let page = await S.reopen('2026-11-04'); // 1º acesso 26/10; depois ela marca as questões de CIR2 · Urologia (01/11) sem a aula await clickTab(page, 'CRONOGRAMA');
+        await gapCheck(page);
+        const before = await getLS(page, CFG);
+        await page.evaluate(() => { const b = [...document.querySelectorAll('[data-t="trilha-gap"] button')].find(x => /^Propor a aula primeiro$/.test(x.innerText.trim())); b.click(); }); await page.waitForTimeout(350);
+        const pv2 = await banner(page, 'trilha-pending'); console.log('   💡', pv2.text.replace(/\n/g, ' '));
+        check('"Propor a aula primeiro": a proposta reabre a cadeia de CIR2 · Urologia a partir da aula (aula, apostila e selagem de hoje em diante), e diz que as questões marcadas ficam como estão; nada gravado ainda', /CIR2 · Urologia · aula \S+ \d\d\/11/.test(pv2.text) && /↺ CIR2 · Urologia: cadeia reaberta a partir da aula — questões \(já marcadas\) ficam como estão/.test(pv2.text) && !(await page.$('[data-t="trilha-gap"]')) && JSON.stringify(await getLS(page, CFG)) === JSON.stringify(before), pv2.text.slice(0, 400));
+        await clickIn(page, 'trilha-pending', 'Aplicar');
+        const p14 = (await getLS(page, CFG)).trilhaPlan[14], t14 = (await getLS(page, TRL))[14];
+        check('Aplicar: aula ≥ 04/11, apostila e selagem depois, nas faixas; as questões continuam marcadas (01/11); orig preservado; histórico "recolocar"', p14.aula >= '2026-11-04' && p14.apost > p14.aula && p14.seal > p14.apost && dd(p14.apost, p14.seal) >= 2 && dd(p14.apost, p14.seal) <= 5 && t14.questoesD2 === true && t14.questoesD2At === '2026-11-01' && p14.orig.aula === '2026-10-30' && p14.hist.some(h => h.ts === 'aula' && h.why === 'recolocar'), JSON.stringify({ p14, t14 }));
+    });
+    await scenario(browser, 'TR9c-recolocar-marca-fora-de-ordem-marcar', '2026-10-26', {}, async (S) => {
+        await setLS(S.page, TRL, seedGap); let page = await S.reopen('2026-11-04'); await clickTab(page, 'CRONOGRAMA');
+        await gapCheck(page);
+        await page.evaluate(() => { const b = [...document.querySelectorAll('[data-t="trilha-gap"] button')].find(x => /^Marquei a aula/.test(x.innerText.trim())); b.click(); }); await page.waitForTimeout(400);
+        const t14 = (await getLS(page, TRL))[14], pv = await banner(page, 'trilha-pending');
+        check('"Marquei a aula": a aula fica marcada com o carimbo do dia planejado (SEX 30/10, antes das questões); o aviso some e CIR2 · Urologia entra na proposta pelo que falta (apostila e selagem)', t14.aula === true && t14.aulaAt === '2026-10-30' && !(await page.$('[data-t="trilha-gap"]')) && /CIR2 · Urologia · apostila/.test(pv.text), JSON.stringify({ t14, pv: pv && pv.text.slice(0, 300) }));
     });
     // ── TR11 · mover etapa da Trilha com aviso de espaçamento (pode cruzar semanas; grava no plano, não materializa dias) ──
     const moveT = async (page, blockRe, toISO) => {
