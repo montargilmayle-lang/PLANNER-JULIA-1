@@ -1438,9 +1438,10 @@ function trilhaFinalPlan(P, cfg, trail, hoje, edited) { // 📦 semana final (29
     const st = cloneSt(P.stNow); const patch = {}; const moved = [], compressed = [], nocabe = [];
     const ids = Object.keys(P.plan).map(Number).filter(id => P.frozen.has(id)).sort((a, b) => (P.qpos[a] || 0) - (P.qpos[b] || 0));
     for (const id of ids) {
-        const p = P.plan[id]; const t = trail[id] || {};
-        const rem = STAGES_T.filter(ts => !t[TS_FIELD[ts]]); if (!rem.length) continue;
-        const fixed = {}; STAGES_T.forEach(ts => { const f = TS_FIELD[ts]; if (t[f]) fixed[ts] = t[STAMP_OF[f]] || p[ts]; });
+        const p = P.plan[id]; const t = trail[id] || {}, keepD = cfg.trilhaFinalKeep || null; // restaurou na semana final (decisão 75): etapa de dia anterior à restauração fica no bloco do dia, para ela marcar
+        const kept = (ts) => !!(keepD && p[ts] && p[ts] < keepD && !t[TS_FIELD[ts]]);
+        const rem = STAGES_T.filter(ts => !t[TS_FIELD[ts]] && !kept(ts)); if (!rem.length) continue;
+        const fixed = {}; STAGES_T.forEach(ts => { const f = TS_FIELD[ts]; if (t[f]) fixed[ts] = t[STAMP_OF[f]] || p[ts]; else if (kept(ts)) fixed[ts] = p[ts]; });
         const prevOf = (ts) => { const i = STAGES_T.indexOf(ts); return i > 0 ? (fixed[STAGES_T[i - 1]] || p[STAGES_T[i - 1]]) : null; };
         const valid = rem.every(ts => { const d = p[ts]; if (!d || d < hoje || d > TRILHA_END || !dayOpenT(d, cfg) || (edited && edited[d]) || (ts === "aula" && P.prot[d]) || (d === TRILHA_END && ts !== "seal")) return false; const pv = prevOf(ts); if (!pv) return ts === "aula"; const g = diffDays(pv, d); return g >= GAP_T[ts][0] && g <= GAP_T[ts][1]; });
         if (valid) continue;
@@ -1551,7 +1552,7 @@ function trilhaMigrateSchedule(sov, hoje, P) {
 // e tudo o que é de antes da atualização (histórico do curso, transição, marcas anteriores ao 1º acesso ou sem data).
 const RESTORE_KEY = "restauracoes";
 const RESTORE_CFG_KEYS = ["trilhaOrder", "trilhaPins", "trilhaRamp", "lightDayOverrides", "trilhaDismiss", "simResults", "simOverrides"]; // voltam ao padrão (e o Desfazer as reaplica inteiras)
-const RESTORE_UNDO_KEYS = RESTORE_CFG_KEYS.concat(["trilhaFinalAutoAt", "trilhaFinalLog"]); // o Desfazer também devolve a marca da semana final (se o dia mudou, o app refaz a recolocação sobre o estado devolvido)
+const RESTORE_UNDO_KEYS = RESTORE_CFG_KEYS.concat(["trilhaFinalAutoAt", "trilhaFinalLog", "trilhaFinalKeep"]); // o Desfazer também devolve a marca da semana final (se o dia mudou, o app refaz a recolocação sobre o estado devolvido)
 const RESTORE_CMP_KEYS = RESTORE_CFG_KEYS.concat(["trilhaPlan", "trilhaWeeks", "trilhaFirstOpen", "trilhaRevFull", "trilhaFinalAutoAt", "trilhaFinalLog"]); // o que "restaurar" ou o app logo depois podem mudar
 const RESTORE_STAMP = { aula: "aulaAt", questoesD2: "questoesD2At", apostila: "apostilaAt", smartcard: "smartcardAt" };
 const RESTORE_FTS = { aula: "aula", questoesD2: "quest", apostila: "apost", smartcard: "seal" };
@@ -1697,6 +1698,13 @@ function trilhaRestoreUndo(cfg, snap, sov) {
     Object.keys(cp).forEach(id => { const p = cp[id] || {}; if ((sp[id] && !later.has(Number(id))) || (p.wk && sw[p.wk])) return; np[id] = p; }); // fica: só o que é de semana congelada depois
     Object.keys(sp).forEach(id => { if (!later.has(Number(id))) np[id] = sp[id]; });
     if (Object.keys(np).length || C.trilhaPlan) out.trilhaPlan = np;
+    // dia sem remédio (🧠): como na restauração — se a troca mexeria num dia já vivido ou no de hoje, fica a escolha de agora
+    const hU = todayISO(), curL = C.lightDayOverrides || {}, snL = sc.lightDayOverrides || {}, light = [];
+    const effL = (lo, k, W) => { const v = (lo || {})[k]; return (v !== undefined && v !== null && v !== "" && Number(v) >= 0 && Number(v) < weekLen(weekOfISO(k))) ? addDaysISO(k, Number(v)) : (((W || {})[k] || {}).light || null); };
+    { const nl = { ...(out.lightDayOverrides || {}) }; let chg = false; const wNow = out.trilhaWeeks || C.trilhaWeeks || {};
+        [...new Set(Object.keys(curL).concat(Object.keys(snL)))].filter(k => k >= TRILHA_START).sort().forEach(k => { const a = effL(curL, k, C.trilhaWeeks), b = effL(snL, k, wNow);
+            if (a === b) return; if ((a && a <= hU) || (b && b <= hU)) { if (curL[k] === undefined) delete nl[k]; else nl[k] = curL[k]; chg = true; light.push({ tue: k, from: a, to: a, kept: true, other: b }); } else light.push({ tue: k, from: a, to: b, kept: false }); });
+        if (chg) { if (Object.keys(nl).length) out.lightDayOverrides = nl; else delete out.lightDayOverrides; } }
     // dias cheios para a revisão (registro do app): até o dia do estado guardado, como estavam nele; depois dele, o que o app registrou fica
     const sd = String((snap && snap.at) || "").slice(0, 10), has = Object.prototype.hasOwnProperty.call(sc, "trilhaRevFull"), rf = { ...(sc.trilhaRevFull || {}) };
     Object.keys(C.trilhaRevFull || {}).forEach(k => { if (sd && k > sd) rf[k] = C.trilhaRevFull[k]; });
@@ -1704,7 +1712,7 @@ function trilhaRestoreUndo(cfg, snap, sov) {
     // dias: os da Trilha voltam como estavam no arquivo; os de antes (histórico do curso e transição — a restauração nunca os toca) ficam como estão agora
     const ss = (snap && snap.schedule) || {}, cur = sov || {}, ns = {};
     Object.keys(cur).forEach(k => { if (k < TRILHA_START) ns[k] = cur[k]; }); Object.keys(ss).forEach(k => { if (k >= TRILHA_START) ns[k] = ss[k]; });
-    return { cfg: out, sov: sov ? ns : ss, trail: (snap && snap.trail) || {} };
+    return { cfg: out, sov: sov ? ns : ss, trail: (snap && snap.trail) || {}, light };
 }
 function trilhaArchiveRaw() { try { return localStorage.getItem(STORAGE_PREFIX + "schedule_archive_v1"); } catch (e) { return null; } }
 function trilhaRestoreList() { try { const arc = JSON.parse(trilhaArchiveRaw() || "{}"); return arc && typeof arc === "object" && Array.isArray(arc[RESTORE_KEY]) ? arc[RESTORE_KEY] : []; } catch (e) { return []; } }
@@ -3561,11 +3569,13 @@ function TrilhaTab({ config, trail, progress, P, scheduleOv, onRestore, onSaveCo
         const leaveLines = (base, U, when) => { // o que mudou desde "base" (o estado logo depois da última ação) e sai da tela com Desfazer/Refazer (fica no arquivo)
             const L = [], bc = base.cfg || {}, bp = bc.trilhaPlan || {}, cp = config.trilhaPlan || {}, up = U.cfg.trilhaPlan || {}, bw = bc.trilhaWeeks || {}, cw = config.trilhaWeeks || {}, bs = base.sov || {}, cs = scheduleOv || {};
             const am = diffMarks(t, base.trail); if (am.length) L.push("marcas feitas depois " + when + " (" + nMarks(am) + "): " + am.map(x => x.name.split(" · ")[0] + " — " + x.items.map(itemTxt).join(", ")).join("; "));
-            Object.keys(cp).forEach(id => { const pc = cp[id] || {}; if (!up[id]) { L.push(nm(id) + ": entrou no plano depois " + when + " (⏩/🔓) → sai"); return; } const pb = bp[id]; if (!pb) return; STAGES_T.forEach(ts => { if ((pc[ts] || null) !== (pb[ts] || null)) L.push(nm(id) + " — " + TS_WORD[ts] + ": " + (pc[ts] ? dn(pc[ts]) : "sem data") + " (mudada depois " + when + ") → volta para " + (up[id][ts] ? dn(up[id][ts]) : "sem data")); }); });
+            Object.keys(cp).forEach(id => { const pc = cp[id] || {}, pb = bp[id]; if (!up[id]) { if (!pb) L.push(nm(id) + ": entrou no plano depois " + when + " (⏩/🔓) → sai"); return; } if (!pb) return; STAGES_T.forEach(ts => { if ((pc[ts] || null) !== (pb[ts] || null) && (pc[ts] || null) !== (up[id][ts] || null)) L.push(nm(id) + " — " + TS_WORD[ts] + ": " + (pc[ts] ? dn(pc[ts]) : "sem data") + " (mudada depois " + when + ") → volta para " + (up[id][ts] ? dn(up[id][ts]) : "sem data")); }); });
             const dl = [...new Set(Object.keys(cs).concat(Object.keys(bs)))].filter(k => k >= TRILHA_START && canonJ(cs[k]) !== canonJ(bs[k])).sort(); if (dl.length) L.push("dias editados depois " + when + ": " + dl.map(dn).join(", ") + " → voltam a como estavam");
             const kl = RESTORE_CFG_KEYS.filter(k => canonJ(config[k]) !== canonJ(bc[k])).map(k => KN[k]); if (kl.length) L.push("escolhas feitas depois " + when + " (" + kl.join(", ") + ") → voltam a como estavam");
-            Object.keys(bw).sort().forEach(k => { if (cw[k] && canonJ(cw[k]) !== canonJ(bw[k])) L.push("semana de " + fmtBR(k) + ": o que mudou nela depois " + when + " (⏩/🔓) → volta a como estava"); });
+            const uw = U.cfg.trilhaWeeks || {};
+            Object.keys(bw).sort().forEach(k => { if (cw[k] && canonJ(cw[k]) !== canonJ(bw[k]) && canonJ(cw[k]) !== canonJ(uw[k])) L.push("semana de " + fmtBR(k) + ": o que mudou nela depois " + when + " (⏩/🔓) → volta a como estava"); });
             return L; };
+        const lightLines = (U) => (U.light || []).map(x => "dia sem remédio da semana de " + fmtBR(x.tue) + ": " + (x.kept ? "fica " + (x.from ? dn(x.from) : "como está") + " (esse dia, ou o que voltaria" + (x.other ? ", " + dn(x.other) : "") + ", já passou ou é hoje: o que você viveu não é reescrito)" : (x.from ? dn(x.from) : "o previsto") + " → " + (x.to ? dn(x.to) : "o previsto")));
         // a restauração em vigor: o estado que ela produziu (para separar o que foi marcado ou mudado depois dela)
         const post = lastOn ? rPost : null;
         const afterMarks = post ? diffMarks(t, post.next.trail) : [];
@@ -3594,7 +3604,7 @@ function TrilhaTab({ config, trail, progress, P, scheduleOv, onRestore, onSaveCo
             if (D.pins.length) cfgL.push("📌 fixados: " + D.pins.join(", ") + " → saem");
             const fzW = config.trilhaWeeks || {};
             D.ramp.forEach(x => cfgL.push("rampa da semana de " + fmtBR(x.tue) + (fzW[x.tue] ? " (já congelada com " + fzW[x.tue].q + ")" : "") + ": " + x.v + " → volta ao padrão (" + (TRILHA_RAMP_DEFAULT[x.tue] != null ? TRILHA_RAMP_DEFAULT[x.tue] : "—") + ")" + (fzW[x.tue] ? " — a cota da semana fica " + fzW[x.tue].q : "")));
-            D.light.forEach(x => cfgL.push("dia sem remédio da semana de " + fmtBR(x.tue) + ": " + (x.from ? dn(x.from) + " (sua escolha)" : "a sua escolha") + " → " + (x.to ? dn(x.to) + " (o previsto)" : "o previsto")));
+            D.light.forEach(x => { const to = x.to || (P2.weeks[x.tue] || {}).light || null; cfgL.push("dia sem remédio da semana de " + fmtBR(x.tue) + ": " + (x.from ? dn(x.from) + " (sua escolha)" : "a sua escolha") + " → " + (to ? dn(to) + " (o previsto)" : "o previsto")); });
             if (D.dismiss.length) cfgL.push("“Agora não”: " + D.dismiss.length + " → sai");
             D.simRes.forEach(x => cfgL.push("% do simulado de " + fmtBR(x.iso) + " (" + x.v + "%) → sai"));
             D.simOv.forEach(x => cfgL.push("simulado de " + fmtBR(x.iso) + (x.v ? " religado" : " desligado") + " → volta à regra"));
@@ -3606,9 +3616,9 @@ function TrilhaTab({ config, trail, progress, P, scheduleOv, onRestore, onSaveCo
             D.lightKeep.forEach(x => notes.push("dia sem remédio da semana de " + fmtBR(x.tue) + ": fica " + (x.from ? dn(x.from) : "a sua escolha") + " (a sua escolha — esse dia, ou o previsto" + (x.to ? ", " + dn(x.to) : "") + ", já passou ou é hoje: o que você viveu não é reescrito)"));
             D.unticked.forEach(x => notes.push("a " + TS_WORD[x.ts] + " de " + x.name.split(" · ")[0] + " estava marcada (" + fmtBR(x.iso) + ") quando a semana congelou e foi desmarcada depois — fica desmarcada"));
             body.push(sec("Fica como está", ["1º acesso: " + (D.firstOpen ? fmtBR(D.firstOpen) : "—"), "semanas congeladas (a cota não é recalculada): " + (D.weeks.map(w => fmtBR(w.tue) + " (" + w.q + (w.n < w.q ? ", entraram " + w.n : "") + (w.held ? ", segurada" : "") + ")").join(" · ") || "—")].concat(notes).concat((D.appRec.revFull || D.appRec.final) ? ["o que o app registra sozinho: " + [D.appRec.revFull ? D.appRec.revFull + " dia(s) cheio(s) para a revisão" : "", D.appRec.final ? "a recolocação da semana final" : ""].filter(Boolean).join(" e ")] : []).concat(["tudo o que é de antes da atualização (histórico do curso e transição)"]), "s6"));
-            const LWs = weekStartISO(P2.LW || LAST_WEEK);
+            const LWs = P2.LW ? weekStartISO(P2.LW) : TRILHA_END;
             body.push(sec("Depois de aplicar", [P2.pending.length + " etapa(s) aparecem como ⏳ pendentes" + (pendS.length ? " (" + pendA + " de dias que já passaram + " + pendS.length + " em " + [...new Set(pendS.map(x => dn(x.iso)))].join(", ") + ", que volta a ser simulado)" : "") + " — é esperado: depois de restaurar nada está marcado; você marca no bloco de cada dia o que fez."]
-                .concat(hoje >= LWs && hoje < TRILHA_END ? ["📦 semana final: o app recoloca sozinho, uma vez por dia, o que estiver aberto. Marque hoje, no bloco de cada dia, o que você fez — amanhã o que estiver sem marca é recolocado."] : hoje === TRILHA_END ? ["📦 hoje é o último dia de acesso: marque no bloco de cada dia o que você fez — o que ficar sem marca não é mais recolocado (fica no registro para o cursinho de 04/01)."] : [])
+                .concat(hoje >= LWs && hoje < TRILHA_END ? ["📦 semana final: as etapas dos dias que já passaram ficam no bloco de cada dia, para você marcar o que fez — o que não foi feito aparece no ⏳ (“Ver como recolocar”). A recolocação automática de cada dia continua para as etapas de hoje em diante."] : hoje === TRILHA_END ? ["📦 hoje é o último dia de acesso: marque no bloco de cada dia o que você fez — o que ficar sem marca não é mais recolocado (fica no registro para o cursinho de 04/01)."] : [])
                 .concat([heavy.length ? "⚠️ acima do tempo hábil (14,5h), de hoje a 2 semanas: " + heavy.join(" · ") : "nenhum dia de hoje a 2 semanas acima do tempo hábil (14,5h)"])
                 .concat(studyHi.length ? ["📚 acima do limiar de estudo (informativo, o dia já avisa): " + studyHi.join(" · ")] : [])
                 .concat(R.changed && !D.any ? ["o app regrava as marcas do dia — nada seu muda"] : []), "s7"));
@@ -3620,22 +3630,29 @@ function TrilhaTab({ config, trail, progress, P, scheduleOv, onRestore, onSaveCo
             const snap = lastR.entry, sc = snap.config || {}, U = trilhaRestoreUndo(config, snap, scheduleOv), PS = post.settled, PB = post.diag;
             const sw = sc.trilhaWeeks || {}, cw = config.trilhaWeeks || {};
             const leave = leaveLines({ cfg: PS, sov: post.next.sov, trail: post.next.trail }, U, "da restauração");
-            const stay = Object.keys(cw).filter(k => !sw[k]).sort().map(k => "a semana de " + fmtBR(k) + " congelou depois da restauração e fica como está (cota " + cw[k].q + ")");
+            const stay = Object.keys(cw).filter(k => !sw[k]).sort().map(k => "a semana de " + fmtBR(k) + " congelou depois da restauração e fica como está (cota " + cw[k].q + ")").concat(lightLines({ light: (U.light || []).filter(x => x.kept) }));
             const later = new Set(); Object.keys(cw).filter(k => !sw[k]).forEach(k => { const W = cw[k] || {}; (W.mods || []).concat(W.adv || [], W.rise || []).forEach(id => later.add(Number(id))); });
             Object.keys(sw).sort().forEach(k => { const x = later.size ? trilhaWeekDrop(sw[k] || {}, later) : null; if (x) stay.push("⏩/🔓 de " + x.adv.concat(x.rise).map(id => nm(id).split(" · ")[0]).join(", ") + " não volta(m) para a semana de " + fmtBR(k) + ": o módulo já está numa semana que congelou depois"); });
             const back = [PB.moved.length ? PB.moved.length + " etapa(s) para as datas de antes" : "", (PB.adv.length || PB.rise.length) ? "⏩/🔓 que você tinha aplicado" : "", nMarks(PB.trail) ? nMarks(PB.trail) + " marcação(ões) do registro" : "", PB.days.length ? PB.days.length + " dia(s) editado(s)" : "", (PB.order || PB.pins.length || PB.ramp.length || PB.light.length || PB.dismiss.length || PB.simRes.length || PB.simOv.length) ? "fila, 📌, rampa, dia sem remédio e simulados como estavam" : ""].filter(Boolean);
             kids.push(React.createElement("div", { key: "u", "data-t": "restore-undo", style: { color: "#cbd5e1", fontSize: 11, lineHeight: 1.5, marginTop: 6 } },
                 React.createElement("div", null, "Desfazer volta o plano para como estava antes da restauração de " + fmtAt(snap.at) + ". O estado de agora vai para o arquivo do app — e dá para refazer."),
-                sec("Voltam", back.length ? back : ["nada além do plano de antes"], "ub1"),
+                sec("Voltam", (back.length ? back : ["nada além do plano de antes"]).concat(lightLines({ light: (U.light || []).filter(x => !x.kept) })), "ub1"),
                 sec("Saem da tela (ficam no arquivo)", leave.length ? leave : ["nada — você não mudou nada depois da restauração"], "ub2"),
                 stay.length ? sec("Fica como está", stay, "ub3") : null));
             kids.push(React.createElement("div", { key: "ub", style: { display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 } }, React.createElement("button", { onClick: () => run("undo"), style: bS(true) }, "Confirmar: desfazer"), React.createElement("button", { onClick: () => setRView(null), style: bS(false) }, "Cancelar")));
         } else if (rView === "redo" && redoT) {
-            const RU = trilhaRestoreUndo(config, redoT.entry, scheduleOv), rc = redoT.rentry.config || {};
-            const leave = leaveLines({ cfg: rc, sov: redoT.rentry.schedule || {}, trail: redoT.rentry.trail || {} }, RU, "de desfazer");
+            const RU = trilhaRestoreUndo(config, redoT.entry, scheduleOv), UB = trilhaRestoreUndo(redoT.entry.config || {}, redoT.rentry, redoT.entry.schedule || {}); // UB = o estado que o Desfazer gravou
+            const leave = leaveLines(UB, RU, "de desfazer");
+            const inT = (tr, id, it) => marksOf((tr || {})[id]).map(canonJ).indexOf(canonJ(it)) >= 0;
+            const again = []; const am = []; Object.keys(t).forEach(id => { const fs = marksOf(t[id]).filter(it => inT(UB.trail, id, it) && !inT(RU.trail, id, it)); if (fs.length) am.push({ id: Number(id), name: nm(id), items: fs }); });
+            if (am.length) again.push(nMarks(am) + " marcação(ões) que o Desfazer tinha trazido de volta: " + am.map(x => x.name.split(" · ")[0] + " — " + x.items.map(itemTxt).join(", ")).join("; "));
+            Object.keys(config.trilhaPlan || {}).forEach(id => { if ((UB.cfg.trilhaPlan || {})[id] && !(RU.cfg.trilhaPlan || {})[id]) again.push(nm(id) + " (⏩/🔓) sai de novo do plano"); });
+            const kA = RESTORE_CFG_KEYS.filter(k => k !== "lightDayOverrides" && canonJ(config[k]) === canonJ(UB.cfg[k]) && canonJ(config[k]) !== canonJ(RU.cfg[k])).map(k => KN[k]); if (kA.length) again.push(kA.join(", ") + " → voltam ao padrão de novo");
+            lightLines(RU).forEach(l => again.push(l));
             kids.push(React.createElement("div", { key: "r", "data-t": "restore-redo", style: { color: "#cbd5e1", fontSize: 11, lineHeight: 1.5, marginTop: 6 } },
                 React.createElement("div", null, "Refazer volta para como estava antes de desfazer (" + fmtAt(redoT.entry.at) + "): o plano restaurado em " + fmtAt(redoT.rentry.at) + " e o que você marcou depois dele. O estado de agora vai para o arquivo do app."),
-                sec("Saem da tela (ficam no arquivo)", leave.length ? leave : ["nada — você não mudou nada depois de desfazer"], "rb1")));
+                again.length ? sec("Saem de novo (a restauração volta a valer — fica tudo no arquivo)", again, "rb0") : null,
+                sec("Mudanças suas depois de desfazer que saem (ficam no arquivo)", leave.length ? leave : ["nada — você não mudou nada depois de desfazer"], "rb1")));
             kids.push(React.createElement("div", { key: "rb", style: { display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 } }, React.createElement("button", { onClick: () => run("redo"), style: bS(true) }, "Confirmar: refazer"), React.createElement("button", { onClick: () => setRView(null), style: bS(false) }, "Cancelar")));
         } else {
             if (lastOn) {
@@ -3954,7 +3971,8 @@ function App() {
                 : (L) => { L.push({ ...snapNow, why: "antes de refazer", of: tg.ridx }); const r = { ...L[tg.ridx] }; delete r.undoneAt; L[tg.ridx] = r; L[tg.idx] = { ...L[tg.idx], redoneAt: at }; };
         } else {
             const o = { keepOwn: !!(opts && opts.keepOwn) }, R = trilhaRestoreCalc(cfg, sov, tr, todayISO(), o); if (!R.changed) return "nada";
-            next = { cfg: R.settled, sov: R.next.sov, trail: R.next.trail };
+            const hR = todayISO(), cfgN = (R.P2 && R.P2.LW && hR >= weekStartISO(R.P2.LW) && hR <= TRILHA_END) ? { ...R.settled, trilhaFinalKeep: hR } : R.settled; // semana final: as etapas dos dias que já passaram ficam no bloco do dia (a recolocação diária não as leva)
+            next = { cfg: cfgN, sov: R.next.sov, trail: R.next.trail };
             mark = (L) => { L.push({ ...snapNow, why: "restaurar", opts: o }); };
         }
         const w = trilhaRestoreWrite(mark); if (!w) return "arquivo";

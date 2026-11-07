@@ -821,7 +821,7 @@ const DEFAULT12 = [5, 6, 14, 19, 24, 32, 34, 85, 86, 1, 2, 3];
         const c3 = await restoreCard(); check('depois de desfazer: sem "Desfazer"; o cartão diz que a restauração foi desfeita e oferece "Refazer a restauração"', !c3.btns.includes('Desfazer a restauração') && c3.btns.includes('Refazer a restauração') && /A restauração de 07\/11 às \d\d:\d\d foi desfeita em 07\/11 às \d\d:\d\d/.test(c3.text), c3.text.slice(0, 300));
         await clickRow(page, 86, '📌'); // depois de desfazer ela fixa um módulo
         await clickBtn(/^Refazer a restauração$/); const cr = await restoreCard();
-        check('a prévia do Refazer lista o que sai da tela, inclusive escolhas feitas depois de desfazer (📌)', /Saem da tela \(ficam no arquivo\)/.test(cr.text) && /escolhas feitas depois de desfazer \(📌\) → voltam a como estavam/.test(cr.text), cr.text.slice(0, 400));
+        check('a prévia do Refazer lista o que sai da tela, inclusive escolhas feitas depois de desfazer (📌)', /Mudanças suas depois de desfazer que saem \(ficam no arquivo\)/.test(cr.text) && /escolhas feitas depois de desfazer \(📌\) → voltam a como estavam/.test(cr.text), cr.text.slice(0, 400));
         check('"Refazer a restauração" pede confirmação (volta para como estava antes de desfazer)', !!cr && /Refazer volta para como estava antes de desfazer \(07\/11 às/.test(cr.text) && cr.btns.includes('Confirmar: refazer'), cr && cr.text.slice(0, 200));
         await clickBtn(/^Confirmar: refazer$/);
         const cfgRR = await getLS(page, CFG), L3 = await arcList();
@@ -950,7 +950,9 @@ const DEFAULT12 = [5, 6, 14, 19, 24, 32, 34, 85, 86, 1, 2, 3];
         await rClick(page, /^Desfazer a restauração$/); await rClick(page, /^Confirmar: desfazer$/);
         const cfgU = await getLS(page, CFG);
         check('Desfazer devolve a T2 com o 🔓 e o ⏩ (cota 4) e os módulos 34 e 85 no plano', subX(cfgU) === subX(pre.cfg) && canon((await getLS(page, TRL)) || {}) === canon(pre.tr), JSON.stringify(cfgU.trilhaWeeks['2026-11-03']));
-        await rClick(page, /^Refazer a restauração$/); await rClick(page, /^Confirmar: refazer$/);
+        await rClick(page, /^Refazer a restauração$/); const rp = await page.evaluate(() => document.querySelector('[data-t="restore-redo"]').innerText);
+        check('a prévia do Refazer (nada mudado depois de desfazer): "Saem de novo" lista o ⏩ e o 🔓 que o Desfazer tinha trazido e as marcas; nas mudanças dela, "nada"', /Saem de novo \(a restauração volta a valer/.test(rp) && /CIR4 · Especialidade Cirúrgica — Parte I \(⏩\/🔓\) sai de novo do plano/.test(rp) && /CIR3 · Hérnias da Parede Abdominal \(⏩\/🔓\) sai de novo do plano/.test(rp) && /marcação\(ões\) que o Desfazer tinha trazido de volta/.test(rp) && /nada — você não mudou nada depois de desfazer/.test(rp) && !/entrou no plano depois de desfazer/.test(rp), rp.slice(0, 600));
+        await rClick(page, /^Confirmar: refazer$/);
         await markUntil(page, '2026-11-06'); page = await S.reopen('2026-11-07'); // ela remarca o que fez (T1 e os dias já vividos da T2) — sem ⏳ na frente, o 🔓 aparece
         const rise = await banner(page, 'trilha-rise');
         check('depois de restaurar, com a T1 remarcada (nos dias dela), o 🔓 volta a ser oferecido para a T2', !!rise && /🔓 A semana passada fechou — o ritmo desta semana pode subir para 4/.test(rise.text), rise && rise.text.slice(0, 120));
@@ -986,7 +988,7 @@ const DEFAULT12 = [5, 6, 14, 19, 24, 32, 34, 85, 86, 1, 2, 3];
         const nulls = (c) => Object.values(c.trilhaPlan).reduce((s, p) => s + STG.filter(ts => !p[ts]).length, 0);
         await clickTab(page, 'TRILHA'); await rClick(page, /^Ver o que mudou desde a atualização$/);
         const diag = await rDiag(page); const nPend = Number((diag.match(/(\d+) etapa\(s\) aparecem como ⏳ pendentes/) || [])[1]);
-        check('diagnóstico na semana final: só a etapa que ela moveu está "fora da data original" (a recolocação do app não conta); avisa que o app recoloca sozinho uma vez por dia', /Etapas fora da data original: 1\n/.test(diag) && /apostila: SEG 21\/12 → volta para/.test(diag) && /📦 semana final: o app recoloca sozinho, uma vez por dia, o que estiver aberto/.test(diag) && nPend > 0, diag.slice(0, 300));
+        check('diagnóstico na semana final: só a etapa que ela moveu está "fora da data original" (a recolocação do app não conta); avisa que as etapas dos dias passados ficam no bloco do dia', /Etapas fora da data original: 1\n/.test(diag) && /apostila: SEG 21\/12 → volta para/.test(diag) && /📦 semana final: as etapas dos dias que já passaram ficam no bloco de cada dia, para você marcar o que fez/.test(diag) && nPend > 0, diag.slice(0, 300));
         await rClick(page, /^Aplicar a restauração$/);
         const cfg1 = await getLS(page, CFG);
         check('depois de aplicar: o simulado de 01/01 volta à regra e a recolocação de hoje não é refeita no registro vazio (marca do dia acompanha: "2026-12-30|0", mesmo registro da recolocação, nenhuma etapa a mais sem data) e a etapa movida volta', cfg1.trilhaFinalAutoAt === '2026-12-30|0' && !(cfg1.simOverrides || {})['2027-01-01'] && canon(cfg1.trilhaFinalLog) === canon(pre.cfg.trilhaFinalLog) && nulls(cfg1) === nulls(pre.cfg) && cfg1.trilhaPlan[mv[0]].apost === mv[1].apost, JSON.stringify([cfg1.trilhaFinalAutoAt, nulls(cfg1), nulls(pre.cfg)]));
@@ -1002,6 +1004,13 @@ const DEFAULT12 = [5, 6, 14, 19, 24, 32, 34, 85, 86, 1, 2, 3];
         if (bL) { await clickTask(page, new RegExp('^' + bL.text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').slice(0, 60)), null); const t = await getLS(page, TRL); check('marcar a etapa no bloco de ' + br(lastD) + ' carimba ' + br(lastD), (t[bL.tm] || {})[STAMP[bL.ts]] === lastD, JSON.stringify(t[bL.tm])); }
         await clickTab(page, 'TRILHA'); await rClick(page, /^Desfazer a restauração$/); await rClick(page, /^Confirmar: desfazer$/);
         check('Desfazer na semana final devolve o estado de antes (plano, marca da semana final, registro)', subX(await getLS(page, CFG)) === subX(pre.cfg) && canon((await getLS(page, TRL)) || {}) === canon(pre.tr));
+        await rClick(page, /^Refazer a restauração$/); await rClick(page, /^Confirmar: refazer$/);
+        const cR = await getLS(page, CFG); const pastD = (c) => { const o = {}; Object.entries(c.trilhaPlan).forEach(([id, p]) => STG.forEach(ts => { const d0 = (p.orig || {})[ts]; if (d0 && d0 < '2026-12-30') o[id + '.' + ts] = p[ts]; })); return o; };
+        check('Refazer na semana final: a restauração volta a valer, com a marca "as etapas dos dias passados ficam no bloco" (trilhaFinalKeep = 30/12)', cR.trilhaFinalKeep === '2026-12-30', cR.trilhaFinalKeep);
+        await page.evaluate(() => { const c = JSON.parse(localStorage.getItem('medplanner_config_v1')); c.manualWeek = null; localStorage.setItem('medplanner_config_v1', JSON.stringify(c)); }); // volta à semana de hoje (a navegação ◀ ficou na semana anterior)
+        page = await S.reopen('2026-12-31'); const c31 = await getLS(page, CFG);
+        const lost = Object.entries(pastD(cR)).filter(([k, v]) => v && v < '2026-12-30' && (pastD(c31)[k] || null) !== v).map(([k]) => k);
+        check('no dia seguinte (31/12) a recolocação automática roda, mas as etapas dos dias que já passaram ficam no bloco do dia (nenhuma vai para "depois de 01/01"); o ⏳ continua', /^2026-12-31\|/.test(c31.trilhaFinalAutoAt || '') && !lost.length && !!(await banner(page, 'trilha-pending')), JSON.stringify({ key: c31.trilhaFinalAutoAt, lost: lost.slice(0, 6), n: lost.length }));
     });
     // ── TR17f · blocos que ela criou nos dias da Trilha: por padrão saem da tela (ficam no arquivo); a prévia oferece mantê-los no dia regenerado ──
     const own12 = { id: 'c-1794200000000', d: 'EXTRA', color: '#0EA5E9', text: 'Consulta médica 14h', time: '3h', done: true }, own05 = { id: 'c-1761000000000', d: 'EXTRA', color: '#0EA5E9', text: 'Consulta (editado por ela)', time: '1h' };
@@ -1011,7 +1020,7 @@ const DEFAULT12 = [5, 6, 14, 19, 24, 32, 34, 85, 86, 1, 2, 3];
         await clickTab(page, 'TRILHA'); await rClick(page, /^Ver o que mudou desde a atualização$/);
         const diag = await rDiag(page);
         check('prévia: os blocos dela aparecem por dia (o de 05/11 marcado "de antes da atualização") e a opção de mantê-los, desmarcada', /QUI 05\/11 · 1 bloco\(s\), 0 ✓ · seus: “Consulta \(editado por ela\)” \(de antes da atualização\) — sai\(em\) da tela, fica\(m\) no arquivo/.test(diag) && /QUI 12\/11 · 2 bloco\(s\), 2 ✓ · seus: “Consulta médica 14h” — sai/.test(diag) && /Manter nos dias regenerados os 2 bloco\(s\) que você criou/.test(diag) && !(await page.evaluate(() => document.querySelector('[data-t="restore-keepown"] input').checked)), diag.slice(0, 500));
-        check('dia sem remédio (🧠): a escolha da semana de 10/11 (QUI 12/11, ainda vai chegar) volta ao previsto; a da semana de 03/11 (QUA 04/11, já vivida) fica, com as duas datas', /dia sem remédio da semana de 10\/11: QUI 12\/11 \(sua escolha\) → o previsto/.test(diag) && /dia sem remédio da semana de 03\/11: fica QUA 04\/11 \(a sua escolha — esse dia, ou o previsto, \S+ \d\d\/11, já passou ou é hoje/.test(diag), (diag.match(/dia sem remédio[^\n]*/g) || []).join(' | '));
+        check('dia sem remédio (🧠): a escolha da semana de 10/11 (QUI 12/11, ainda vai chegar) volta ao previsto; a da semana de 03/11 (QUA 04/11, já vivida) fica, com as duas datas', /dia sem remédio da semana de 10\/11: QUI 12\/11 \(sua escolha\) → \S+ \d\d\/11 \(o previsto\)/.test(diag) && /dia sem remédio da semana de 03\/11: fica QUA 04\/11 \(a sua escolha — esse dia, ou o previsto, \S+ \d\d\/11, já passou ou é hoje/.test(diag), (diag.match(/dia sem remédio[^\n]*/g) || []).join(' | '));
         await page.evaluate(() => document.querySelector('[data-t="restore-keepown"] input').click()); await page.waitForTimeout(300);
         const diag2 = await rDiag(page);
         check('marcando "Manter…", a prévia diz que eles ficam no dia, sem ✓', /“Consulta médica 14h” — fica\(m\) no dia, sem ✓/.test(diag2), (diag2.match(/QUI 12\/11[^\n]*/) || [''])[0]);
@@ -1023,6 +1032,21 @@ const DEFAULT12 = [5, 6, 14, 19, 24, 32, 34, 85, 86, 1, 2, 3];
         check('restaurar de novo: a prévia começa com a escolha da restauração em vigor ("Manter" marcado) — "Nada a restaurar"', /Nada a restaurar/.test(c2.text) && (await page.evaluate(() => document.querySelector('[data-t="restore-keepown"] input').checked)), c2.text.slice(0, 200));
         await page.evaluate(() => document.querySelector('[data-t="restore-keepown"] input').click()); await page.waitForTimeout(300);
         const c3 = await rCard(page); check('… desmarcando "Manter" (escolha dela), a prévia oferece "Aplicar"', c3.btns.includes('Aplicar a restauração'), c3.btns.join(' | '));
+    });
+    // ── TR17g · dia sem remédio no Desfazer (🧠): a troca que mexeria num dia já vivido ou no de hoje não acontece — fica como está, com as duas datas ──
+    await scenario(browser, 'TR17g-restaurar-dia-sem-remedio-desfazer', '2026-10-27', {}, async (S) => {
+        let page = await S.reopen('2026-11-04');
+        await page.evaluate(() => { const c = JSON.parse(localStorage.getItem('medplanner_config_v1')); c.lightDayOverrides = { ...(c.lightDayOverrides || {}), '2026-11-03': 5 }; localStorage.setItem('medplanner_config_v1', JSON.stringify(c)); }); // em 04/11 ela escolhe DOM 08/11
+        page = await S.reopen('2026-11-04'); const T2l = (await getLS(page, CFG)).trilhaWeeks['2026-11-03'].light;
+        await clickTab(page, 'TRILHA'); await rClick(page, /^Ver o que mudou desde a atualização$/); const diag = await rDiag(page);
+        check('04/11: a escolha DOM 08/11 e o previsto (' + br(T2l) + ') ainda vão chegar → volta ao previsto, com as duas datas', new RegExp('dia sem remédio da semana de 03\\/11: DOM 08\\/11 \\(sua escolha\\) → \\S+ ' + br(T2l).replace('/', '\\/') + ' \\(o previsto\\)').test(diag), (diag.match(/dia sem remédio[^\n]*/) || [''])[0]);
+        await rClick(page, /^Aplicar a restauração$/);
+        check('depois de aplicar: sem a escolha (vale o previsto, ' + br(T2l) + ')', ((await getLS(page, CFG)).lightDayOverrides || {})['2026-11-03'] === undefined);
+        page = await S.reopen('2026-11-08'); // o previsto (07/11) já foi vivido como dia sem remédio; hoje é 08/11
+        await clickTab(page, 'TRILHA'); await rClick(page, /^Desfazer a restauração$/); const up = await page.evaluate(() => document.querySelector('[data-t="restore-undo"]').innerText);
+        check('Desfazer em 08/11: a prévia diz que o dia sem remédio fica como está (o previsto já foi vivido e a escolha de antes seria hoje)', new RegExp('dia sem remédio da semana de 03\\/11: fica \\S+ ' + br(T2l).replace('/', '\\/') + ' \\(esse dia, ou o que voltaria, DOM 08\\/11, já passou ou é hoje').test(up), up.slice(0, 500));
+        await rClick(page, /^Confirmar: desfazer$/);
+        check('… e grava assim: a escolha de antes não volta (hoje não vira dia sem remédio; o dia vivido não é reescrito)', ((await getLS(page, CFG)).lightDayOverrides || {})['2026-11-03'] === undefined);
     });
 
     await browser.close();
