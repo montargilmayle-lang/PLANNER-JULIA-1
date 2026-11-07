@@ -737,6 +737,114 @@ const DEFAULT12 = [5, 6, 14, 19, 24, 32, 34, 85, 86, 1, 2, 3];
         check('aba Trilha: 1 fechado (CIR2 Urologia, do registro)', /1\nFechados na Trilha/.test(t.counts), t.counts.slice(0, 160));
     });
 
+    // ── TR17 · RESTAURAR O PLANO AO ESTADO DA ÚLTIMA ATUALIZAÇÃO (paciente, 07/11): ela não cumpriu a 1ª semana e foi movendo tarefas até desorganizar o
+    //    app. Bagunça pela interface (mover etapas e blocos, marcar no bloco e no card, ↑ e 📌 na fila, rampa, dia sem remédio) + o que só se grava no
+    //    fim da semana ("Agora não", % e religar simulado) → diagnóstico → "Aplicar" → o plano volta ao congelado; arquivo com o estado anterior inteiro;
+    //    restaurar de novo não muda nada; "Desfazer" devolve o estado de antes; depois: ⏳, marcar no bloco do dia passado, recolocar e 🔓 ──
+    await scenario(browser, 'TR17-restaurar', '2026-10-27', {}, async (S) => {
+        let page = S.page;
+        const restoreCard = () => page.evaluate(() => { const el = document.querySelector('[data-t="restore-card"]'); return el ? { text: el.innerText, btns: [...el.querySelectorAll('button')].map(b => b.innerText.trim()) } : null; });
+        const clickBtn = async (re) => { const ok = await page.evaluate((src) => { const b = [...document.querySelectorAll('button')].find(x => new RegExp(src).test(x.innerText.trim())); if (!b) return false; b.click(); return true; }, re.source); if (!ok) throw new Error('botão não encontrado: ' + re); await page.waitForTimeout(450); };
+        const arcList = async () => (JSON.parse(await page.evaluate(() => localStorage.getItem('medplanner_schedule_archive_v1')) || '{}').restauracoes || []);
+        const moveAny = async (re, to) => { await moveT(page, re, to); const ask = await readAsk(page); if (ask) await clickAsk(page, 'Mover assim mesmo'); await page.evaluate(() => { const b = [...document.querySelectorAll('button')].find(x => x.innerText.trim() === '✓ Pronto'); if (b) b.click(); }); await page.waitForTimeout(250); };
+        const RK = ['trilhaPlan', 'trilhaOrder', 'trilhaPins', 'trilhaRamp', 'lightDayOverrides', 'trilhaDismiss', 'simResults', 'simOverrides', 'trilhaRevFull', 'trilhaFinalAutoAt', 'trilhaFinalLog', 'trilhaWeeks', 'trilhaFirstOpen'];
+        const sub = (c) => JSON.stringify(RK.map(k => c[k] === undefined ? null : c[k])); // a navegação (manualWeek) não conta
+        const cfgA = await getLS(page, CFG); // 1º acesso 27/10: a T1 congela (CIR1 · Trauma I, Trauma II, CIR2 · Urologia)
+        check('ponto de partida: 1º acesso 27/10, T1 congelada com 5, 6, 14', cfgA.trilhaFirstOpen === '2026-10-27' && JSON.stringify(cfgA.trilhaWeeks['2026-10-26'].mods) === '[5,6,14]', JSON.stringify(cfgA.trilhaWeeks));
+        // ── a bagunça da 1ª semana, pela interface ──
+        await clickDate(page, '28/10'); await clickTask(page, /^Trilha · CIR1 — Trauma I .*aula online/, null); // marca a aula no bloco
+        await moveAny(/^Academia/, '2026-10-30'); // move um bloco comum (vira dia editado em 28 e 30/10)
+        await clickDate(page, '29/10'); await moveAny(/^Trilha · CIR1 — Trauma I .*30 questões/, '2026-10-31'); // move uma etapa
+        page = await S.reopen('2026-10-30');
+        await clickDate(page, '30/10'); await clickTask(page, /^Trilha · CIR1 — Trauma II .*aula online/, null);
+        await clickTab(page, 'MÓDULOS'); await clickCardBtn(page, /Trauma I — Avaliação Inicial/, /D2 · 30q/); // marca pelo card (carimba hoje)
+        await clickTab(page, 'TRILHA'); await clickRow(page, 85, '📌'); await clickRow(page, 34, '↑');
+        await page.evaluate(() => { const r = document.querySelector('[data-t="trilha-ramp"] [data-tue="2026-11-17"]'); const b = [...r.querySelectorAll('button')].find(b => b.innerText.trim() === '−'); b.click(); }); await page.waitForTimeout(350);
+        await clickTab(page, 'CRONOGRAMA'); await H.setLight(page, '6');
+        page = await S.reopen('2026-11-03'); // a T2 congela segurada (a T1 não fechou)
+        const cfgB = await getLS(page, CFG);
+        const T2 = (cfgB.trilhaWeeks['2026-11-03'] || {}).mods || [];
+        check('03/11: a T2 congela segurada em 3 (a T1 não fechou) com a fila que valia na hora — o 📌 de 30/10 (85) entra: 85, 19, 24', cfgB.trilhaWeeks['2026-11-03'] && cfgB.trilhaWeeks['2026-11-03'].q === 3 && cfgB.trilhaWeeks['2026-11-03'].held && JSON.stringify(T2) === '[85,19,24]', JSON.stringify(cfgB.trilhaWeeks['2026-11-03']));
+        await clickDate(page, '09/11'); await moveAny(/^Trilha · CIR2 — Cicatrização .*aula online/, '2026-11-08');
+        await page.evaluate(() => { const c = JSON.parse(localStorage.getItem('medplanner_config_v1')); c.trilhaDismiss = { '2026-11-03|rise': '2026-11-03' }; c.simResults = { ...(c.simResults || {}), '2026-11-06': 62 }; c.simOverrides = { ...(c.simOverrides || {}), '2026-11-20': true }; c.manualWeek = null; localStorage.setItem('medplanner_config_v1', JSON.stringify(c));
+            const t = JSON.parse(localStorage.getItem('medplanner_trail_v1') || '{}'); t[5] = { ...(t[5] || {}), accD2: 70 }; t[14] = { aulaAudio: true, aulaAudioAt: '2026-11-02', aula: true, aulaAt: '2026-11-02' }; localStorage.setItem('medplanner_trail_v1', JSON.stringify(t)); });
+        page = await S.reopen('2026-11-07');
+        const pre = { cfg: await getLS(page, CFG), sch: (await getLS(page, SCH)) || {}, tr: (await getLS(page, TRL)) || {} };
+        const movedPre = Object.values(pre.cfg.trilhaPlan).filter(p => STG.some(ts => p[ts] !== p.orig[ts])).length;
+        check('a bagunça está gravada: etapas fora da data original (questões de CIR1 · Trauma I em 31/10, aula de CIR2 · Cicatrização em 08/11), dias da Trilha editados, ✓ e % no registro, 📌, ↑, rampa, dia sem remédio, "Agora não", % e religar do simulado', movedPre === 2 && pre.cfg.trilhaPlan[5].quest === '2026-10-31' && pre.cfg.trilhaPlan[19].aula === '2026-11-08' && Object.keys(pre.sch).some(d => d >= '2026-10-26') && pre.tr[5] && pre.tr[5].aula && pre.tr[5].questoesD2 && pre.tr[6] && pre.tr[6].aula && (pre.cfg.trilhaPins || []).includes(85) && Array.isArray(pre.cfg.trilhaOrder) && pre.cfg.trilhaRamp && pre.cfg.trilhaRamp['2026-11-17'] === 3 && pre.cfg.lightDayOverrides && pre.cfg.lightDayOverrides['2026-10-26'] !== undefined, JSON.stringify([movedPre, Object.keys(pre.sch), pre.tr, pre.cfg.trilhaPins, pre.cfg.trilhaRamp, pre.cfg.lightDayOverrides]));
+        // ── diagnóstico (nada gravado) ──
+        await clickTab(page, 'TRILHA');
+        const c0 = await restoreCard(); check('aba Trilha: cartão "🧹 RESTAURAR O PLANO AO ESTADO DA ÚLTIMA ATUALIZAÇÃO" com "Ver o que mudou desde a atualização"', !!c0 && /RESTAURAR O PLANO AO ESTADO DA ÚLTIMA ATUALIZAÇÃO/.test(c0.text) && c0.btns.includes('Ver o que mudou desde a atualização'), c0 && c0.text.slice(0, 120));
+        await clickBtn(/^Ver o que mudou desde a atualização$/);
+        const diag = await page.evaluate(() => document.querySelector('[data-t="restore-diag"]').innerText); console.log('   ' + diag.replace(/\n/g, '\n   '));
+        check('diagnóstico: etapas fora da data original (com a data de volta), data original guardada em todas, dias da Trilha editados, ✓/%/áudio do registro, fila, 📌, rampa, dia sem remédio, "Agora não", simulado; fica o 1º acesso 27/10 e as semanas congeladas 26/10 (3) e 03/11 (3, segurada)',
+            new RegExp('Etapas fora da data original: ' + movedPre).test(diag) && /CIR1 · Trauma I — Avaliação Inicial e Trauma de Tórax — questões: SÁB 31\/10 → volta para QUI 29\/10/.test(diag) && /em todas as etapas planejadas ✓/.test(diag) && /Dias da Trilha editados à mão: [1-9]/.test(diag) && /Registro da Trilha desde 26\/10: [1-9]\d* ✓ de etapa · 1 % · 1 áudio/.test(diag) && /fila: ordem mudada/.test(diag) && /📌 fixados: .* → saem/.test(diag) && /rampa da semana de 17\/11: 3 → volta ao padrão \(4\)/.test(diag) && /dia sem remédio escolhido na semana de 26\/10/.test(diag) && /“Agora não”: 1/.test(diag) && /% do simulado de 06\/11 \(62%\)/.test(diag) && /simulado de 20\/11 religado/.test(diag) && /1º acesso: 27\/10/.test(diag) && /26\/10 \(3\) · 03\/11 \(3, segurada\)/.test(diag) && /11 etapa\(s\) de dias que já passaram aparecem como ⏳ pendentes/.test(diag), diag.slice(0, 300));
+        check('diagnóstico: a semana de 03/11 congelou com o 📌 de 30/10 (85) — fica como congelou, e o diagnóstico mostra o que a fila padrão daria (19, 24, 32)', /a semana de 03\/11 congelou com a fila e os 📌 que valiam na hora: .* — pela fila padrão seriam CIR2 · Cicatrização.*; fica como congelou/.test(diag) && !/a semana de 26\/10 congelou/.test(diag), (diag.match(/a semana de 03\/11 congelou[^\n]*/) || [''])[0]);
+        check('o diagnóstico não grava nada', JSON.stringify(await getLS(page, CFG)) === JSON.stringify(pre.cfg) && JSON.stringify((await getLS(page, SCH)) || {}) === JSON.stringify(pre.sch) && JSON.stringify((await getLS(page, TRL)) || {}) === JSON.stringify(pre.tr) && (await arcList()).length === 0);
+        // ── Aplicar ──
+        await clickBtn(/^Aplicar a restauração$/);
+        const cfg = await getLS(page, CFG), sch = (await getLS(page, SCH)) || {}, tr = (await getLS(page, TRL)) || {};
+        const want = {}; [5, 6, 14].forEach(id => { want[id] = cfgA.trilhaPlan[id]; }); T2.forEach(id => { want[id] = { ...cfgB.trilhaPlan[id], hist: [] }; });
+        check('trilhaPlan volta ao congelado: T1 = como congelou em 27/10, T2 = como congelou em 03/11 (datas = orig, sem histórico de movimentos)', Object.keys(want).every(id => JSON.stringify(cfg.trilhaPlan[id]) === JSON.stringify({ ...want[id], hist: [] })) && Object.keys(cfg.trilhaPlan).length === 6, JSON.stringify(Object.fromEntries(Object.entries(cfg.trilhaPlan).map(([id, p]) => [id, STG.map(ts => p[ts]).join(' ')]))));
+        check('ficam intactos o 1º acesso e o congelamento das semanas (cota não recalculada)', cfg.trilhaFirstOpen === '2026-10-27' && JSON.stringify(cfg.trilhaWeeks) === JSON.stringify(pre.cfg.trilhaWeeks), JSON.stringify(cfg.trilhaWeeks));
+        check('dias da Trilha editados descartados; registro da Trilha sem ✓, %, carimbo nem áudio de depois da atualização', !Object.keys(sch).some(d => d >= '2026-10-26') && JSON.stringify(tr) === '{}', JSON.stringify([Object.keys(sch), tr]));
+        check('fila, 📌, rampa, dia sem remédio, "Agora não", % e religar do simulado de volta ao padrão', cfg.trilhaOrder === undefined && cfg.trilhaPins === undefined && !Object.keys(cfg.trilhaRamp || {}).some(k => k >= '2026-10-20') && !Object.keys(cfg.lightDayOverrides || {}).some(k => k >= '2026-10-26') && cfg.trilhaDismiss === undefined && !Object.keys(cfg.simResults || {}).some(k => k >= '2026-10-26') && !Object.keys(cfg.simOverrides || {}).some(k => k >= '2026-10-26'), JSON.stringify([cfg.trilhaOrder, cfg.trilhaPins, cfg.trilhaRamp, cfg.lightDayOverrides, cfg.trilhaDismiss, cfg.simResults, cfg.simOverrides]));
+        const L1 = await arcList();
+        check('o arquivo guarda o estado anterior inteiro, com data e hora: config, dias editados e registro da Trilha idênticos aos de antes', L1.length === 1 && L1[0].why === 'restaurar' && /^2026-11-07T\d\d:\d\d$/.test(L1[0].at) && JSON.stringify(L1[0].config) === JSON.stringify(pre.cfg) && JSON.stringify(L1[0].schedule) === JSON.stringify(pre.sch) && JSON.stringify(L1[0].trail) === JSON.stringify(pre.tr), JSON.stringify(L1.map(e => e.why + ' ' + e.at)));
+        const c1 = await restoreCard();
+        check('cartão depois de aplicar: "✅ Plano restaurado em 07/11", backup novo antes de marcar, os 3 passos (marcar no bloco do dia, ⏳ "Ver como recolocar", 🔓) e "Desfazer a restauração"', /✅ Plano restaurado em 07\/11 às/.test(c1.text) && c1.btns.includes('💾 Baixar backup agora') && /1\. Marque o que você fez dentro do bloco de cada dia, voltando com ◀/.test(c1.text) && /Não use o card da aba Módulos/.test(c1.text) && /2\. O que ficar pendente aparece no topo como ⏳/.test(c1.text) && /3\. Se uma semana não fechar/.test(c1.text) && c1.btns.includes('Desfazer a restauração'), c1.text.slice(0, 200));
+        // ── o plano na tela = o congelado (T1 e T2), dia a dia ──
+        await clickTab(page, 'CRONOGRAMA'); await navWeek(page, -1);
+        const map = await trailMap(page, 3);
+        check('na tela (T1 a T3), cada etapa dos módulos da T1 e da T2 está no dia congelado (o plano que o motor gerou)', Object.keys(want).every(id => STG.every(ts => (map[id] || {})[ts] === want[id][ts])) && !Object.values(map).some(m => Object.keys(m).some(k => k.endsWith('_dup'))), JSON.stringify(map));
+        await page.evaluate(() => { const c = JSON.parse(localStorage.getItem('medplanner_config_v1')); c.manualWeek = null; localStorage.setItem('medplanner_config_v1', JSON.stringify(c)); });
+        page = await S.reopen('2026-11-07'); // volta à semana de hoje
+        // ── restaurar de novo não muda nada ──
+        await clickTab(page, 'TRILHA'); await clickBtn(/^Ver o que mudou desde a atualização$/);
+        const c2 = await restoreCard();
+        check('restaurar de novo: "Nada a restaurar", sem "Aplicar"; nada gravado e o arquivo não cresce', /Nada a restaurar: o plano já está como na última atualização/.test(c2.text) && !c2.btns.includes('Aplicar a restauração') && sub(await getLS(page, CFG)) === sub(cfg) && JSON.stringify((await getLS(page, SCH)) || {}) === JSON.stringify(sch) && (await arcList()).length === 1, c2.text.slice(0, 160));
+        await clickBtn(/^Fechar$/);
+        // ── Desfazer devolve o estado de antes ──
+        await clickBtn(/^Desfazer a restauração$/); const cu = await restoreCard();
+        check('"Desfazer a restauração" pede confirmação (volta para como estava antes da restauração de 07/11)', /Desfazer volta o plano para como estava antes da restauração de 07\/11/.test(cu.text) && cu.btns.includes('Confirmar: desfazer'), cu.text.slice(0, 200));
+        await clickBtn(/^Confirmar: desfazer$/);
+        const cfgU = await getLS(page, CFG), schU = (await getLS(page, SCH)) || {}, trU = (await getLS(page, TRL)) || {}, L2 = await arcList();
+        check('Desfazer: config (as chaves da restauração, as semanas e o 1º acesso), dias editados e registro da Trilha voltam exatamente ao estado de antes da restauração; o arquivo marca a restauração como desfeita e guarda o estado restaurado', sub(cfgU) === sub(pre.cfg) && JSON.stringify(schU) === JSON.stringify(pre.sch) && JSON.stringify(trU) === JSON.stringify(pre.tr) && L2.length === 2 && !!L2[0].undoneAt && L2[1].why === 'antes de desfazer' && JSON.stringify(L2[1].trail) === '{}', JSON.stringify(L2.map(e => e.why + (e.undoneAt ? ' (desfeita)' : ''))));
+        const c3 = await restoreCard(); check('depois de desfazer: sem "Desfazer" no cartão', !c3.btns.includes('Desfazer a restauração'), c3.btns.join(' | '));
+        // ── restaura de novo e segue: ⏳, marcar no bloco do dia passado, recolocar, 🔓 ──
+        await clickBtn(/^Ver o que mudou desde a atualização$/); await clickBtn(/^Aplicar a restauração$/);
+        check('restaurar outra vez depois de desfazer: mesmo plano restaurado', JSON.stringify((await getLS(page, CFG)).trilhaPlan) === JSON.stringify(cfg.trilhaPlan) && (await arcList()).length === 3);
+        await clickTab(page, 'CRONOGRAMA');
+        const pend0 = await banner(page, 'trilha-pending');
+        check('depois de restaurar: as 11 etapas de dias que já passaram aparecem como ⏳ pendentes (esperado)', !!pend0 && /Ficaram para trás 11 etapas/.test(pend0.text), pend0 && pend0.text.slice(0, 120));
+        await navWeek(page, -1); await clickDate(page, '28/10'); await clickTask(page, /^Trilha · CIR1 — Trauma I .*aula online/, null);
+        await clickDate(page, '29/10'); await clickTask(page, /^Trilha · CIR1 — Trauma I .*30 questões/, /D2 · 30q/);
+        await navWeek(page, 1); // de volta à semana atual (o ⏳ fica no topo da semana de hoje)
+        const trM = await getLS(page, TRL);
+        check('marcar no bloco do dia passado: carimbo = a data daquele dia (aula 28/10, questões 29/10), não hoje', trM[5].aulaAt === '2026-10-28' && trM[5].questoesD2At === '2026-10-29', JSON.stringify(trM[5]));
+        const pend1 = await banner(page, 'trilha-pending');
+        check('a lista de pendentes encolhe: 11 → 9', !!pend1 && /Ficaram para trás 9 etapas/.test(pend1.text), pend1 && pend1.text.slice(0, 120));
+        await clickIn(page, 'trilha-pending', 'Ver como recolocar'); const pv = await banner(page, 'trilha-pending'); console.log('   💡', pv.text.replace(/\n/g, ' '));
+        await clickIn(page, 'trilha-pending', 'Aplicar');
+        const cfgR = await getLS(page, CFG), p5 = cfgR.trilhaPlan[5];
+        const rem = []; [5, 6, 14].forEach(id => STG.forEach(ts => { const done = (trM[id] || {})[{ aula: 'aula', quest: 'questoesD2', apost: 'apostila', seal: 'smartcard' }[ts]]; if (!done && cfgA.trilhaPlan[id][ts] < '2026-11-07') rem.push([id, ts, cfgR.trilhaPlan[id][ts]]); }));
+        check('"Ver como recolocar" → Aplicar: as 9 etapas que ficaram vão para hoje (07/11) em diante, com histórico "recolocar"; CIR1 · Trauma I continua da questão carimbada em 29/10 (apostila e selagem depois, em ordem)', rem.length === 9 && rem.every(r => r[2] && r[2] >= '2026-11-07') && p5.apost >= '2026-11-07' && p5.seal > p5.apost && p5.hist.some(h => h.why === 'recolocar') && !(await banner(page, 'trilha-pending')), JSON.stringify(rem));
+        // 🔓: ela marca o que faltava da T1 (no bloco de cada dia) ainda na T2 — a semana passada fecha e o ritmo pode subir
+        await markUntil(page, '2026-11-30', [[19, 'aula'], [19, 'quest'], [19, 'apost'], [19, 'seal'], [24, 'aula'], [24, 'quest'], [24, 'apost'], [24, 'seal'], [32, 'aula'], [32, 'quest'], [32, 'apost'], [32, 'seal']]);
+        page = await S.reopen('2026-11-07');
+        const rise = await banner(page, 'trilha-rise');
+        check('com a T1 toda marcada (ainda na T2), o app oferece o 🔓 "A semana passada fechou — o ritmo desta semana pode subir para 4"', !!rise && /🔓 A semana passada fechou — o ritmo desta semana pode subir para 4/.test(rise.text), rise && rise.text.slice(0, 160));
+    });
+    // ── TR17b · arquivo ilegível: "Aplicar" avisa e não muda nada (nada sai sem guardar) ──
+    await scenario(browser, 'TR17b-restaurar-arquivo-ilegivel', '2026-11-07', {}, async (S) => {
+        const page = S.page; const before = { cfg: await getLS(page, CFG), tr: await getLS(page, TRL) };
+        await clickTab(page, 'TRILHA');
+        await page.evaluate(() => { const b = [...document.querySelectorAll('button')].find(x => /Ver o que mudou desde a atualização/.test(x.innerText)); b.click(); }); await page.waitForTimeout(400);
+        await page.evaluate(() => { const b = [...document.querySelectorAll('button')].find(x => /^Aplicar a restauração$/.test(x.innerText.trim())); b.click(); }); await page.waitForTimeout(450);
+        const msg = await page.evaluate(() => (document.querySelector('[data-t="restore-msg"]') || {}).innerText || '');
+        check('arquivo ilegível: "Não consegui gravar no arquivo do app — nada foi mudado"; config, registro e arquivo como estavam', /Não consegui gravar no arquivo do app — nada foi mudado/.test(msg) && JSON.stringify(await getLS(page, CFG)) === JSON.stringify(before.cfg) && JSON.stringify(await getLS(page, TRL)) === JSON.stringify(before.tr) && (await page.evaluate(() => localStorage.getItem('medplanner_schedule_archive_v1'))) === '{corrompido', msg);
+    }, { raw: { 'medplanner_schedule_archive_v1': '{corrompido', [CFG]: JSON.stringify({ ...baseCfg, trilhaFirstOpen: '2026-10-27', trilhaInicio: '2026-10-26', trilhaLegacyOv: { '2026-10-20': null, '2026-10-21': null }, trilhaPins: [85] }), [TRL]: JSON.stringify({ 5: { aula: true, aulaAt: '2026-10-28' } }) } });
+
     await browser.close();
     H.summary('trilha');
 })();
