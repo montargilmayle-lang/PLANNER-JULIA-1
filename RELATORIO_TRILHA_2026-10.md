@@ -53,11 +53,13 @@ Depois de aplicar: 11 etapa(s) aparecem como ⏳ pendentes · nenhum dia acima d
    - ⏩ Adiantar e 🔓 subida aplicados depois da atualização saem. A semana volta à cota com que congelou (segurada, "fechamento"), e o 🔓 volta a ser oferecido quando a semana anterior fechar;
    - dias da Trilha editados à mão voltam a ser gerados (ver B.5.1 para os blocos que ela criou);
    - ✓, %, carimbos, áudio e revisões registrados **desde o 1º acesso à versão nova** saem (ficam no arquivo);
-   - fila, 📌, rampa, dia sem remédio, "Agora não", % de simulado e simulado ligado/desligado voltam ao padrão.
+   - fila, 📌, rampa, "Agora não", % de simulado e simulado ligado/desligado voltam ao padrão;
+   - o dia sem remédio escolhido por ela volta ao previsto **só se as duas datas ainda vão chegar**. Se o dia escolhido ou o previsto já passou ou é hoje, a escolha fica (ver B.5.6). A prévia mostra as duas datas.
 4. **O que fica:**
    - `trilhaFirstOpen` e as semanas congeladas: composição e cota, nunca recalculadas;
-   - o que o app registra sozinho: dias cheios para a revisão (`trilhaRevFull`, decisão 73) e a recolocação da semana final;
-   - tudo o que é de antes da atualização: histórico do curso, dias de transição, e marcas sem data, de antes de 26/10, ou de antes do 1º acesso registradas assim no congelamento.
+   - o que o app registra sozinho: dias cheios para a revisão (`trilhaRevFull`, decisão 73) e a recolocação da semana final. Se ela tinha religado o simulado de 01/01, ele volta à regra, mas a recolocação de hoje não é refeita: o app refaria a recolocação sobre o registro sem as marcas dela, e as etapas dos dias passados perderiam a data. Amanhã ela roda de novo, como sempre;
+   - tudo o que é de antes da atualização: histórico do curso, dias de transição, e marcas sem data, de antes de 26/10, ou de antes do 1º acesso registradas assim no congelamento. Uma revisão conta pela data em que foi marcada, não pela data do bloco.
+   - Junto com a revisão D+30 sai o reforço (R3), que depende dela.
 5. **Grava o estado em que o app assenta.** Ao gravar, roda o congelamento sobre o estado restaurado. Por isso **restaurar de novo mostra "Nada a restaurar"** e o arquivo não cresce. Vale também num plantão longo com revisão vencida (10/11) e na semana final (30/12).
 
 ### B.3 · Desfazer e Refazer
@@ -71,7 +73,8 @@ Depois de aplicar: 11 etapa(s) aparecem como ⏳ pendentes · nenhum dia acima d
   
   O estado de agora vai para o arquivo ("antes de desfazer").
 - **Uma semana que congelou depois da restauração fica como está** (a cota não é recalculada), e a prévia diz isso. Se um módulo do ⏩/🔓 de antes já entrou nessa semana nova, ele não volta para a semana antiga, e a prévia também diz.
-- **"Refazer a restauração"** aparece logo depois de desfazer. Ele reaplica o estado de antes de desfazer, ou seja, o plano restaurado e o que ela marcou depois.
+- **Os dias de antes da Trilha não mudam.** O que ela marcou depois da restauração no histórico até 19/10 ou nos dias de transição fica, porque a restauração nunca toca nesses dias.
+- **"Refazer a restauração"** aparece logo depois de desfazer, inclusive quando uma restauração anterior continua em vigor. Ele reaplica o estado de antes de desfazer: o plano restaurado e o que ela marcou depois. A prévia lista, como a do Desfazer, o que ela mudou depois de desfazer e sai da tela.
 - Os dias cheios para a revisão seguem uma regra própria: até o dia do estado guardado voltam como estavam; depois dele, o que o app registrou fica.
 
 ### B.4 · Depois de restaurar (o uso pela paciente)
@@ -96,13 +99,14 @@ Os dias de 13 a 16/11 recebem também as 3 aulas da T2, que começam em 09/11. A
 
 ### B.5 · Para a equipe decidir — conflitos apresentados, padrão aplicado
 
-1. **Os blocos que ela criou nos dias da Trilha (compromissos).** O pedido diz "descarte as edições de dias da trilha". O padrão segue o pedido: saem da tela e ficam no arquivo. Mas "idêntico ao da última atualização" incluiria um dia editado antes da atualização (a migração de 26/10 manteve os blocos dela, TR16). **A prévia oferece "Manter nos dias regenerados os N bloco(s) que você criou", desmarcado**, e marca os blocos de antes da atualização. Marcado, o dia volta a ser o gerado com o bloco dela (sem ✓) antes do lazer.
+1. **Os blocos que ela criou nos dias da Trilha (compromissos).** O pedido diz "descarte as edições de dias da trilha". O padrão segue o pedido: saem da tela e ficam no arquivo. Mas "idêntico ao da última atualização" incluiria um dia editado antes da atualização (a migração de 26/10 manteve os blocos dela, TR16). **A prévia oferece "Manter nos dias regenerados os N bloco(s) que você criou", desmarcado**, e marca os blocos de antes da atualização. Marcado, o dia volta a ser o gerado com o bloco dela (sem ✓) antes do lazer. A prévia seguinte já abre com a escolha da restauração em vigor.
 2. **⏩ e 🔓 aplicados depois da atualização saem.** São ações dela depois da atualização ("como se não tivesse marcado nem movido nada"). O congelamento da semana fica: mesma composição e a cota com que congelou. Se a equipe preferir manter o ⏩/🔓, as etapas desses módulos viram ⏳.
 3. **"Desde a atualização" = desde o 1º acesso à versão nova (27/10 no exemplo).** Uma marca de antes do 1º acesso fica, se o congelamento a registrou assim. Exemplo: uma apostila marcada na versão anterior em 26/10.
 4. **Além da lista do pedido, também voltam ao padrão** o liga/desliga de simulado (`simOverrides`) e o histórico de movimentos dentro do `trilhaPlan`. **Não voltam** o registro de dias cheios para a revisão e a recolocação automática da semana final: os dois são do app, e mexer neles fazia "restaurar duas vezes" mudar o estado.
-5. **Uma semana congelada com 📌 ou ↑ fica como congelou.** "A cota não pode ser recalculada." O diagnóstico mostra o que a fila padrão daria e a razão (📌/fila da hora, um módulo começado por uma marca anterior, ou um ⏩/🔓 que volta para a fila). No exemplo, a T2 congelou com o 📌 CIR4 · Parte I.
+5. **Uma semana congelada com 📌 ou ↑ fica como congelou.** Se ela congelou com menos módulos do que a cota (a cadeia do próximo não coube), o diagnóstico mostra "entraram N" e explica. "A cota não pode ser recalculada." O diagnóstico mostra o que a fila padrão daria e a razão (📌/fila da hora, um módulo começado por uma marca anterior, ou um ⏩/🔓 que volta para a fila). No exemplo, a T2 congelou com o 📌 CIR4 · Parte I.
+6. **O dia sem remédio (🧠) — conflito entre o pedido e o veto da psiquiatria.** O pedido diz "volte o dia leve ao padrão". Na semana em curso, isso pode mudar o status de hoje ("🌿 Hoje sem Venvanse") ou reescrever um dia sem remédio que ela já viveu. Pode até deixar dois dias sem remédio na mesma semana. **Aplicado:** a escolha dela volta ao previsto só quando as duas datas ainda vão chegar. Quando uma delas já passou ou é hoje, a escolha fica e a prévia mostra as duas datas ("fica QUA 04/11 (a sua escolha — esse dia, ou o previsto, SÁB 07/11, já passou ou é hoje: o que você viveu não é reescrito)"). Se a equipe preferir, o padrão pode passar a ser voltar sempre ao previsto. Isso fica a validar com a psiquiatra.
 
-### B.6 · Revisão adversarial (3 lentes, cada achado verificado) — 15 achados, todos corrigidos
+### B.6 · Revisão adversarial — 1ª rodada (3 lentes, cada achado verificado): 15 achados, todos corrigidos
 
 | # | Achado | Correção | Teste |
 |---|---|---|---|
@@ -121,11 +125,32 @@ Os dias de 13 a 16/11 recebem também as 3 aulas da T2, que começam em 09/11. A
 | 14 | Depois de remarcar, "Aplicar" tirava as marcas novas sem avisar | aviso, "Aplicar mesmo assim", link discreto | TR17 |
 | 15 | ⏳ prometido ≠ banner (sexta que volta a ser simulado) | mesma conta do banner | TR17e |
 
+**2ª rodada (3 lentes de novo, sobre as correções; cada achado verificado):** 17 achados confirmados, todos corrigidos e testados. Três foram recusados pelos verificadores.
+
+| Achado | Correção | Teste |
+|---|---|---|
+| Semana final com o simulado de 01/01 religado: "Aplicar" refazia a recolocação no registro vazio (139 etapas sem data) | a marca do dia acompanha o simulado que volta à regra; nada é refeito hoje | TR17e |
+| Refazer descartava sem listar o que ela mudou depois de desfazer (📌, rampa, etapas, dias) | a prévia do Refazer usa a mesma lista do Desfazer | TR17 |
+| Depois de restaurar com "Manter os blocos", a prévia seguinte voltava desmarcada e oferecia "Aplicar" | a prévia abre com a escolha em vigor | TR17f |
+| Desfazer/Refazer trocavam o schedule inteiro: marcas de depois no histórico e na transição sumiam | dias de antes de 26/10 ficam como estão | TR17c |
+| Dia sem remédio: a restauração mudava o de hoje sem dizer as datas | regra das duas datas (B.5.6) | TR17, TR17f |
+| Desfazer podia pôr o mesmo ⏩ em duas semanas | o conjunto "congelou depois" inclui ⏩/🔓 | TR17d (sem módulo em duas semanas) |
+| Reforço R3 ficava sem o D+30 | sai junto com o D+30 | TR17c |
+| Refazer sumia com uma restauração anterior em vigor | Refazer independe de haver restauração em vigor | TR17 |
+| Revisão marcada num bloco anterior ao 1º acesso escapava da restauração | conta a data em que foi marcada (`r1MarkedAt`/`r2MarkedAt`) | TR17c (grava a data em que foi marcada) |
+| Semana congelada com 0 de 3 módulos aparecia como "3" | "entraram N" e nota explicando | — |
+| Nota da semana: razão "📌" em semana empurrada por um ⏩/🔓; concordância de "as questões"; frase de "amanhã" em 01/01; legenda "marque só o que você fez de verdade" (💬) | textos corrigidos; o texto da equipe ("sem mover tarefa à mão de novo") fica | TR17c |
+
+Recusados pelos verificadores (comportamento pedido, sem perda):
+- a rampa de uma semana já congelada "volta ao padrão" com a cota mantida. O texto agora diz "a cota da semana fica N";
+- um dia editado antes da restauração volta como era numa semana que congelou depois;
+- uma marca de antes da atualização que ela desmarcou depois não é recriada. A prévia agora informa.
+
 ### B.7 · Passagem pelos oito
 
 | | Veto? | Por quê |
 |---|---|---|
-| 🧠 Psiquiatria | não | Nenhum texto novo fala de medicação. A restauração não toca no dia sem remédio previsto, só tira a escolha manual. |
+| 🧠 Psiquiatria | não | Nenhum texto novo fala de horário de medicação. Um dia sem remédio já vivido, ou o de hoje, nunca é reescrito pela restauração, e a prévia mostra as duas datas (conflito apresentado em B.5.6). |
 | 📚 Pedagogia | não | As datas reais voltam a ancorar os intervalos: marcar no bloco do dia passado e "Revisei" carimbam aquele dia. A recolocação avisa quando um intervalo ideal já passou. |
 | 😴 Sono | não | A prévia mostra os dias acima de 14,5h nas próximas 2 semanas antes de aplicar, e a proposta de recolocar marca ⚠️ nos dias pesados. |
 | 🩺 Preceptor | não | A fila e a ordem não mudam. A semana congelada fica como congelou. |
