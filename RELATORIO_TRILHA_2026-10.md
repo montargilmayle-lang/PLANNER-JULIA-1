@@ -14,6 +14,7 @@ O diagnóstico, item a item do pedido:
 
 | Lugar | O que a prévia mostra |
 |---|---|
+| como o plano está | "Como o plano está agora": quantas etapas estão fora da ordem, no mesmo dia que outra etapa do mesmo módulo, em dia bloqueado ou fora da faixa de intervalo — agora e depois de restaurar |
 | `trilhaPlan` | cada etapa fora da data original: "CIR1 · Trauma I — questões: SÁB 31/10 → volta para QUI 29/10" |
 | `orig` | "Data original guardada: em todas as etapas planejadas ✓", ou a lista das que não têm (essas ficam onde estão) |
 | ⏩ e 🔓 | módulo adiantado e subida aplicados depois da atualização, e a cota com que a semana volta |
@@ -22,6 +23,7 @@ O diagnóstico, item a item do pedido:
 | revisões | vencidas hoje: agora → depois de restaurar |
 | fila, 📌, rampa, dia leve, "Agora não", simulados | cada escolha que volta ao padrão, com o valor de agora |
 | fica como está | 1º acesso, semanas congeladas com a cota, o que a fila padrão daria em cada semana congelada e por quê, e o que o app registra sozinho |
+| alcance | o alcance estimado até 01/01 agora → depois de restaurar, com "o ritmo da semana seguinte fica segurado até a semana anterior fechar" (e o bloco 04h30 sem subida) |
 | depois de aplicar | quantas etapas aparecem como ⏳ (o mesmo número do banner), dias acima de 14,5h nas próximas 2 semanas, dias acima do limiar de estudo |
 
 Exemplo real (cenário TR17 da bateria: a mesma bagunça feita pela interface, em 07/11):
@@ -105,7 +107,7 @@ Os dias de 13 a 16/11 recebem também as 3 aulas da T2, que começam em 09/11. A
 3. **"Desde a atualização" = desde o 1º acesso à versão nova (27/10 no exemplo).** Uma marca de antes do 1º acesso fica, se o congelamento a registrou assim. Exemplo: uma apostila marcada na versão anterior em 26/10.
 4. **Além da lista do pedido, também voltam ao padrão** o liga/desliga de simulado (`simOverrides`) e o histórico de movimentos dentro do `trilhaPlan`. **Não voltam** o registro de dias cheios para a revisão e a recolocação automática da semana final: os dois são do app, e mexer neles fazia "restaurar duas vezes" mudar o estado.
 5. **Uma semana congelada com 📌 ou ↑ fica como congelou.** Se ela congelou com menos módulos do que a cota (a cadeia do próximo não coube), o diagnóstico mostra "entraram N" e explica. "A cota não pode ser recalculada." O diagnóstico mostra o que a fila padrão daria e a razão (📌/fila da hora, um módulo começado por uma marca anterior, ou um ⏩/🔓 que volta para a fila). No exemplo, a T2 congelou com o 📌 CIR4 · Parte I.
-6. **O dia sem remédio (🧠) — conflito entre o pedido e o veto da psiquiatria.** O pedido diz "volte o dia leve ao padrão". Na semana em curso, isso pode mudar o status de hoje ("🌿 Hoje sem Venvanse") ou reescrever um dia sem remédio que ela já viveu. Pode até deixar dois dias sem remédio na mesma semana. **Aplicado:** a escolha dela volta ao previsto só quando as duas datas ainda vão chegar. Quando uma delas já passou ou é hoje, a escolha fica e a prévia mostra as duas datas ("fica QUA 04/11 (a sua escolha — esse dia, ou o previsto, SÁB 07/11, já passou ou é hoje: o que você viveu não é reescrito)"). Se a equipe preferir, o padrão pode passar a ser voltar sempre ao previsto. Isso fica a validar com a psiquiatra.
+6. **O dia sem remédio (🧠) — decidido em 07/11 (padrão mantido).** O pedido diz "volte o dia leve ao padrão". Na semana em curso, isso pode mudar o status de hoje ("🌿 Hoje sem Venvanse") ou reescrever um dia sem remédio que ela já viveu. Pode até deixar dois dias sem remédio na mesma semana. **Aplicado:** a escolha dela volta ao previsto só quando as duas datas ainda vão chegar. Quando uma delas já passou ou é hoje, a escolha fica e a prévia mostra as duas datas ("fica QUA 04/11 (a sua escolha — esse dia, ou o previsto, SÁB 07/11, já passou ou é hoje: o que você viveu não é reescrito)"). A equipe manteve esse padrão em 07/11. **Se a equipe preferir "sempre volta ao previsto", isso deve ser validado com a psiquiatra antes.**
 
 ### B.6 · Revisão adversarial — 1ª rodada (3 lentes, cada achado verificado): 15 achados, todos corrigidos
 
@@ -209,6 +211,103 @@ Os testes novos da restauração (TR17, TR17b–i) mexem pela interface:
 - o arquivo ilegível e a gravação que não cabe.
 
 Cada um confere o plano, o registro, o arquivo e o que aparece na tela.
+
+### B.9 · Teste de aceite ponta a ponta — a situação dela (TR17z)
+
+A situação dela foi montada no navegador, toda pela interface (cenário `TR17z` da bateria). O resultado de cada passo:
+
+1. **1º acesso em 27/10.** A semana 1 congela com CIR1 · Trauma I, CIR1 · Trauma II e CIR2 · Urologia (cota 3). Em 03/11, a semana 2 congela com CIR2 · Cicatrização, CIR2 · Cirurgia Pediátrica e CIR3 · Preparo Pré-operatório. A cota é 3, segurada, porque a semana 1 não fechou. Alcance na aba Trilha: **30**. Era 36 no 1º acesso; caiu porque a semana 1 não fechou.
+2. **A bagunça, sem marcar nada (em 04/11):**
+   - a aula de CIR2 · Cicatrização atrasada de SEG 09/11 para QUA 11/11, o dia das questões. O aviso foi "Mover assim mesmo";
+   - a apostila de CIR2 · Cirurgia Pediátrica adiantada de SEX 13/11 para QUI 12/11, que é plantão longo;
+   - a selagem de CIR1 · Trauma II levada para TER 10/11 (plantão longo);
+   - a selagem de CIR2 · Urologia levada para SEX 06/11 (sexta de simulado);
+   - Anki de 08/11 → 09/11 e academia de 09/11 → 08/11.
+   
+   Ficaram gravados: 4 etapas fora da data original, 2 dias editados, 0 marcas.
+3. **Prévia.**
+   - "Etapas fora da data original: 4", cada uma com a data de volta.
+   - **"Como o plano está agora: 0 fora da ordem · 1 no mesmo dia que outra etapa do mesmo módulo · 3 em dia bloqueado · 2 fora da faixa de intervalo — em 4 módulo(s)"**, e "depois de restaurar: 0 · 0 · 0 · 0".
+   - "Dias da Trilha editados à mão: 2"; "Registro…: 0 ✓".
+   - **"alcance estimado: 30 módulos agora → 30 depois de restaurar"**, com a linha do ritmo segurado e do bloco 04h30.
+4. **Aplicar.**
+   - O plano volta exatamente ao que o motor gerou: a semana 1 como congelou em 27/10, a semana 2 como congelou em 03/11, sem histórico de movimentos e sem dia editado.
+   - O arquivo guarda a versão anterior inteira, com data e hora.
+   - **Uma 2ª restauração diz "Nada a restaurar"** e o arquivo não cresce.
+5. **Marcar nos blocos de dias passados.** Aula de CIR1 · Trauma I no bloco de 28/10, aula de CIR2 · Urologia no de 02/11 e as questões dela no de 04/11, ou seja, nas semanas 1 e 2. Os carimbos ficam **28/10, 02/11 e 04/11**, as datas dos blocos. O ⏳ vai de **11 → 8**.
+6. **"Ver como recolocar".** A proposta cobre os 3 módulos com ⏳:
+   - Trauma I: questões DOM 08/11, apostila SEG 09/11, selagem QUA 11/11;
+   - Trauma II: aula SEX 13/11 ⚠️ 10,2h, questões DOM 15/11, apostila SEG 16/11, selagem QUI 19/11;
+   - Urologia: apostila DOM 08/11, selagem QUA 11/11.
+   
+   Conferido etapa a etapa:
+   - a ordem é aula → questões → apostila → selagem e nenhum módulo tem duas etapas no mesmo dia;
+   - entre as etapas recolocadas, as faixas são respeitadas;
+   - nenhuma etapa recolocada cai em dia bloqueado nem antes de hoje;
+   - o intervalo com uma etapa feita há muito tempo aparece **avisado** ("11 dias após a aula — fora de 1–2");
+   - os ⚠️ de carga só informam: "Aplicar" está lá.
+7. **Desfazer e Refazer.**
+   - **Desfazer** devolve exatamente a bagunça de antes da restauração (plano, dias da Trilha, registro vazio). A prévia listou as 3 marcas e as recolocações feitas depois.
+   - **Refazer** volta ao estado de antes de desfazer: restaurado, com as 3 marcas e a recolocação.
+
+Telas (as mesmas da página do relatório): a prévia, o cartão depois de aplicar e a proposta de recolocar.
+
+### B.10 · As causas da desorganização e o botão "Atrasei: retomar a partir de hoje"
+
+**Contagens da causa — implementadas.** O diagnóstico ganhou a seção "Como o plano está agora", com quatro contagens, antes e depois da restauração (`trilhaPlanIssues`):
+- etapas fora da ordem;
+- no mesmo dia que outra etapa do mesmo módulo;
+- em dia bloqueado (plantão longo, pós-noturno, sexta de simulado), contando só as etapas sem marca;
+- fora da faixa de intervalo.
+
+A conta usa a data efetiva: o carimbo, se marcada; a data do plano, se não. No teste de aceite: **0 · 1 · 3 · 2, em 4 módulos → 0 · 0 · 0 · 0**. Os números reais dela aparecem na prévia, no aparelho dela.
+
+**"Atrasei: retomar a partir de hoje" — avaliação, sem implementar.**
+- **O que "Ver como recolocar" já faz:** para cada módulo com etapa ⏳, refaz a cadeia a partir da 1ª etapa pendente. Ancora no carimbo da última etapa feita e põe de hoje em diante, com o mesmo agendador do plano: dias abertos, faixas, carga. Só grava com "Aplicar". Não mexe em módulo sem pendência nem na cota das semanas.
+- **Sobreposição:** no caso principal ("fiquei para trás, quero retomar de hoje"), o recolocar já é exatamente isso, módulo a módulo.
+- **O que ele não cobre:**
+  - *Espalhar.* O recolocar encaixa o atrasado nos próximos dias, por cima do que já está planejado. Por isso aparecem dias com ⚠️, como SEX 13/11 com 10,2h. Um "retomar" global empurraria o plano inteiro, aliviando esses dias, mas atrasaria todos os módulos. Isso baixa o alcance e tira as etapas das semanas já congeladas, o que conflita com "a cota não é recalculada".
+  - *Pausa à frente*, como 3 dias doente na semana que vem. Ainda não há nada pendente, então o recolocar não aparece. O "Mover o fio todo junto" (PR 2) cobre isso módulo a módulo.
+- **Recomendação:** não criar o botão agora. Se as propostas de recolocar continuarem gerando dias pesados, considerar uma opção "espalhar" dentro do próprio recolocar, sem mexer nas semanas congeladas.
+
+### B.11 · Conferência final — item pedido → código → teste
+
+| Item pedido | Onde está (`planner_residencia_2026_offline.html`) | Teste que prova |
+|---|---|---|
+| Diagnóstico antes de qualquer mudança (`trilhaPlan` × `orig`, `orig` guardado, dias editados, `trail_v1`, revisões, fila, 📌, rampa, dia leve, "Agora não", `simResults`) | `trilhaRestore` (o `diag`) e `restoreEl`, vista "diag" | TR17 (diagnóstico e "não grava nada"), TR17c, TR17z passo 3 |
+| Copiar o estado inteiro para `medplanner_schedule_archive_v1`, com data e hora | `restorePlan` (`restaurar`), `trilhaRestoreWrite` | TR17 (o arquivo é igual ao de antes), TR17z 4b |
+| Etapas de volta às datas `orig` | `trilhaRestore` passo 1 | TR17, TR17z 4a |
+| Descartar edições de dias da Trilha | `trilhaRestore` passo 2 (opção `keepOwn`) | TR17, TR17f, TR17z 4a |
+| Limpar ✓, %, carimbos e áudio desde a atualização, depois de arquivar | `trilhaRestore` passo 3 (`preStage`, `preRev`) | TR17, TR17c |
+| Fila, 📌, rampa e dia leve ao padrão | `trilhaRestore` passo 4 e regra do dia sem remédio | TR17, TR17f, TR17g, TR17h |
+| `trilhaFirstOpen` e congelamento intactos; cota não recalculada | não tocados; só o ⏩/🔓 de depois sai (`trilhaWeekDrop`) | TR17 ("ficam intactos"), TR17d, TR17z 4a |
+| Prévia; grava só com "Aplicar" | `restoreEl` "diag" → `run("apply")` | TR17 ("o diagnóstico não grava nada") |
+| "Desfazer a restauração" reaplica o arquivo | `trilhaRestoreUndo`, `restorePlan("undo")` | TR17, TR17c, TR17d, TR17z 7a |
+| Etapas de dias passados como ⏳ | `buildTrilhaPlan` (`pending`) | TR17 (11), TR17z passo 5 |
+| Carimbo `min(hoje, data do bloco)`; o ⏳ encolhe | `toggleProgressField` (já existia); `markReviewDone` com `dayAt` | TR17, TR17c ("Revisei"), TR17z passo 5 |
+| "Ver como recolocar" a partir de hoje, ancorado nos carimbos | `trilhaProposeRecolocar` (já existia) | TR17, TR17z passo 6 |
+| Restaurar duas vezes não muda nada | `trilhaRestoreCalc`, `trilhaRestoreSame` | TR17, TR17c, TR17d, TR17e, TR17f, TR17z 4c |
+| Teste de aceite ponta a ponta | — | TR17z (passos 1–7) |
+| Contagens da causa da desorganização | `trilhaPlanIssues` e a seção "Como o plano está agora" | TR17z passo 3 |
+| Alcance antes/depois, com a linha do ritmo segurado | `restoreEl` (`data-t="restore-reach"`) | TR17z passo 3 |
+| Dia sem remédio: o vivido e o de hoje nunca reescritos | `trilhaRestore` (`lightKeep`), `trilhaRestoreUndo` (`light`) | TR17, TR17f, TR17g, TR17h |
+| Gravação tudo ou nada | `trilhaWriteKeys`, `trilhaArchiveBack` | TR17b |
+| Semana final e véspera | `trilhaFinalKeep` em `restorePlan` e `trilhaFinalPlan` | TR17e, TR17i |
+| Refazer | `trilhaRestoreRedo`, `restorePlan("redo")` | TR17, TR17c, TR17d, TR17h, TR17z 7b |
+| Texto de uso da equipe e backup novo no app | `restoreEl`, cartão "restore-done" | TR17 (cartão depois de aplicar) |
+
+**Limitações conhecidas.**
+1. **Os dados reais dela estão só no aparelho dela.** O diagnóstico com os números dela aparece na prévia, que ela pode fotografar antes de tocar em "Aplicar".
+2. **A restauração não muda o alcance por si.** As semanas 1 e 2 não fecharam, por isso o alcance está em 30, e era 36 no 1º acesso. Fechar a semana libera o 🔓. No bloco 04h30 (16/11 a 11/12), o ritmo não sobe.
+3. **"Ver como recolocar":**
+   - se ela marcar uma etapa posterior sem a anterior (questões sem a aula), ele não acha dia para a anterior e diz "não cabe" para aquele módulo. Marcar na ordem resolve;
+   - o intervalo com uma etapa feita há muitos dias fica fora da faixa, avisado ("fora de");
+   - a proposta nomeia o módulo só pelo código, então aparecem dois "CIR1".
+4. **Prévias de Desfazer/Refazer em sequências longas** (restaurar, desfazer, refazer, misturadas com a recolocação diária da semana final): os textos são o melhor esforço. Os dados estão sempre certos e no arquivo.
+5. **"Manter os blocos" vira dia editado.** O dia regenerado com os blocos dela passa a ser um dia editado: a lista fica fixa, como qualquer dia editado.
+6. **Marca feita em 26/10 com 1º acesso em 26/10.** Quando a marca é do mesmo dia do 1º acesso, não dá para saber se foi antes ou depois da atualização. Conta como depois.
+7. **Restaurar a partir de 22/12.** As etapas dos dias anteriores ficam no bloco do dia e não entram na recolocação automática da semana final. O caminho para elas é o ⏳.
+8. **A restauração é inteira.** Não dá para escolher partes, com exceção dos blocos dela.
 
 ## A · Início em 26/10 (pedido de 26/10/2026) — decisão 74
 

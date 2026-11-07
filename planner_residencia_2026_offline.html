@@ -1564,6 +1564,17 @@ function trilhaWeekDrop(W, ids) { // tira de uma semana congelada os módulos qu
     if (ra.length) { w2.q = Math.max(0, (Number(W.q) || 0) - ra.length); w2.held = w2.q < (Number(W.base) || 0); if (w2.held && !W.why) w2.why = "fechamento"; }
     return { w: w2, adv: aa, rise: ra };
 }
+function trilhaPlanIssues(cfg, trail) { // o retrato da desorganização: etapas fora da ordem, no mesmo dia que outra do mesmo módulo, em dia bloqueado, fora da faixa de intervalo
+    const plan = (cfg && cfg.trilhaPlan) || {}, T = trail || {}, out = { order: 0, same: 0, blocked: 0, range: 0, mods: 0 };
+    Object.keys(plan).forEach(id => { const p = plan[id] || {}, t = T[id] || {}; let bad = false;
+        const eff = (ts) => { const f = TS_FIELD[ts]; return t[f] ? (t[STAMP_OF[f]] || p[ts] || null) : (p[ts] || null); };
+        const D = {}; STAGES_T.forEach(ts => { D[ts] = eff(ts); });
+        STAGES_T.forEach(ts => { const d = D[ts]; if (d && !t[TS_FIELD[ts]] && d >= TRILHA_START && !dayOpenT(d, cfg)) { out.blocked++; bad = true; } });
+        for (let i = 0; i < STAGES_T.length; i++) for (let j = i + 1; j < STAGES_T.length; j++) { const a = D[STAGES_T[i]], b = D[STAGES_T[j]]; if (a && b && a === b) { out.same++; bad = true; } }
+        for (let i = 1; i < STAGES_T.length; i++) { const x = STAGES_T[i - 1], y = STAGES_T[i]; if (!D[x] || !D[y]) continue; const g = diffDays(D[x], D[y]); if (g < 0) { out.order++; bad = true; } else if (g > 0 && (g < GAP_T[y][0] || g > GAP_T[y][1])) { out.range++; bad = true; } }
+        if (bad) out.mods++; });
+    return out;
+}
 function restoreMsOf(id) { const m = String(id || "").match(/^c-(\d{12,})/); return m ? Number(m[1]) : null; }
 function trilhaRestoreOwn(a) { const id = String((a && a.id) || ""); return !!a && a.tm == null && !a.gh && !a.au && !a.pc && !/^↷ /.test(a.text || "") && (/^c-\d+$/.test(id) || (a.d === "EXTRA" && !/^[gt]-/.test(id))); } // bloco que ela criou
 function canonJ(v) { // JSON com chaves em ordem (comparar estados sem depender da ordem em que foram gravados)
@@ -1584,6 +1595,7 @@ function trilhaRestore(cfg, sov, trail, opts) {
     const preRev = (at) => !at || at < fo;
     const d = { cut: fo, moved: [], noOrig: [], histN: 0, adv: [], rise: [], days: [], trans: [], trail: [], counts: { checks: 0, pcts: 0, audio: 0, reviews: 0, complete: 0 }, order: false, pins: [], ramp: [], light: [], lightKeep: [], dismiss: [], simRes: [], simOv: [], unticked: [],
         firstOpen: C.trilhaFirstOpen || null, appRec: { revFull: Object.keys(C.trilhaRevFull || {}).filter(k => k >= TRILHA_START).length, final: C.trilhaFinalAutoAt !== undefined }, ownN: 0 };
+    d.issues = trilhaPlanIssues(C, T); // como o plano está agora (a causa da desorganização)
     const out = { ...C };
     // 0 · ⏩ Adiantar e 🔓 subida (sempre depois da atualização — o congelamento grava adv: [] e rise: []): saem do plano; a semana volta a como congelou
     const wIn = C.trilhaWeeks || {}, nw = {}, gone = new Set(); let wCh = false;
@@ -3591,6 +3603,8 @@ function TrilhaTab({ config, trail, progress, P, scheduleOv, onRestore, onSaveCo
             const revB = computeReviews(t, hoje).length, revA = computeReviews(N2.trail, hoje).length;
             const body = [];
             if (lastOn && afterMarks.length) body.push(React.createElement("div", { key: "w", "data-t": "restore-after-warn", style: { color: "#fbbf24", fontSize: 11, fontWeight: 700, lineHeight: 1.5, marginTop: 6 } }, "⚠️ Depois da restauração de " + fmtAt(lastR.entry.at) + " você marcou " + nMarks(afterMarks) + " coisa(s): " + afterMarks.map(x => x.name.split(" · ")[0] + " (" + x.items.map(itemTxt).join(", ") + ")").join("; ") + ". Restaurar de novo tira essas marcas da tela (ficam no arquivo do app e dá para desfazer)."));
+            const I0 = D.issues, I1 = trilhaPlanIssues(C2, N2.trail), iTx = (I) => I.order + " fora da ordem · " + I.same + " no mesmo dia que outra etapa do mesmo módulo · " + I.blocked + " em dia bloqueado (plantão longo, pós-noturno, sexta de simulado) · " + I.range + " fora da faixa de intervalo";
+            body.push(React.createElement("div", { key: "s0", "data-t": "restore-issues" }, sec("Como o plano está agora", [iTx(I0) + (I0.mods ? " — em " + I0.mods + " módulo(s)" : ""), "depois de restaurar: " + iTx(I1)], "s0i")));
             body.push(sec("1 · Etapas fora da data original: " + D.moved.length, D.moved.length ? D.moved.map(m => m.name + " — " + TS_WORD[m.ts] + ": " + (m.cur ? dn(m.cur) : "sem data") + " → volta para " + (m.orig ? dn(m.orig) : "sem data")) : ["nenhuma"], "s1"));
             if (D.adv.length || D.rise.length) body.push(sec("⏩ e 🔓 aplicados depois da atualização", D.adv.map(x => "⏩ " + x.mods.join(", ") + " (adiantado na semana de " + fmtBR(x.tue) + ") → sai do plano e volta para a fila (fica no arquivo)").concat(D.rise.map(x => "🔓 semana de " + fmtBR(x.tue) + ": +" + x.n + " (" + x.mods.join(", ") + ") → sai; a semana volta a " + x.q2 + (x.held ? ", segurada — o 🔓 volta a aparecer quando a semana anterior fechar" : ""))), "s1b"));
             body.push(sec("Data original guardada", [D.noOrig.length ? "⚠️ sem data original (ficam onde estão): " + D.noOrig.map(x => x.name).join(", ") : "em todas as etapas planejadas ✓"].concat(D.histN ? ["histórico de movimentos de " + D.histN + " módulo(s) sai do plano (fica no arquivo)"] : []), "s1c"));
@@ -3620,6 +3634,7 @@ function TrilhaTab({ config, trail, progress, P, scheduleOv, onRestore, onSaveCo
             D.unticked.forEach(x => notes.push("a " + TS_WORD[x.ts] + " de " + x.name.split(" · ")[0] + " estava marcada (" + fmtBR(x.iso) + ") quando a semana congelou e foi desmarcada depois — fica desmarcada"));
             body.push(sec("Fica como está", ["1º acesso: " + (D.firstOpen ? fmtBR(D.firstOpen) : "—"), "semanas congeladas (a cota não é recalculada): " + (D.weeks.map(w => fmtBR(w.tue) + " (" + w.q + (w.n < w.q ? ", entraram " + w.n : "") + (w.held ? ", segurada" : "") + ")").join(" · ") || "—")].concat(notes).concat((D.appRec.revFull || D.appRec.final) ? ["o que o app registra sozinho: " + [D.appRec.revFull ? D.appRec.revFull + " dia(s) cheio(s) para a revisão" : "", D.appRec.final ? "a recolocação da semana final" : ""].filter(Boolean).join(" e ")] : []).concat(["tudo o que é de antes da atualização (histórico do curso e transição)"]), "s6"));
             const LWs = P2.LW ? weekStartISO(P2.LW) : TRILHA_END;
+            body.push(React.createElement("div", { key: "reach", "data-t": "restore-reach" }, sec("Alcance até 01/01", ["alcance estimado: " + P.N + " módulos agora → " + P2.N + " depois de restaurar (supondo que as próximas semanas fechem)", "o ritmo da semana seguinte fica segurado até a semana anterior fechar — e no bloco 04h30 (16/11 a 11/12) o ritmo não sobe. Isso só informa: a decisão é sua."], "s7r")));
             body.push(sec("Depois de aplicar", [P2.pending.length + " etapa(s) aparecem como ⏳ pendentes" + (pendS.length ? " (" + pendA + " de dias que já passaram + " + pendS.length + " em " + [...new Set(pendS.map(x => dn(x.iso)))].join(", ") + ", que volta a ser simulado)" : "") + " — é esperado: depois de restaurar nada está marcado; você marca no bloco de cada dia o que fez."]
                 .concat(hoje >= addDaysISO(LWs, -7) && hoje < LWs ? ["📦 a partir de " + fmtBR(LWs) + " (semana final): as etapas dos dias que já passaram ficam no bloco de cada dia, para você marcar o que fez — a recolocação automática diária só leva as de cada dia em diante."] : [])
                 .concat(hoje >= LWs && hoje < TRILHA_END ? ["📦 semana final: as etapas dos dias que já passaram ficam no bloco de cada dia, para você marcar o que fez — o que não foi feito aparece no ⏳ (“Ver como recolocar”). A recolocação automática de cada dia continua para as etapas de hoje em diante."] : hoje === TRILHA_END ? ["📦 hoje é o último dia de acesso: marque no bloco de cada dia o que você fez — o que ficar sem marca não é mais recolocado (fica no registro para o cursinho de 04/01)."] : [])

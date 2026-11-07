@@ -1078,6 +1078,94 @@ const DEFAULT12 = [5, 6, 14, 19, 24, 32, 34, 85, 86, 1, 2, 3];
         const lost = []; Object.entries(c1.trilhaPlan).forEach(([id, p]) => STG.forEach(ts => { if (p[ts] && p[ts] < '2026-12-28' && ((c2.trilhaPlan[id] || {})[ts] || null) !== p[ts]) lost.push(id + '.' + ts); }));
         check('29/12: a recolocação da semana final roda e nenhuma etapa de dia anterior à restauração sai do seu bloco; o ⏳ continua', /^2026-12-29\|/.test(c2.trilhaFinalAutoAt || '') && !lost.length && !!(await banner(page, 'trilha-pending')), JSON.stringify({ key: c2.trilhaFinalAutoAt, n: lost.length, lost: lost.slice(0, 5) }));
     });
+    // ── TR17z · ACEITE PONTA A PONTA (a situação dela, 07/11): 1º acesso 27/10, semanas 1 e 2 congeladas; ela move etapas e blocos à mão sem marcar nada;
+    //    prévia → Aplicar → o plano volta ao do motor, o arquivo guarda, 2ª vez "Nada a restaurar"; ela marca nos blocos de dias passados; ⏳ recolocar
+    //    respeita ordem, faixas e dias bloqueados; Desfazer e Refazer. Cada passo imprime o resultado (relatório §B.9). SHOTS=<pasta> salva as telas. ──
+    await scenario(browser, 'TR17z-aceite-ponta-a-ponta', '2026-10-27', {}, async (S) => {
+        let page = S.page; const shot = async (name, sel) => { if (!process.env.SHOTS) return; const f = require('path').join(process.env.SHOTS, name + '.png'); const h = await page.evaluate(() => { const hid = []; document.querySelectorAll('body *').forEach(e => { const p = getComputedStyle(e).position; if (p === 'fixed' || p === 'sticky') { hid.push(e); e.dataset.shotHide = e.style.visibility || '-'; e.style.visibility = 'hidden'; } }); return hid.length; }); const el = sel ? await page.$(sel) : null; if (el) await el.screenshot({ path: f }); else await page.screenshot({ path: f }); await page.evaluate(() => document.querySelectorAll('[data-shot-hide]').forEach(e => { e.style.visibility = e.dataset.shotHide === '-' ? '' : e.dataset.shotHide; delete e.dataset.shotHide; })); }; // telas para o relatório: sem o cabeçalho e a barra fixos por cima
+        const say = (txt) => console.log('   📋 ' + txt); const TS_W = (ts) => ({ aula: 'aula', quest: 'questões', apost: 'apostila', seal: 'selagem' })[ts];
+        const BLOCKED = new Set(['2026-10-20', '2026-10-27', '2026-11-03', '2026-11-10', '2026-11-12', '2026-11-06', '2026-12-18']); // plantão longo (20/10, 27/10, 03/11, 10/11, 12/11) e sexta de simulado (06/11, 18/12); 20–25/10 transição
+        const isBlocked = (d, ts) => BLOCKED.has(d) || (d >= '2026-10-20' && d <= '2026-10-25') || (d === '2027-01-01' && ts !== 'seal');
+        // 1 · 1º acesso 27/10; a semana 2 congela em 03/11
+        const cfg27 = await getLS(page, CFG);
+        page = await S.reopen('2026-11-03'); const cfgF = await getLS(page, CFG);
+        const T1 = cfgF.trilhaWeeks['2026-10-26'], T2 = cfgF.trilhaWeeks['2026-11-03'];
+        say('passo 1 · 1º acesso ' + cfgF.trilhaFirstOpen + ' · semana 1 = ' + JSON.stringify(T1.mods) + ' (cota ' + T1.q + ') · semana 2 = ' + JSON.stringify(T2.mods) + ' (cota ' + T2.q + (T2.held ? ', segurada' : '') + ')');
+        check('passo 1: 1º acesso 27/10; semanas 1 e 2 congeladas', cfgF.trilhaFirstOpen === '2026-10-27' && !!T1 && !!T2 && T1.mods.length === 3, JSON.stringify({ T1: T1.mods, T2: T2.mods }));
+        page = await S.reopen('2026-11-04'); // a bagunça acontece durante a semana 2 (aqui, em 04/11)
+        await clickTab(page, 'TRILHA'); const reach0 = await page.evaluate(() => (document.body.innerText.match(/No ritmo atual cabem (\d+) módulos/) || [])[1]); say('alcance na aba Trilha antes da bagunça: ' + reach0);
+        // 2 · a bagunça, pela interface, sem marcar nada
+        let off = 0; const wk = (iso) => iso < '2026-11-03' ? -1 : iso < '2026-11-10' ? 0 : iso < '2026-11-17' ? 1 : 2; // em relação à semana de hoje (03–09/11)
+        const goto = async (iso) => { await clickTab(page, 'CRONOGRAMA'); const k = wk(iso); if (k !== off) { await navWeek(page, k - off); off = k; } await clickDate(page, br(iso)); };
+        const esc = (t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const moveStage = async (id, ts, to) => { const c = await getLS(page, CFG); const from = c.trilhaPlan[id][ts]; await goto(from); const day = await readDay(page); const b = day.blocks.find(x => x.tm === id && x.ts === ts && !x.au); if (!b) throw new Error('bloco ' + id + '.' + ts + ' não está em ' + from); await moveT(page, new RegExp('^' + esc(b.text.slice(0, 60))), to); const ask = await readAsk(page); if (ask) await clickAsk(page, 'Mover assim mesmo'); await page.evaluate(() => { const x = [...document.querySelectorAll('button')].find(y => y.innerText.trim() === '✓ Pronto'); if (x) x.click(); }); await page.waitForTimeout(250); return { from, ask: ask ? ask.text.split('\n')[0] : '(sem aviso)' }; };
+        const moveBlock = async (re, fromIso, to) => { await goto(fromIso); await moveT(page, re, to); const ask = await readAsk(page); if (ask) await clickAsk(page, 'Mover assim mesmo'); await page.evaluate(() => { const x = [...document.querySelectorAll('button')].find(y => y.innerText.trim() === '✓ Pronto'); if (x) x.click(); }); await page.waitForTimeout(250); };
+        const P0 = cfgF.trilhaPlan; const stg = []; Object.keys(P0).forEach(id => STG.forEach(ts => stg.push({ id: Number(id), ts, d: P0[id][ts], q: P0[id].quest })));
+        const inRange = (d) => d >= '2026-11-03' && d <= '2026-11-16';
+        const aMod = Object.keys(P0).map(Number).find(id => P0[id].aula >= '2026-11-05' && inRange(P0[id].aula) && inRange(P0[id].quest));
+        const r1 = await moveStage(aMod, 'aula', P0[aMod].quest); say('passo 2a · aula de ' + aMod + ' atrasada ' + br(r1.from) + ' → ' + br(P0[aMod].quest) + ' (dia das questões) · aviso: ' + r1.ask);
+        const bMod = Object.keys(P0).map(Number).find(id => id !== aMod && P0[id].apost >= '2026-11-06' && inRange(P0[id].apost) && addDays(P0[id].apost, -1) > P0[id].quest);
+        const bTo = bMod ? addDays(P0[bMod].apost, -1) : null; if (bMod) { const r = await moveStage(bMod, 'apost', bTo); say('passo 2b · apostila de ' + bMod + ' adiantada ' + br(r.from) + ' → ' + br(bTo) + ' · aviso: ' + r.ask); }
+        const cS = stg.find(x => x.id !== aMod && x.id !== bMod && x.d >= '2026-11-05' && inRange(x.d) && x.d !== '2026-11-10' && x.ts !== 'aula'); const rc = await moveStage(cS.id, cS.ts, '2026-11-10'); say('passo 2c · ' + TS_W(cS.ts) + ' de ' + cS.id + ' → TER 10/11 (plantão longo) · aviso: ' + rc.ask);
+        const dS = stg.find(x => x.id !== aMod && x.id !== bMod && x.id !== cS.id && x.d >= '2026-11-07' && inRange(x.d)); const rd = await moveStage(dS.id, dS.ts, '2026-11-06'); say('passo 2d · ' + TS_W(dS.ts) + ' de ' + dS.id + ' → SEX 06/11 (sexta de simulado, dia bloqueado) · aviso: ' + rd.ask);
+        await moveBlock(/^Anki/, '2026-11-08', '2026-11-09'); await moveBlock(/^Academia/, '2026-11-09', '2026-11-08'); say('passo 2e · blocos comuns movidos: Anki de 08/11 → 09/11, academia de 09/11 → 08/11');
+        await page.evaluate(() => { const c = JSON.parse(localStorage.getItem('medplanner_config_v1')); c.manualWeek = null; localStorage.setItem('medplanner_config_v1', JSON.stringify(c)); }); off = 0;
+        page = await S.reopen('2026-11-07');
+        const pre = { cfg: await getLS(page, CFG), sch: (await getLS(page, SCH)) || {}, tr: (await getLS(page, TRL)) || {} };
+        const movedPre = []; Object.entries(pre.cfg.trilhaPlan).forEach(([id, p]) => STG.forEach(ts => { if (p[ts] !== p.orig[ts]) movedPre.push(id + '.' + ts); }));
+        check('passo 2: a bagunça está gravada — 4 etapas fora da data original, dias editados, nada marcado', movedPre.length === (bMod ? 4 : 3) && Object.keys(pre.sch).some(d => d >= '2026-10-26') && JSON.stringify(pre.tr) === '{}', JSON.stringify({ movedPre, days: Object.keys(pre.sch) }));
+        // 3 · prévia
+        await clickTab(page, 'TRILHA'); await rClick(page, /^Ver o que mudou desde a atualização$/); const diag = await rDiag(page);
+        await shot('aceite-1-previa', '[data-t="restore-card"]');
+        const issues = await page.evaluate(() => (document.querySelector('[data-t="restore-issues"]') || {}).innerText || ''); const reach = await page.evaluate(() => (document.querySelector('[data-t="restore-reach"]') || {}).innerText || '');
+        say('passo 3 · ' + issues.replace(/\n/g, ' | ')); say('passo 3 · ' + reach.replace(/\n/g, ' | '));
+        const nn = (re) => Number((issues.match(re) || [])[1]);
+        check('passo 3: prévia — etapas fora da data original = ' + movedPre.length + '; o retrato da desorganização (no mesmo dia, em dia bloqueado, fora da faixa) e "depois de restaurar: 0 · 0 · 0 · 0"; 0 ✓ no registro', new RegExp('Etapas fora da data original: ' + movedPre.length + '\\n').test(diag) && nn(/(\d+) no mesmo dia/) >= 1 && nn(/(\d+) em dia bloqueado/) >= 2 && /depois de restaurar: 0 fora da ordem · 0 no mesmo dia que outra etapa do mesmo módulo · 0 em dia bloqueado [^·]*· 0 fora da faixa de intervalo/.test(issues) && /Dias da Trilha editados à mão: [1-9]/.test(diag) && /Registro da Trilha desde o 1º acesso à versão nova \(27\/10\): 0 ✓ de etapa/.test(diag), issues);
+        check('passo 3: prévia do alcance — antes → depois, com "o ritmo da semana seguinte fica segurado até a semana anterior fechar"', /alcance estimado: \d+ módulos agora → \d+ depois de restaurar/.test(reach) && /o ritmo da semana seguinte fica segurado até a semana anterior fechar/.test(reach) && /bloco 04h30 \(16\/11 a 11\/12\) o ritmo não sobe/.test(reach), reach);
+        // 4 · Aplicar
+        await rClick(page, /^Aplicar a restauração$/);
+        const cfgA = await getLS(page, CFG), schA = (await getLS(page, SCH)) || {}, trA = (await getLS(page, TRL)) || {}, LA = await rArc(page);
+        const engine = (id) => { const f = (T1.mods.includes(Number(id)) ? cfg27 : cfgF).trilhaPlan[id]; return STG.map(ts => f[ts]).join(' '); };
+        const same = Object.keys(cfgA.trilhaPlan).every(id => STG.map(ts => cfgA.trilhaPlan[id][ts]).join(' ') === engine(id) && !(cfgA.trilhaPlan[id].hist || []).length);
+        say('passo 4 · plano depois de aplicar: ' + Object.keys(cfgA.trilhaPlan).map(id => id + ' ' + STG.map(ts => br(cfgA.trilhaPlan[id][ts])).join('·')).join(' | '));
+        check('passo 4a: o plano volta ao que o motor gerou (T1 como congelou em 27/10, T2 como congelou em 03/11), sem histórico de movimentos; dias da Trilha sem edição', same && !Object.keys(schA).some(d => d >= '2026-10-26') && JSON.stringify(trA) === '{}');
+        check('passo 4b: o arquivo guarda a versão anterior inteira (config, dias, registro), com data e hora', LA.length === 1 && LA[0].why === 'restaurar' && canon(LA[0].config) === canon(pre.cfg) && canon(LA[0].schedule) === canon(pre.sch) && canon(LA[0].trail) === canon(pre.tr) && /^2026-11-07T/.test(LA[0].at));
+        await rClick(page, /^Ver o que mudou desde a atualização$/); const c2 = await rCard(page);
+        check('passo 4c: uma 2ª restauração diz "Nada a restaurar" e o arquivo não cresce', /Nada a restaurar/.test(c2.text) && (await rArc(page)).length === 1, c2.text.slice(0, 120)); await rClick(page, /^Fechar$/);
+        await shot('aceite-2-restaurado', '[data-t="restore-card"]');
+        // 5 · ela marca nos blocos de dias passados das semanas 1 e 2
+        await clickTab(page, 'CRONOGRAMA'); const pend0 = await banner(page, 'trilha-pending'); const n0 = Number((pend0.text.match(/Ficaram para trás (\d+) etapas/) || [])[1]);
+        const pastT = []; Object.entries(cfgA.trilhaPlan).forEach(([id, p]) => STG.forEach(ts => { if (p[ts] && p[ts] < '2026-11-07') pastT.push({ id: Number(id), ts, d: p[ts] }); })); pastT.sort((a, b) => a.d < b.d ? -1 : 1);
+        const w2 = pastT.find(x => x.d >= '2026-11-03' && STG.indexOf(x.ts) === 1), w2a = w2 && pastT.find(x => x.id === w2.id && x.ts === 'aula'), w1 = pastT.find(x => x.d < '2026-11-03' && x.ts === 'aula' && (!w2 || x.id !== w2.id)); // na ordem: a aula antes das questões
+        const marks = [w1, w2a, w2].filter(Boolean);
+        for (const x of marks) { await goto(x.d); const day = await readDay(page); const b = day.blocks.find(y => y.tm === x.id && y.ts === x.ts && !y.au); await clickTask(page, new RegExp('^' + esc(b.text.slice(0, 60))), x.ts === 'quest' ? /D2 · 30q/ : null); }
+        await goto('2026-11-07'); const trM = await getLS(page, TRL); const pend1 = await banner(page, 'trilha-pending'); const n1 = Number((pend1.text.match(/Ficaram para trás (\d+) etapas/) || [])[1]);
+        say('passo 5 · marcou ' + marks.map(x => TS_W(x.ts) + ' de ' + x.id + ' no bloco de ' + br(x.d) + ' → carimbo ' + br(trM[x.id][STAMP[x.ts]])).join('; ') + ' · ⏳ ' + n0 + ' → ' + n1);
+        check('passo 5: marcar no bloco do dia passado (semana 1 e semana 2) carimba a data do bloco, e o ⏳ diminui', marks.length === 3 && marks.some(x => x.d >= '2026-11-03') && marks.some(x => x.d < '2026-11-03') && marks.every(x => trM[x.id][STAMP[x.ts]] === x.d) && n1 === n0 - marks.length, JSON.stringify({ n0, n1 }));
+        // 6 · ⏳ Ver como recolocar
+        await clickIn(page, 'trilha-pending', 'Ver como recolocar'); const pv = await banner(page, 'trilha-pending'); say('passo 6 · proposta: ' + pv.text.replace(/\n/g, ' ').slice(0, 900));
+        await shot('aceite-3-recolocar', '[data-t="trilha-pending"]');
+        const cBefore = await getLS(page, CFG); await clickIn(page, 'trilha-pending', 'Aplicar'); const cR = await getLS(page, CFG);
+        const bad = []; Object.entries(cR.trilhaPlan).forEach(([id, p]) => { if (!(p.hist || []).some(h => h.why === 'recolocar')) return; const t = trM[id] || {}; const D = {}; STG.forEach(ts => { D[ts] = t[FIELD[ts]] ? t[STAMP[ts]] : p[ts]; });
+            const moved = STG.filter(ts => !t[FIELD[ts]] && p[ts] !== cBefore.trilhaPlan[id][ts]);
+            for (let i = 1; i < 4; i++) { const a = D[STG[i - 1]], b = D[STG[i]]; if (a && b && b <= a) bad.push(id + ' ordem/mesmo dia ' + STG[i - 1] + '→' + STG[i]); }
+            moved.forEach(ts => { if (isBlocked(p[ts], ts)) bad.push(id + '.' + ts + ' em dia bloqueado ' + p[ts]); if (p[ts] < '2026-11-07') bad.push(id + '.' + ts + ' antes de hoje'); });
+            const gap = { quest: [1, 2], apost: [1, 2], seal: [2, 5] };
+            for (let i = 1; i < 4; i++) { const x = STG[i - 1], y = STG[i]; if (!moved.includes(y) || !D[x] || !D[y]) continue; const g = dd(D[x], D[y]); if (g < gap[y][0] || g > gap[y][1]) { if (moved.includes(x)) bad.push(id + ' fora da faixa ' + x + '→' + y + ' (' + g + 'd)'); else if (!/fora de/.test(pv.text)) bad.push(id + ' faixa com a etapa feita fora (' + g + 'd) sem aviso'); } } });
+        say('passo 6 · aplicada; conferência: ' + (bad.length ? bad.join('; ') : 'ordem, faixas e dias bloqueados ok; nenhum módulo com duas etapas no mesmo dia'));
+        check('passo 6: a proposta cobre todos os módulos com ⏳ e respeita a ordem, as faixas entre as etapas recolocadas e os dias bloqueados; nenhum módulo com duas etapas no mesmo dia; o intervalo com uma etapa feita há muito tempo aparece avisado ("fora de"); ⚠️ de carga só informa (Aplicar existe)', !bad.length && pv.btns.includes('Aplicar') && !/não cabe/.test(pv.text), bad.join('; '));
+        // 7 · Desfazer e Refazer
+        const beforeUndo = { cfg: cR, sch: (await getLS(page, SCH)) || {}, tr: await getLS(page, TRL) };
+        await clickTab(page, 'TRILHA'); await rClick(page, /^Desfazer a restauração$/); const up = await page.evaluate(() => document.querySelector('[data-t="restore-undo"]').innerText); await rClick(page, /^Confirmar: desfazer$/);
+        const cU = await getLS(page, CFG), tU = (await getLS(page, TRL)) || {}, sU = (await getLS(page, SCH)) || {};
+        const trilhaDays = (o) => Object.fromEntries(Object.entries(o || {}).filter(([k]) => k >= '2026-10-26'));
+        say('passo 7 · Desfazer — prévia: ' + up.replace(/\n/g, ' | ').slice(0, 500));
+        check('passo 7a: Desfazer devolve a bagunça de antes da restauração (plano, dias da Trilha, registro vazio); a prévia listou as marcas e as recolocações feitas depois', subX(cU) === subX(pre.cfg) && canon(tU) === canon(pre.tr) && canon(trilhaDays(sU)) === canon(trilhaDays(pre.sch)) && /marcas feitas depois da restauração \(3\)/.test(up) && /mudada depois da restauração/.test(up), up.slice(0, 300));
+        await rClick(page, /^Refazer a restauração$/); await rClick(page, /^Confirmar: refazer$/);
+        const cRR = await getLS(page, CFG), tRR = await getLS(page, TRL), sRR = (await getLS(page, SCH)) || {};
+        say('passo 7 · Refazer — plano: ' + Object.keys(cRR.trilhaPlan).filter(id => (cRR.trilhaPlan[id].hist || []).length).map(id => id + ' ' + STG.map(ts => br(cRR.trilhaPlan[id][ts] || '----------')).join('·')).join(' | '));
+        check('passo 7b: Refazer volta ao estado de antes de desfazer (restaurado + as 3 marcas + a recolocação)', subX(cRR) === subX(beforeUndo.cfg) && canon(tRR) === canon(beforeUndo.tr) && canon(trilhaDays(sRR)) === canon(trilhaDays(beforeUndo.sch)));
+    });
 
     await browser.close();
     H.summary('trilha');
