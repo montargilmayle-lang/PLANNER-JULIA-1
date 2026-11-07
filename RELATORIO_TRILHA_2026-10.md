@@ -192,7 +192,7 @@ Recusados pelos verificadores (comportamento pedido, sem perda):
 | Suíte | Checks |
 |---|---|
 | audit | 396 |
-| trilha (com TR17, TR17b–i: restauração) | 321 |
+| trilha (com TR17, TR17b–i e o aceite TR17z: restauração) | 332 |
 | historico | 148 |
 | coverage41 | 80 |
 | coverageTrilha | 8 |
@@ -201,9 +201,9 @@ Recusados pelos verificadores (comportamento pedido, sem perda):
 | loads16 | 12 |
 | simTrilha | 6 |
 
-**989 checks verdes.** `cmp planner_residencia_2026_offline.html index.html`: idênticos.
+**1000 checks verdes.** `cmp planner_residencia_2026_offline.html index.html`: idênticos.
 
-Os testes novos da restauração (TR17, TR17b–i) mexem pela interface:
+Os testes novos da restauração (TR17, TR17b–i, TR17z) mexem pela interface:
 - mover etapas e blocos, marcar no bloco e no card;
 - 📌, ↑, rampa, dia sem remédio, ⏩ e 🔓;
 - restaurar duas vezes, Desfazer, Refazer;
