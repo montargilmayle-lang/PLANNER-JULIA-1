@@ -57,7 +57,7 @@ Depois de aplicar: 11 etapa(s) aparecem como ⏳ pendentes · nenhum dia acima d
    - o dia sem remédio escolhido por ela volta ao previsto **só se as duas datas ainda vão chegar**. Se o dia escolhido ou o previsto já passou ou é hoje, a escolha fica (ver B.5.6). A prévia mostra as duas datas.
 4. **O que fica:**
    - `trilhaFirstOpen` e as semanas congeladas: composição e cota, nunca recalculadas;
-   - o que o app registra sozinho: dias cheios para a revisão (`trilhaRevFull`, decisão 73) e a recolocação da semana final. Se ela tinha religado o simulado de 01/01, ele volta à regra, mas a recolocação de hoje não é refeita: o app refaria a recolocação sobre o registro sem as marcas dela, e as etapas dos dias passados perderiam a data. Nos dias seguintes da semana final, a recolocação diária continua, mas só para as etapas de hoje em diante. **As etapas dos dias anteriores à restauração ficam no bloco do dia, para ela marcar** (`trilhaFinalKeep`). O que ela não fez aparece no ⏳ ("Ver como recolocar"). Sem isso, no dia seguinte toda etapa ainda não remarcada iria para "depois de 01/01" e sairia dos blocos;
+   - o que o app registra sozinho: dias cheios para a revisão (`trilhaRevFull`, decisão 73) e a recolocação da semana final. Se ela tinha religado o simulado de 01/01, ele volta à regra, mas a recolocação de hoje não é refeita: o app refaria a recolocação sobre o registro sem as marcas dela, e as etapas dos dias passados perderiam a data. Se ela restaura na semana final, ou na semana antes dela (a partir de 22/12), a recolocação diária da semana final continua, mas só para as etapas do dia da restauração em diante. **As etapas dos dias anteriores ficam no bloco do dia, para ela marcar** (`trilhaFinalKeep`). O que ela não fez aparece no ⏳ ("Ver como recolocar"). Sem isso, no dia seguinte toda etapa ainda não remarcada iria para "depois de 01/01" e sairia dos blocos;
    - tudo o que é de antes da atualização: histórico do curso, dias de transição, e marcas sem data, de antes de 26/10, ou de antes do 1º acesso registradas assim no congelamento. Uma revisão conta pela data em que foi marcada, não pela data do bloco.
    - Junto com a revisão D+30 sai o reforço (R3), que depende dela.
 5. **Grava o estado em que o app assenta.** Ao gravar, roda o congelamento sobre o estado restaurado. Por isso **restaurar de novo mostra "Nada a restaurar"** e o arquivo não cresce. Vale também num plantão longo com revisão vencida (10/11) e na semana final (30/12).
@@ -156,6 +156,21 @@ Recusados pelos verificadores (comportamento pedido, sem perda):
 | Desfazer/Refazer devolviam o dia sem remédio inteiro (podia virar hoje, ou reescrever o dia vivido) | mesma regra das duas datas da restauração | TR17g |
 | Semana final: no dia seguinte à restauração, toda etapa ainda não remarcada ia para "depois de 01/01" | as etapas dos dias anteriores à restauração ficam no bloco do dia (`trilhaFinalKeep`) | TR17e |
 | Prévia sem a data prevista do dia sem remédio numa semana ainda não congelada | data da prévia do plano | TR17f |
+
+**4ª rodada (2 lentes sobre as correções da 3ª; cada achado verificado):** 12 achados confirmados, todos corrigidos. Quase todos eram textos das prévias de Desfazer e Refazer em sequências raras. Um era um furo de dados.
+
+| Achado | Correção | Teste |
+|---|---|---|
+| Restaurar em 28/12 (véspera da semana final) não protegia as etapas: em 29/12, 137 iam para "depois de 01/01" | a proteção vale a partir de 22/12, e a prévia avisa | TR17i |
+| A prévia do Refazer refazia a regra do dia sem remédio com a data de hoje e mostrava uma escolha que ela não fez | usa o dia do Desfazer | TR17h |
+| "📌 → voltam ao padrão" quando o Refazer traz de volta o 📌 que ela fixou depois da restauração | separa "volta ao padrão" de "volta como você deixou" | — |
+| A prévia do Desfazer dizia que o dia sem remédio "volta" quando ele fica | o resumo usa só o que muda; o dia sem remédio tem linha própria | TR17g |
+| No Refazer, um dia sem remédio mantido aparecia em "Saem de novo" | vai para "Fica como está" | TR17h |
+| A recolocação automática do app aparecia como mudança dela (semana final, Desfazer/Refazer em outro dia) | a mudança feita pelo app não é atribuída a ela; a prévia compara com o estado em que o app assenta | — |
+| O Refazer não listava etapas e dias editados que o Desfazer tinha trazido e ele tira de novo | listados em "Saem de novo" | — |
+| As prévias de Desfazer/Refazer não davam a data prevista do dia sem remédio numa semana ainda não congelada | data projetada | — |
+
+**Limite conhecido.** Os textos das prévias de Desfazer e Refazer, em sequências longas de restaurar, desfazer e refazer misturadas com a recolocação diária da semana final, são o melhor esforço. Os dados estão sempre certos e guardados: tudo vai para o arquivo antes, e cada ação pode ser desfeita.
 
 ### B.7 · Passagem pelos oito
 
