@@ -1192,8 +1192,8 @@ function trilhaListFor(iso, X) {
         (P.byDay[iso] || []).forEach(({ id, ts }) => {
             const m = modById(id); if (!m) return;
             if (!X.keepDone && iso > hoje && (trail[id] || {})[TS_FIELD[ts]]) return; // BUG 2: etapa já feita não ocupa dia ainda não vivido
-            const b = trilhaStageBlock(m, ts);
-            acts.push({ ...b, text: b.text + (L === iso ? " · 🌿 dia leve — etapa de menor demanda" : ""), tm: m.id, ts });
+            const b = trilhaStageBlock(m, ts), bw = trilhaBlockedWhy(iso, cfg, ts);
+            acts.push({ ...b, text: b.text + (L === iso ? " · 🌿 dia leve — etapa de menor demanda" : "") + (bw ? " · ⚠️ " + bw + " — escolha sua" : ""), tm: m.id, ts }); // etapa deixada num dia bloqueado (escolha dela ao mover): o bloco avisa
         });
         (P.ghosts[iso] || []).forEach(g => { const m = modById(g.id); if (m) acts.push({ d: "EXTRA", color: "#475569", text: "↷ Trilha · " + m.code + " — " + TS_WORD[g.ts] + " recolocada para " + (g.to ? DOW_LBL[dowOf(g.to)] + " " + fmtBR(g.to) : "depois de 01/01 (segue no novo cursinho)"), time: "", gh: 1 }); });
         if (longo) { const au = trilhaAudioTarget(iso, P, trail); const m = au && modById(au.id); if (m) acts.push({ d: "D3", color: "#7E22CE", text: "🎧 Áudio (opcional, nos tempos mortos) — aula de " + m.code + " " + m.title + " (planejada " + DOW_LBL[dowOf(au.aula)] + " " + fmtBR(au.aula) + "). O conteúdo visual (imagens, ECG, dermatoscopia) precisa do vídeo depois.", time: "opcional", tm: m.id, ts: "aula", au: 1 }); }
@@ -1218,7 +1218,8 @@ function buildShiftDayT(sh, iso, acts) { // plantões da Trilha (😴): longo = 
     const trajeto = (a) => a.d === "ANKI" ? AC("ANKI", "#0369A1", "Anki no trajeto — 20min" + (sh.kind === "longo" ? " (meditação 10min no almoço ou à noite)" : ""), "20min") : a;
     if (sh.kind === "longo") {
         const ves = vesperaTxt(iso);
-        const out = [AC("AMB", "#6B7280", "🚑 Plantão " + sh.hours + " — sem etapa de mesa hoje: só Anki" + (isTransDay(iso) ? " no trajeto" : " e áudio nos tempos mortos"), dur)]
+        const chosen = acts.some(a => a.tm != null && a.ts && !a.au && !a.gh); // etapa deixada no plantão longo por escolha dela ("Deixar neste dia", PR 2)
+        const out = [AC("AMB", "#6B7280", "🚑 Plantão " + sh.hours + (chosen ? " — etapa deixada aqui por escolha sua (⚠️ no bloco); fora ela, só Anki e áudio nos tempos mortos" : " — sem etapa de mesa hoje: só Anki" + (isTransDay(iso) ? " no trajeto" : " e áudio nos tempos mortos")), dur)]
             .concat(acts.filter(a => a.d !== "LAZER").map(a => a.d === "GYM" ? AC("GYM", "#1D4ED8", "Academia — opcional, só se sobrar energia", "30min") : trajeto(a)));
         out.push(AC("LAZER", "#6B7280", "Jantar, banho, sono cedo" + (ves && /20h30/.test(ves) ? " — " + ves : " (plantão de 13h: dormir ~21h45)"), "livre"));
         return out;
@@ -1442,6 +1443,62 @@ function trilhaProposeRecolocar(P, cfg, trail, hoje, opts) { // ⏳ para cada m�
         const pend = new Set(P.pending.filter(x => x.id === id).map(x => x.ts)); const fi = STAGES_T.findIndex(ts => pend.has(ts)); const rem = STAGES_T.filter((ts, i) => i >= fi && !t[TS_FIELD[ts]]); const fixed = {}; STAGES_T.forEach((ts, i) => { if (rem.indexOf(ts) >= 0) return; const f = TS_FIELD[ts]; if (t[f]) fixed[ts] = t[STAMP_OF[f]] || p[ts]; else if (i < fi && p[ts]) fixed[ts] = p[ts]; }); return { id, rem, fixed, before: { ...p } }; });
     jobs.forEach(j => j.rem.forEach(ts => stAdd(st, j.before[ts], ts, -1)));
     return jobs.map(j => { if (j.wait) return { ...j, days: null }; const ch = placeChain(st, j.chain || j.rem, j.fixed, hoje, addDaysISO(hoje, 6), TRILHA_END, { prot: P.prot }); if (ch) j.rem.forEach(ts => stAdd(st, ch[ts], ts)); return { ...j, days: ch ? Object.fromEntries(j.rem.map(ts => [ts, ch[ts]])) : null }; });
+}
+// ── MOVER O FIO TODO JUNTO (paciente, 07/11): a etapa movida e as seguintes do mesmo módulo, ainda sem marca, andam o mesmo N dias — os intervalos que o fio
+// já tinha ficam. Ao adiantar, uma etapa anterior sem marca que ficaria fora de ordem anda junto. Dia bloqueado: o app pergunta ("Deixar neste dia" ou
+// "Pular +1 dia"), não decide. Nunca depois de 01/01; nunca duas etapas do módulo no mesmo dia; a ordem aula → questões → apostila → selagem sempre.
+function trilhaBlockedWhy(iso, cfg, ts) { // por que o dia não recebe etapa (null = recebe)
+    if (!iso) return null;
+    if (iso >= POS_CURSO && iso < TRILHA_START) return "dia de transição (a trilha começa em " + fmtBR(TRILHA_START) + ")";
+    if (iso === TRILHA_END && ts && ts !== "seal") return "último dia de acesso — só selagem";
+    if (!isTrilhaDay(iso)) return null;
+    const sh = shiftFor(iso); if (sh && sh.kind === "longo") return "plantão longo";
+    if (postNight(iso)) return "pós-noturno";
+    if (dowOf(iso) === 5 && simForCfg(cfg || {}, iso)) return "sexta de simulado";
+    return null;
+}
+// ans[ts] = respostas às perguntas daquela etapa, em ordem: "skip" (pular +1 dia) ou "stay" (deixar neste dia)
+function trilhaShiftPlan(P, cfg, trail, id, ts, fromIso, toIso, hoje, ans) {
+    const A = ans || {}, p = (P && P.plan[id]) || {}, t = (trail || {})[id] || {}, tomorrow = addDaysISO(hoje, 1);
+    const marked = (x) => !!t[TS_FIELD[x]], eff = (x) => marked(x) ? (t[STAMP_OF[TS_FIELD[x]]] || p[x] || null) : (p[x] || null);
+    const N = diffDays(fromIso, toIso), i = STAGES_T.indexOf(ts);
+    const out = { id, ts, N, fromIso, toIso, rows: [], stopAt: null, stopEarly: null, orderBroken: false, orderWhy: "", nofit: [], pendingQ: 0, past: toIso < hoje, movedWhy: trilhaBlockedWhy(toIso, cfg, ts), leftOnEnd: null, notes: [] };
+    // seguintes: andam todas as sem marca até a primeira marcada (o fio não passa dela)
+    const later = []; for (let j = i + 1; j < STAGES_T.length; j++) { const x = STAGES_T[j]; if (marked(x)) { out.stopAt = x; break; } if (p[x]) later.push(x); }
+    // anteriores (ao adiantar): sem marca e fora de ordem com a etapa movida (ou com outra que anda) andam junto
+    const earlier = []; if (N < 0) { let nxt = toIso; for (let j = i - 1; j >= 0; j--) { const x = STAGES_T[j]; if (marked(x)) { if ((eff(x) || "") >= nxt) out.stopEarly = x; break; } if (!p[x] || p[x] < nxt) break; earlier.unshift(x); nxt = addDaysISO(p[x], N); } }
+    const rowOf = (x, to, kind) => ({ ts: x, from: p[x] || null, to, kind, why: null, q: null, stay: false, adj: false, nofit: false });
+    // perguntas: uma por vez em cada etapa; "Pular +1 dia" empurra também as seguintes do mesmo trecho
+    const place = (xs, baseOf, floor) => { let extra = 0, prev = null; const rows = [];
+        xs.forEach(x => { let d = addDaysISO(baseOf(x), extra); const r = rowOf(x, d, "anda");
+            if (floor && d < floor) { const dd2 = floor; extra += diffDays(d, dd2); d = dd2; r.adj = true; } // ⏳ anda a partir de amanhã
+            if (prev && d <= prev) { extra += diffDays(d, addDaysISO(prev, 1)); d = addDaysISO(prev, 1); r.adj = true; }
+            const ax = A[x] || []; let k = 0;
+            while (d <= TRILHA_END) { const why = trilhaBlockedWhy(d, cfg, x); if (!why) break; const a = ax[k++]; if (a === "skip") { d = addDaysISO(d, 1); extra++; continue; } if (a === "stay") { r.stay = true; r.why = why; break; } r.q = { d, why }; out.pendingQ++; break; }
+            if (d > TRILHA_END) { r.nofit = true; r.to = null; } else r.to = d;
+            if (!r.nofit) prev = d; rows.push(r); });
+        return rows; };
+    const eRows = place(earlier, (x) => addDaysISO(p[x], N), null);
+    const mRow = { ...rowOf(ts, toIso, "movida"), why: out.movedWhy };
+    const lRows = place(later, (x) => addDaysISO(p[x], N), toIso < tomorrow ? tomorrow : addDaysISO(toIso, 1));
+    // depois de 01/01 nada: a partir da 1ª que não cabe, as seguintes também ficam sem dia
+    let cut = false; lRows.forEach(r => { if (cut) { r.nofit = true; r.to = null; r.q = null; } if (r.nofit) cut = true; });
+    out.pendingQ = eRows.concat(lRows).filter(r => r.q).length;
+    out.rows = eRows.concat([mRow], lRows);
+    out.nofit = lRows.filter(r => r.nofit).map(r => r.ts);
+    const endStay = out.rows.find(r => r.to === TRILHA_END && r.ts !== "seal" && !r.q); if (endStay) out.leftOnEnd = endStay.ts; // deixada em 01/01 (escolha dela), não a que ainda espera resposta
+    // a etapa anterior que precisava andar não pode voltar para antes de amanhã
+    eRows.forEach(r => { if (r.to && r.to < tomorrow) { out.orderBroken = true; out.orderWhy = (r.ts === "quest" ? "as questões iriam" : "a " + TS_WORD[r.ts] + " iria") + " para antes de amanhã — não pode voltar"; } });
+    // ordem e mesmo dia, com as que não andam (marcadas, ou depois de uma marcada)
+    const D = {}; STAGES_T.forEach(x => { D[x] = eff(x); }); out.rows.forEach(r => { D[r.ts] = r.to; });
+    const seq = STAGES_T.filter(x => D[x]);
+    const OFX = { aula: ["da aula", "que a aula"], quest: ["das questões", "que as questões"], apost: ["da apostila", "que a apostila"], seal: ["da selagem", "que a selagem"] };
+    for (let k = 1; k < seq.length; k++) if (D[seq[k]] <= D[seq[k - 1]]) { out.orderBroken = true; out.orderWhy = out.orderWhy || ((seq[k] === "quest" ? "as questões ficariam " : "a " + TS_WORD[seq[k]] + " ficaria ") + (D[seq[k]] === D[seq[k - 1]] ? "no mesmo dia " + OFX[seq[k - 1]][1] : "antes " + OFX[seq[k - 1]][0])); break; }
+    // intervalos antes e depois (a faixa só informa)
+    const B = {}; STAGES_T.forEach(x => { B[x] = eff(x); });
+    out.gaps = STAGES_T.slice(1).map((y, k) => { const x = STAGES_T[k]; const g0 = B[x] && B[y] ? diffDays(B[x], B[y]) : null, g1 = D[x] && D[y] ? diffDays(D[x], D[y]) : null; const r = GAP_T[y]; return { x, y, before: g0, after: g1, ok: g1 == null || (g1 >= r[0] && g1 <= r[1]) }; });
+    out.ready = !out.orderBroken && !out.pendingQ;
+    return out;
 }
 function trilhaFinalPlan(P, cfg, trail, hoje, edited) { // 📦 semana final (29/12–01/01): recoloca SOZINHA (pedido dela) o que estiver aberto para selar até 01/01 — limiar do dia como limite, nunca em dia editado
     const st = cloneSt(P.stNow); const patch = {}; const moved = [], compressed = [], nocabe = [];
@@ -2595,6 +2652,42 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, trail, P, onSa
         __CFG_SAVE && __CFG_SAVE({ trilhaPlan: { ...((config && config.trilhaPlan) || {}), [id]: p } });
         setMoveAsk(null);
     };
+    const applyShiftT = (ask, SP) => { // "Mover o fio todo": grava em trilhaPlan as datas novas (orig fica; hist com motivo próprio "fio")
+        const id = ask.id; const base = ((config && config.trilhaPlan) || {})[id]; if (!base || !SP || !SP.ready) { setMoveAsk(null); return; }
+        const p = { ...base }; const hist = (p.hist || []).slice(); const ov = { ...scheduleOv }; let ovCh = false;
+        SP.rows.forEach(r => { const to = r.nofit ? null : r.to, from = p[r.ts] || null; if (to === from) return; p[r.ts] = to; hist.push({ ts: r.ts, from, to, at: hojeT, why: "fio" }); if (from && takeFromT(ov, from, id, r.ts)) ovCh = true; if (to && putIntoT(ov, to, id, r.ts)) ovCh = true; });
+        p.hist = hist;
+        if (ovCh) onSaveSchedule(ov);
+        __CFG_SAVE && __CFG_SAVE({ trilhaPlan: { ...((config && config.trilhaPlan) || {}), [id]: p } });
+        setMoveAsk(null);
+    };
+    const nTxtT = (n) => (n > 0 ? "+" : "−") + Math.abs(n) + (Math.abs(n) === 1 ? " dia" : " dias");
+    const TS_CAP = { aula: "Aula", quest: "Questões", apost: "Apostila", seal: "Selagem" }, TS_THE = { aula: "a aula", quest: "as questões", apost: "a apostila", seal: "a selagem" };
+    const PAST_LINE = "Esse dia já passou. Se você fez a etapa nele, marque o ✓ no bloco desse dia, assim o carimbo fica com a data certa. Mover para um dia passado só deixa a etapa como pendente (⏳).";
+    const shiftViewT = (ask) => { // prévia do "Mover o fio todo": dia e carga de cada etapa, intervalos antes e depois, perguntas dos dias bloqueados
+        const SP = trilhaShiftPlan(P, config, trail, ask.id, ask.ts, ask.fromIso, ask.toIso, hojeT, ask.shift.ans);
+        const ans = ask.shift.ans || {}, answer = (x, a) => setMoveAsk({ ...ask, shift: { ans: { ...ans, [x]: (ans[x] || []).concat([a]) } } });
+        const gapS = (g) => g != null && g < 0 ? "−" + (-g) + "d" : gapTxt(g); // etapa que ficaria antes da anterior
+        const sm = { color: "#e0f2fe", fontSize: 11, lineHeight: 1.5 }, warn = { color: "#fbbf24", fontSize: 11, fontWeight: 700, lineHeight: 1.5 }, btn = { background: "#0f172a", border: "1px solid #334155", borderRadius: 8, color: "#cbd5e1", fontSize: 11, fontWeight: 700, padding: "4px 9px", cursor: "pointer" };
+        const kids = [React.createElement("span", { key: "h", style: { ...sm, fontWeight: 800 } }, "💡 Mover o fio todo de " + (ask.mod ? ask.mod.code + " · " + ask.mod.title : "") + " (" + nTxtT(SP.N) + "):")];
+        SP.rows.forEach(r => {
+            if (r.q) { kids.push(React.createElement("div", { key: "q" + r.ts, "data-t": "shift-q", "data-ts": r.ts, style: { display: "flex", flexDirection: "column", gap: 4 } },
+                React.createElement("span", { style: warn }, "⛔ " + TS_THE[r.ts].replace(/^./, c => c.toUpperCase()) + (r.ts === "quest" ? " iriam" : " iria") + " para " + dayNameT(r.q.d) + ", que é " + r.q.why + "."),
+                React.createElement("div", { style: { display: "flex", gap: 6, flexWrap: "wrap" } }, React.createElement("button", { onClick: () => answer(r.ts, "stay"), style: btn }, "Deixar neste dia"), React.createElement("button", { onClick: () => answer(r.ts, "skip"), style: btn }, "Pular +1 dia")))); return; }
+            const txt = r.nofit ? TS_CAP[r.ts] + ": " + dayNameT(r.from) + " → sem dia — não cabe antes do fim do acesso (01/01)"
+                : TS_CAP[r.ts] + ": " + dayNameT(r.from) + " → " + dayCostT(r.to, HRS_T[r.ts]) + (r.kind === "movida" ? " (seu movimento)" : "") + (r.why ? " · ⚠️ " + r.why + " — escolha sua" : "") + (r.adj ? " · a partir de amanhã" : "") + ((ans[r.ts] || []).filter(a => a === "skip").length ? " · pulou " + (ans[r.ts] || []).filter(a => a === "skip").length + " dia(s)" : "");
+            kids.push(React.createElement("span", { key: "r" + r.ts, "data-t": "shift-row", "data-ts": r.ts, style: r.nofit ? warn : sm }, "· " + txt)); });
+        const notes = [...new Set(SP.rows.filter(r => r.to).map(r => lightNoteT(r.to)).filter(Boolean))]; notes.forEach((n, k) => kids.push(React.createElement("span", { key: "ln" + k, style: sm }, n)));
+        if (SP.stopAt) kids.push(React.createElement("span", { key: "st", style: warn }, "⚠️ " + TS_THE[SP.stopAt].replace(/^./, c => c.toUpperCase()) + (SP.stopAt === "quest" ? " já estão marcadas" : " já está marcada") + ": o fio não anda além " + (SP.stopAt === "quest" ? "delas" : "dela") + "."));
+        if (SP.stopEarly) kids.push(React.createElement("span", { key: "se", style: warn }, "⚠️ " + TS_THE[SP.stopEarly].replace(/^./, c => c.toUpperCase()) + (SP.stopEarly === "quest" ? " já estão marcadas" : " já está marcada") + ": as etapas antes " + (SP.stopEarly === "quest" ? "delas" : "dela") + " não andam."));
+        if (SP.nofit.length && !SP.pendingQ) kids.push(React.createElement("span", { key: "nf", "data-t": "shift-nofit", style: warn }, "⚠️ " + (SP.nofit.length === 1 ? "Esta etapa não cabe" : "Estas etapas não cabem") + " antes do fim do acesso (01/01): " + SP.nofit.map(x => TS_WORD[x]).join(", ") + ". Você pode aplicar o deslocamento parcial (só o que cabe; " + (SP.nofit.length === 1 ? "ela fica" : "elas ficam") + " sem dia) ou cancelar."));
+        if (SP.leftOnEnd && !SP.pendingQ) kids.push(React.createElement("span", { key: "le", "data-t": "shift-end", style: warn }, "⚠️ Deixando " + TS_THE[SP.leftOnEnd] + " em 01/01 (último dia de acesso), as etapas seguintes ficam sem dia."));
+        if (SP.past) kids.push(React.createElement("span", { key: "pa", "data-t": "shift-past", style: warn }, PAST_LINE));
+        kids.push(React.createElement("span", { key: "gp", "data-t": "shift-gaps", style: sm }, "Intervalos (antes → depois): " + SP.gaps.map(g => BARE[g.x] + " → " + BARE[g.y] + " " + gapS(g.before) + " → " + gapS(g.after) + (g.ok ? "" : " ⚠️ fora de " + GAP_T[g.y][0] + "–" + GAP_T[g.y][1])).join(" · ")));
+        if (SP.orderBroken) kids.push(React.createElement("span", { key: "ob", "data-t": "shift-order", style: warn }, "⚠️ A ordem não pode ser preservada: " + SP.orderWhy + ". As outras opções continuam."));
+        else if (SP.pendingQ) kids.push(React.createElement("span", { key: "pq", style: sm }, "Responda " + (SP.pendingQ === 1 ? "a pergunta" : "as perguntas") + " acima para aplicar."));
+        return { SP, el: React.createElement("div", { key: "shift", "data-t": "shift-prev", style: { display: "flex", flexDirection: "column", gap: 4 } }, kids) };
+    };
     const moveToIso = (fromIdx, idx, toIso) => { // seletor "→ mover p/ dia" (valor = data)
         const act = listFor(fromIdx)[idx]; if (!act || !toIso) return;
         const fromIso = dateFor(fromIdx);
@@ -2603,8 +2696,10 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, trail, P, onSa
             const an = analyzeMoveT(act, fromIso, toIso);
             const l = listAtISO(toIso) || []; const destHrs = dayLoadHours(l) + actHours(act);
             const capMsg = destHrs > DAY_CAP_H ? "⚠️ " + dayNameT(toIso) + " ficaria com ~" + destHrs.toFixed(1).replace(".", ",") + "h de atividades — acima do tempo hábil (~" + String(DAY_CAP_H).replace(".", ",") + "h). Nada será apagado nem trocado." : "";
-            if (!an.issues.length && !capMsg) { applyMoveT(an, false); return; }
-            setMoveAsk({ trail: true, fromIdx, idx, act, capMsg, ...an, missing: [], view: false });
+            const tr0 = (trail || {})[act.tm] || {}, pl0 = (P && P.plan[act.tm]) || {};
+            const hasLater = STAGES_T.slice(STAGES_T.indexOf(act.ts) + 1).some(x => !tr0[TS_FIELD[x]] && pl0[x]); // etapas sem marca depois dela: o diálogo abre sempre (só esta etapa ou o fio todo) — paciente, 07/11
+            if (!an.issues.length && !capMsg && !hasLater && toIso >= hojeT) { applyMoveT(an, false); return; } // a selagem (nada depois dela) segue movendo direto
+            setMoveAsk({ trail: true, fromIdx, idx, act, capMsg, ...an, missing: [], view: false, hasLater, short: !an.issues.length && hasLater, shift: null }); // curto = os intervalos ficam; a carga (capMsg) só informa
             return;
         }
         const toIdx = diffDays(dateFor(0), toIso);
@@ -2944,18 +3039,28 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, trail, P, onSa
                 isCustom(activeIdx) && (React.createElement("button", { onClick: () => resetDay(activeIdx), style: { background: "#0f172a",
                         border: "1px solid #7f1d1d", borderRadius: 8, color: "#f87171", padding: "8px 12px",
                         fontSize: 12, cursor: "pointer" } }, "\u21BA Voltar ao padr\u00E3o"))),
-            moveAsk && React.createElement("div", { "data-pw": "move-ask", style: { display: "flex", flexDirection: "column", gap: 6, background: "#0b1f33", border: "1px solid #1d4ed8", borderRadius: 10, padding: "8px 12px", marginBottom: 12 } },
+            moveAsk && (() => { const SV = moveAsk.trail && moveAsk.shift ? shiftViewT(moveAsk) : null; const bS2 = (main) => ({ background: main ? "#1e3a8a" : "#0f172a", border: "1px solid " + (main ? "#3b82f6" : "#334155"), borderRadius: 8, color: main ? "#bfdbfe" : "#94a3b8", fontSize: 11, fontWeight: 700, padding: "5px 10px", cursor: "pointer" });
+                const nShift = moveAsk.trail ? diffDays(moveAsk.fromIso, moveAsk.toIso) : 0;
+                return React.createElement("div", { "data-pw": "move-ask", style: { display: "flex", flexDirection: "column", gap: 6, background: "#0b1f33", border: "1px solid #1d4ed8", borderRadius: 10, padding: "8px 12px", marginBottom: 12 } },
                 React.createElement("span", { style: { color: "#93c5fd", fontSize: 11, fontWeight: 800, lineHeight: 1.45 } }, "Mover \"" + moveAsk.act.text.slice(0, 48) + (moveAsk.act.text.length > 48 ? "…" : "") + "\" de " + (moveAsk.trail ? dayNameT(moveAsk.fromIso) + " para " + dayNameT(moveAsk.toIso) + " · carga do destino: " + dayCostT(moveAsk.toIso, actHours(moveAsk.act)) : dayName(moveAsk.fromIdx) + " para " + dayName(moveAsk.toIdx) + " · carga do destino: " + dayCost(moveAsk.toIdx, actHours(moveAsk.act)))),
-                moveAsk.capMsg && React.createElement("span", { style: { color: "#fbbf24", fontSize: 11, fontWeight: 700, lineHeight: 1.45 } }, moveAsk.capMsg),
-                moveAsk.issues.length > 0 && React.createElement("span", { style: { color: "#fbbf24", fontSize: 11, fontWeight: 800, lineHeight: 1.45 } }, "⚠️ Isso deixa " + moveAsk.issues.map(i => i.text).join(" e ") + "."),
-                moveAsk.issues.length > 0 && React.createElement("div", { style: { color: "#e0f2fe", fontSize: 10, lineHeight: 1.5 } }, (moveAsk.trail ? askLinesT(moveAsk) : askLines(moveAsk)).map((l, i) => React.createElement("div", { key: i }, "· " + l))),
-                (moveAsk.missing || []).map((ms, i) => React.createElement("span", { key: "m" + i, style: { color: "#fbbf24", fontSize: 11, fontWeight: 800, lineHeight: 1.45 } }, "⚠️ " + NOM[ms.stage] + " deste módulo não está em nenhum dia desta semana (apagada de um dia editado — a cascata a esperava " + dayName(ms.d) + ")")),
-                moveAsk.view && React.createElement("span", { style: { color: "#e0f2fe", fontSize: 11, lineHeight: 1.45 } }, "💡 " + (moveAsk.trail ? propTextT(moveAsk) : propText(moveAsk))),
-                React.createElement("div", { style: { display: "flex", gap: 8, flexWrap: "wrap" } },
-                    moveAsk.view && moveAsk.proposal && React.createElement("button", { onClick: () => moveAsk.trail ? applyMoveT(moveAsk, true) : applyMovePlan(moveAsk), style: { background: "#1e3a8a", border: "1px solid #3b82f6", borderRadius: 8, color: "#bfdbfe", fontSize: 11, fontWeight: 700, padding: "5px 10px", cursor: "pointer" } }, "Aplicar"),
-                    React.createElement("button", { onClick: () => { if (moveAsk.trail) { applyMoveT(moveAsk, false); return; } __moveActCore(moveAsk.fromIdx, moveAsk.idx, moveAsk.toIdx); setMoveAsk(null); }, style: { background: (moveAsk.issues.length || (moveAsk.missing || []).length) ? "#0f172a" : "#1e3a8a", border: "1px solid " + ((moveAsk.issues.length || (moveAsk.missing || []).length) ? "#334155" : "#3b82f6"), borderRadius: 8, color: (moveAsk.issues.length || (moveAsk.missing || []).length) ? "#94a3b8" : "#bfdbfe", fontSize: 11, fontWeight: 700, padding: "5px 10px", cursor: "pointer" } }, "Mover assim mesmo"),
-                    !moveAsk.view && (moveAsk.issues.length > 0 || (moveAsk.missing || []).length > 0) && React.createElement("button", { onClick: () => setMoveAsk({ ...moveAsk, view: true }), style: { background: "#1e3a8a", border: "1px solid #3b82f6", borderRadius: 8, color: "#bfdbfe", fontSize: 11, fontWeight: 700, padding: "5px 10px", cursor: "pointer" } }, "Ver como reorganizar o fio"),
-                    React.createElement("button", { onClick: () => setMoveAsk(null), style: { background: "#0f172a", border: "1px solid #334155", borderRadius: 8, color: "#94a3b8", fontSize: 11, fontWeight: 700, padding: "5px 10px", cursor: "pointer" } }, "Cancelar"))),
+                moveAsk.trail && moveAsk.short && !SV && React.createElement("span", { "data-t": "move-short", style: { color: "#86efac", fontSize: 11, fontWeight: 700, lineHeight: 1.45 } }, "Este movimento mantém os intervalos."),
+                moveAsk.trail && !SV && moveAsk.toIso < hojeT && React.createElement("span", { "data-t": "move-past", style: { color: "#fbbf24", fontSize: 11, fontWeight: 700, lineHeight: 1.45 } }, PAST_LINE),
+                moveAsk.capMsg && !SV && React.createElement("span", { style: { color: "#fbbf24", fontSize: 11, fontWeight: 700, lineHeight: 1.45 } }, moveAsk.capMsg),
+                moveAsk.issues.length > 0 && !SV && React.createElement("span", { style: { color: "#fbbf24", fontSize: 11, fontWeight: 800, lineHeight: 1.45 } }, "⚠️ Isso deixa " + moveAsk.issues.map(i => i.text).join(" e ") + "."),
+                moveAsk.issues.length > 0 && !SV && React.createElement("div", { style: { color: "#e0f2fe", fontSize: 10, lineHeight: 1.5 } }, (moveAsk.trail ? askLinesT(moveAsk) : askLines(moveAsk)).map((l, i) => React.createElement("div", { key: i }, "· " + l))),
+                !SV && (moveAsk.missing || []).map((ms, i) => React.createElement("span", { key: "m" + i, style: { color: "#fbbf24", fontSize: 11, fontWeight: 800, lineHeight: 1.45 } }, "⚠️ " + NOM[ms.stage] + " deste módulo não está em nenhum dia desta semana (apagada de um dia editado — a cascata a esperava " + dayName(ms.d) + ")")),
+                moveAsk.view && !SV && React.createElement("span", { style: { color: "#e0f2fe", fontSize: 11, lineHeight: 1.45 } }, "💡 " + (moveAsk.trail ? propTextT(moveAsk) : propText(moveAsk))),
+                SV && SV.el,
+                SV ? React.createElement("div", { style: { display: "flex", gap: 8, flexWrap: "wrap" } },
+                    SV.SP.ready && React.createElement("button", { onClick: () => applyShiftT(moveAsk, SV.SP), style: bS2(true) }, SV.SP.nofit.length ? "Aplicar o deslocamento parcial" : "Aplicar"),
+                    React.createElement("button", { onClick: () => setMoveAsk({ ...moveAsk, shift: null }), style: bS2(false) }, "Voltar às outras opções"),
+                    React.createElement("button", { onClick: () => setMoveAsk(null), style: bS2(false) }, "Cancelar"))
+                : React.createElement("div", { style: { display: "flex", gap: 8, flexWrap: "wrap" } },
+                    moveAsk.view && moveAsk.proposal && React.createElement("button", { onClick: () => moveAsk.trail ? applyMoveT(moveAsk, true) : applyMovePlan(moveAsk), style: bS2(true) }, "Aplicar"),
+                    React.createElement("button", { onClick: () => { if (moveAsk.trail) { applyMoveT(moveAsk, false); return; } __moveActCore(moveAsk.fromIdx, moveAsk.idx, moveAsk.toIdx); setMoveAsk(null); }, style: bS2(!(moveAsk.issues.length || (moveAsk.missing || []).length) && !moveAsk.hasLater) }, moveAsk.trail && moveAsk.short ? "Mover só esta etapa" : "Mover assim mesmo"),
+                    !moveAsk.view && (moveAsk.issues.length > 0 || (moveAsk.missing || []).length > 0) && React.createElement("button", { onClick: () => setMoveAsk({ ...moveAsk, view: true }), style: bS2(true) }, "Ver como reorganizar o fio"),
+                    moveAsk.trail && moveAsk.hasLater && React.createElement("button", { onClick: () => setMoveAsk({ ...moveAsk, shift: { ans: {} } }), style: bS2(true) }, "Mover o fio todo (" + nTxtT(nShift) + ")"),
+                    React.createElement("button", { onClick: () => setMoveAsk(null), style: bS2(false) }, "Cancelar"))); })(),
             React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 8 } }, list.map((act, i) => {
                 const isT = act.tm != null && !isTransDay(dayDate); // bloco da Trilha: identidade pelo módulo (tm) e etapa (ts); registro próprio (trail_v1) — num dia de transição, um bloco de etapa que sobrou vira nota
                 const noteT = !isT && dayDate >= POS_CURSO; // bloco antigo num dia da Trilha (ou de transição) (lista editada antes): vira nota, sem tarefa nem cartão
