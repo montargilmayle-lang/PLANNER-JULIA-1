@@ -115,7 +115,25 @@ Entregue antes do merge, como pedido ("bateria completa verde, `cmp` do `index.h
 
 ### C.10 · Bateria e `cmp`
 
-PLACEHOLDER_BAT
+| Suíte | Checks |
+|---|---|
+| audit | 396 |
+| trilha (com TR18a–h: mover o fio todo junto) | 385 |
+| historico | 148 |
+| coverage41 | 80 |
+| coverageTrilha | 8 |
+| intervalsTrilha | 11 |
+| intervals16 | 7 |
+| loads16 | 12 |
+| simTrilha | 6 |
+
+**1053 checks verdes.** `cmp planner_residencia_2026_offline.html index.html`: idênticos. O histórico até 19/10 continua idêntico (historico, 148).
+
+Os testes novos (TR18a–h, 44 checks) mexem só pela interface:
+- mover pelo seletor do bloco;
+- os botões do diálogo e da prévia, e as perguntas dos dias bloqueados.
+
+Cada um confere a prévia na tela, o `trilhaPlan` gravado (datas, `orig`, `hist`), o registro e os outros módulos. Os helpers de mover do TR17 e do TR17z passaram a clicar "Mover só esta etapa" quando o diálogo é o curto.
 
 Telas (página do relatório):
 - o diálogo curto;
