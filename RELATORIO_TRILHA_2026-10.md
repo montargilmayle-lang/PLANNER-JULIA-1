@@ -11,14 +11,17 @@ Entregue antes do merge, como pedido ("bateria completa verde, `cmp` do `index.h
 - **Se nada quebra**, o diálogo é curto: "Este movimento mantém os intervalos.", com "Mover só esta etapa", "Mover o fio todo (+N dias)" (ou "−N dias") e "Cancelar". A linha de carga do destino aparece junto quando o dia passa do tempo hábil; ela só informa.
 - **Se algo quebra**, aparece o aviso de hoje (os intervalos antes → depois) com as opções de sempre ("Mover assim mesmo", "Ver como reorganizar o fio") **e** a opção nova "Mover o fio todo (±N)".
 - **A selagem** (nada depois dela) continua movendo direto. A exceção é o dia que já passou: aí o diálogo abre só para mostrar a linha do dia passado, com "Mover assim mesmo" e "Cancelar".
+- **Uma etapa já marcada nunca anda:** mover o bloco dela não oferece o fio.
 
 ### C.2 · O que "Mover o fio todo" faz
-- **N** = dias entre a data atual da etapa e a nova. O mesmo N vale para a etapa movida e para **todas as seguintes sem marca** do mesmo módulo, inclusive as ⏳ de dias que já passaram: essas andam **a partir de amanhã**.
+- **N** = dias entre a data atual da etapa e a nova. O mesmo N vale para a etapa movida e para **todas as seguintes sem marca** do mesmo módulo, inclusive as ⏳ de dias que já passaram.
+  - As ⏳ andam **a partir de amanhã**. Só elas: as outras continuam com o mesmo N.
+  - Uma etapa que cairia no dia da anterior, ou antes dela, vai **logo depois da etapa anterior**.
 - **Uma etapa seguinte já marcada segura o fio.** O fio não anda além dela, e a prévia avisa: "⚠️ As questões já estão marcadas: o fio não anda além delas."
 - **Se a ordem não pode ser mantida**, a prévia diz "⚠️ A ordem não pode ser preservada: … As outras opções continuam." e não oferece "Aplicar". O botão "Voltar às outras opções" devolve o diálogo inteiro. Isso acontece quando uma etapa ficaria antes ou no mesmo dia de uma marcada, ou quando uma etapa anterior teria de ir para antes de amanhã.
-- **Só o módulo tocado muda.** Nunca há duas etapas do módulo no mesmo dia, e a ordem aula → questões → apostila → selagem fica sempre.
+- **Só o módulo tocado muda.** Nunca há duas etapas do módulo no mesmo dia, e a ordem aula → questões → apostila → selagem fica sempre. A ordem é conferida nos pares em que o fio mexe: um par antigo que ele não toca (por exemplo, as questões já no dia da aula) não bloqueia o fio e não é atribuído ao movimento.
 - **A prévia mostra:**
-  - cada etapa, com o dia de antes → o dia novo e a carga dele (⚠️ acima do 📚, 🌿 dia leve, 🎄 feriado);
+  - cada etapa, com o dia de antes → o dia novo e a carga dele, já sem a etapa do módulo que sai daquele dia (⚠️ acima do 📚, 🌿 dia leve, 🎄 feriado);
   - "(seu movimento)" na etapa que ela moveu, e "a partir de amanhã" na ⏳ que andou;
   - os intervalos antes → depois, com ⚠️ fora da faixa.
 - **Só grava com "Aplicar".** A gravação vai para `trilhaPlan[id]`: a `orig` fica intacta e o `hist` ganha uma entrada por etapa com o motivo próprio **"fio"**. Restaurar o plano (decisão 75) volta à `orig`.
@@ -31,15 +34,20 @@ Entregue antes do merge, como pedido ("bateria completa verde, `cmp` do `index.h
   - 20–25/10 (transição);
   - **01/01**, para aula, questões e apostila ("último dia de acesso — só selagem").
 - Cada etapa que cairia num dia bloqueado vira uma pergunta: **"⛔ As questões iriam para TER 10/11, que é plantão longo."**, com "Deixar neste dia" e "Pular +1 dia". O texto segue o modelo pedido, com artigo e concordância (C.6.3).
-- **"Deixar neste dia"** põe a etapa lá. O bloco do dia mostra "⚠️ plantão longo — escolha sua". No plantão longo, o 🚑 passa a dizer "etapa deixada aqui por escolha sua (⚠️ no bloco); fora ela, só Anki e áudio nos tempos mortos".
+- **"Deixar neste dia"** põe a etapa lá, e o app guarda a escolha (`trilhaPlan[id].keep`).
+  - O bloco do dia mostra "⚠️ plantão longo — escolha sua", também num dia editado à mão.
+  - No plantão longo, o 🚑 e a linha 🗓️ passam a dizer "etapa deixada aqui por escolha sua (⚠️ no bloco)".
+  - Na sexta de simulado, a etapa que ela deixou não vira ⏳.
+  - Uma etapa que **o app** pôs num dia que depois virou bloqueado (o simulado religado depois) não recebe "escolha sua". Ela continua no ⏳ ("que virou simulado"), como antes.
 - **"Pular +1 dia"** empurra essa etapa e as seguintes do fio. Se o dia seguinte também é bloqueado, o app pergunta de novo.
-- **As perguntas são independentes.** "Aplicar" só aparece quando todas estão respondidas; até lá, a prévia diz "Responda as perguntas acima para aplicar."
+- **A resposta vale para o dia perguntado.** Se outra resposta muda o dia em que a etapa cai, o app pergunta de novo pelo dia novo.
+- **As perguntas são independentes.** "Aplicar" só aparece quando todas estão respondidas; até lá, a prévia diz "Responda às perguntas acima para aplicar."
 - **Dia leve 🌿 e feriados 🎄 não perguntam.** Mostram o selo e a carga com ⚠️.
 
 ### C.4 · Limites
 - **Nada vai para depois de 01/01.** A partir da 1ª etapa que não cabe, as seguintes ficam "sem dia — não cabe antes do fim do acesso (01/01)". A prévia diz "⚠️ Estas etapas não cabem antes do fim do acesso (01/01): …", e o botão vira "Aplicar o deslocamento parcial" (as que não cabem ficam sem data). "Cancelar" continua lá. "Pular" a partir de 01/01 significa exatamente isso.
-- **Aula, questões ou apostila deixada em 01/01** traz o aviso explícito: "⚠️ Deixando a apostila em 01/01 (último dia de acesso), as etapas seguintes ficam sem dia."
-- **Para hoje ou um dia futuro:** a etapa vai para lá; as seguintes, a partir de amanhã. Se uma anterior teria de voltar para antes de amanhã, a prévia diz "a aula iria para antes de amanhã — não pode voltar".
+- **Aula, questões ou apostila deixada em 01/01** traz o aviso explícito, que nomeia as etapas: "⚠️ Deixando a apostila em 01/01 (último dia de acesso), a etapa seguinte (selagem) fica sem dia." Com mais de uma: "as etapas seguintes (…) ficam sem dia".
+- **Para hoje ou um dia futuro:** a etapa vai para lá; as seguintes, a partir de amanhã. Se uma anterior teria de voltar para antes de amanhã, a prévia diz "a aula iria para antes de amanhã — não pode voltar" ("as questões … não podem voltar").
 - **Para um dia passado:** é permitido, com a linha pedida, no diálogo e na prévia: "Esse dia já passou. Se você fez a etapa nele, marque o ✓ no bloco desse dia, assim o carimbo fica com a data certa. Mover para um dia passado só deixa a etapa como pendente (⏳)."
 - **O que não muda:**
   - a carga ⚠️/📚 só informa;
@@ -64,6 +72,7 @@ Entregue antes do merge, como pedido ("bateria completa verde, `cmp` do `index.h
 3. **O texto da pergunta tem artigo e concordância:** "⛔ As questões iriam para …" e "⛔ A apostila iria para …". O modelo pedido era "⛔ [etapa] iria para [dia], que é [motivo]."
 4. **O 🚑 do plantão longo com etapa deixada por ela** diz "etapa deixada aqui por escolha sua (⚠️ no bloco)". O texto antigo dizia "sem etapa de mesa hoje" e ficaria em contradição com o bloco. Sem etapa deixada, o texto é o de sempre.
 5. **A selagem para um dia passado** abre o diálogo só com a linha do dia passado, porque a linha é pedida em todo movimento para dia passado. Para hoje ou para a frente, a selagem continua indo direto.
+6. **Semana final (a partir de 29/12).** A recolocação automática diária, pedida por ela, segue valendo. Ela pode recolocar uma etapa deixada em 01/01 por "Deixar neste dia", ou uma que ficou sem dia no deslocamento parcial: é o caso "aberto, sem selar até 01/01" que essa regra existe para resolver. *Alternativa:* o "Deixar" também valer ali, isentando a etapa como o `trilhaFinalKeep` faz.
 
 ### C.7 · Conferência — item pedido → código → teste
 
@@ -91,6 +100,13 @@ Entregue antes do merge, como pedido ("bateria completa verde, `cmp` do `index.h
 | Dia passado permitido, com a linha | `PAST_LINE` (`data-t="move-past"`, `data-t="shift-past"`) | TR18c, TR18d, TR18h |
 | A carga só informa; a regra de fechar a semana e o seletor não mudam | `dayCostT`; `moveOptsFor` e `weekDone` sem mudança | TR18b (⚠️ com "Aplicar"); bateria inteira |
 | Outro módulo intacto | `applyShiftT` | TR18a, TR18b, TR18e |
+| A resposta vale para o dia perguntado (respondendo fora de ordem, o app pergunta de novo) | `trilhaShiftPlan` (`ans[ts][dia]`) | TR18e |
+| "Deixar" guardado: ⚠️ só no que ela escolheu; não vira ⏳ na sexta de simulado; 🚑 e 🗓️ coerentes; dia editado igual | `applyShiftT` (`keep`), `trilhaKeptOf`, `buildTrilhaPlan` (`pending`), `trilhaListFor`, `putIntoT`, linha `day-type` | TR18e, TR18i |
+| Etapa marcada não oferece o fio | `moveToIso` (`hasLater`) | TR18b |
+| Par antigo fora de ordem não bloqueia o fio | `trilhaShiftPlan` (pares com etapa do fio) | TR18g |
+| Carga da prévia sem a etapa que sai do dia | `shiftViewT` (`net`) | TR18a |
+| "Mover só esta etapa" grava só ela | `applyMoveT` | TR18a |
+| Restaurar tira o `keep` com o histórico dela | `trilhaRestore` | TR18a (restauração) |
 
 ### C.8 · Passagem pelos oito
 
@@ -107,13 +123,35 @@ Entregue antes do merge, como pedido ("bateria completa verde, `cmp` do `index.h
 
 ### C.9 · Limitações conhecidas
 1. **O fio anda só dentro do módulo tocado.** Os outros módulos dos dias de destino ficam onde estão; a carga ⚠️ informa.
-2. **As respostas se perdem ao "Voltar às outras opções":** a prévia recomeça sem respostas.
+2. **As respostas se perdem ao "Voltar às outras opções":** a prévia recomeça sem respostas. Não há "desfazer" para uma resposta só.
 3. **O seletor oferece esta semana e a próxima** para a etapa movida. As seguintes podem ir mais longe, até 01/01.
 4. **Uma aula pode cair no dia leve pelo fio**, só por movimento dela (o motor nunca faz isso). Ela aparece com o 🌿.
 5. **Etapa movida para um dia passado fica ⏳**, como decidido. O caminho para ela continua sendo marcar no bloco ou "Ver como recolocar".
-6. **Não testei um fio aplicado dentro da semana final (29/12–01/01).** Lá o app recoloca sozinho, uma vez por dia, com as regras de sempre.
+6. **Não testei um fio aplicado dentro da semana final (29/12–01/01).** Lá o app recoloca sozinho, uma vez por dia, com as regras de sempre (ver C.6.6).
+7. **Só o "Deixar neste dia" do fio (ou o próprio movimento dele) fica guardado como escolha.** "Mover só esta etapa" e "Mover assim mesmo" para uma sexta de simulado continuam como antes do PR: a etapa aparece no ⏳ ("que virou simulado").
+8. **"Pular +1 dia" numa etapa anterior pode cair no dia da etapa movida.** Ao adiantar, a prévia diz então que a ordem não pode ser preservada. O caminho é "Deixar neste dia" ou "Mover só esta etapa".
 
-### C.10 · Bateria e `cmp`
+### C.10 · Revisão adversarial (4 lentes, cada achado verificado por um segundo revisor)
+A revisão independente usou quatro lentes: motor, interface, interações com o resto do app, e pedido + textos + testes. Foram 27 achados, que viram 9 problemas distintos, todos corrigidos e testados:
+
+| # | Problema confirmado | Correção | Teste |
+|---|---|---|---|
+| 1 | Resposta guardada pela posição: respondendo fora de ordem, um "Deixar" dado para QUI 12/11 valia para SEX 13/11 sem perguntar | respostas por dia (`ans[ts][dia]`) | TR18e |
+| 2 | "⚠️ … — escolha sua" também em etapa que o app pôs (simulado religado depois) | a escolha fica guardada (`keep`); o ⚠️ só nela | TR18e (módulo 32 sem "escolha sua") |
+| 3 | "Deixar" numa sexta de simulado virava ⏳ "que virou simulado" e escondia 🔓/⏩ | `pending` ignora a etapa guardada | TR18e (⏳ de 3 → 1) |
+| 4 | Dia editado à mão: o bloco entrava sem ⚠️ e o 🚑 dizia "sem etapa de mesa" | `putIntoT` com o motivo e o 🚑 novo | TR18i |
+| 5 | Linha 🗓️ dizia "nenhuma etapa de mesa hoje" / "sem etapa de módulo hoje" ao lado da etapa deixada | a linha diz "etapa deixada aqui por escolha sua" | TR18e, TR18i |
+| 6 | Um par antigo fora de ordem, que o fio não toca, bloqueava o "Aplicar" e culpava o movimento | ordem conferida só nos pares com etapa do fio | TR18g |
+| 7 | O empurrão "a partir de amanhã" de uma ⏳ se espalhava: as seguintes andavam N+k | o piso vale só para a ⏳; as outras seguem com N | TR18c (selagem +1, não +2) |
+| 8 | Mover o bloco de uma etapa já marcada oferecia o fio | sem fio para etapa marcada | TR18b |
+| 9 | A carga da prévia contava a etapa do módulo que sai do dia (⚠️ falso) | carga líquida do dia | TR18a (aula 3,4h, sem ⚠️) |
+| — | Textos: "não podem voltar" (questões); "Responda à/às pergunta(s)"; "a etapa seguinte (selagem) fica sem dia"; "pulou 1 dia / 2 dias" | corrigidos | TR18e, TR18f |
+
+Achados refutados pelo verificador:
+- **A recolocação automática da semana final pode desfazer um "Deixar" em 01/01.** É a regra da semana final, pedida por ela. Está apresentado em C.6.6.
+- **"Pular" numa etapa anterior pode cair no dia da etapa movida.** O invariante vale e a prévia diz que a ordem não pode ser preservada. Está em C.9.8.
+
+### C.11 · Bateria e `cmp`
 
 | Suíte | Checks |
 |---|---|
