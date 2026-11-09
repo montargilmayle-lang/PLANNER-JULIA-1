@@ -66,13 +66,13 @@ Entregue antes do merge, como pedido ("bateria completa verde, `cmp` do `index.h
   - "Aplicar" está lá, porque o ⚠️ só informa. As marcas e os carimbos não mudam.
 - **Prévia do diálogo curto:** aula de QUA 18/11 para TER 17/11 → "Este movimento mantém os intervalos." · "Mover só esta etapa" · "Mover o fio todo (−1 dia)" · "Cancelar".
 
-### C.6 · Escolhas minhas — para a equipe confirmar (o padrão está aplicado; a alternativa, não)
+### C.6 · Escolhas minhas — decididas no aval de 08/11 (1 a 5 confirmadas; a 6 mudou, ver C.11)
 1. **Ao adiantar (N negativo), uma etapa anterior sem marca que ficaria no mesmo dia da etapa movida, ou depois dela, anda junto o mesmo N.** Os intervalos ficam. Se ela teria de ir para antes de amanhã, a prévia diz que a ordem não pode ser preservada. *Alternativa:* nunca levar as anteriores e dizer direto que a ordem não pode ser preservada. O pedido fala só das seguintes; levei as anteriores para manter a ordem sem quebrar intervalo.
 2. **O diálogo curto também aparece quando o destino passa do tempo hábil.** A linha de carga aparece junto, porque o curto é sobre intervalos e a carga só informa. *Alternativa:* o diálogo completo nesse caso.
 3. **O texto da pergunta tem artigo e concordância:** "⛔ As questões iriam para …" e "⛔ A apostila iria para …". O modelo pedido era "⛔ [etapa] iria para [dia], que é [motivo]."
 4. **O 🚑 do plantão longo com etapa deixada por ela** diz "etapa deixada aqui por escolha sua (⚠️ no bloco)". O texto antigo dizia "sem etapa de mesa hoje" e ficaria em contradição com o bloco. Sem etapa deixada, o texto é o de sempre.
 5. **A selagem para um dia passado** abre o diálogo só com a linha do dia passado, porque a linha é pedida em todo movimento para dia passado. Para hoje ou para a frente, a selagem continua indo direto.
-6. **Semana final (a partir de 29/12).** A recolocação automática diária, pedida por ela, segue valendo. Ela pode recolocar uma etapa deixada em 01/01 por "Deixar neste dia", ou uma que ficou sem dia no deslocamento parcial: é o caso "aberto, sem selar até 01/01" que essa regra existe para resolver. *Alternativa:* o "Deixar" também valer ali, isentando a etapa como o `trilhaFinalKeep` faz.
+6. ~~Semana final: a recolocação automática diária pode recolocar uma etapa deixada em 01/01.~~ **Mudou no aval de 08/11:** a etapa que ela deixou com "Deixar neste dia" fica onde ela deixou; a recolocação diária respeita a escolha (C.11).
 
 ### C.7 · Conferência — item pedido → código → teste
 
@@ -107,6 +107,8 @@ Entregue antes do merge, como pedido ("bateria completa verde, `cmp` do `index.h
 | Carga da prévia sem a etapa que sai do dia | `shiftViewT` (`net`) | TR18a |
 | "Mover só esta etapa" grava só ela | `applyMoveT` | TR18a |
 | Restaurar tira o `keep` com o histórico dela | `trilhaRestore` | TR18a (restauração) |
+| Aval 08/11: a recolocação automática da semana final não tira de lá a etapa deixada em 01/01 | `trilhaFinalPlan` (`mine`/`kept`, teto `before`, âncora do modo guloso) e `placeChain` (`opt.before`) | TR18k (29/12 e 31/12), TR18j (30/12) |
+| Aval 08/11: fio dentro da semana final, depois da recolocação automática e de restaurar | `trilhaFinalPlan`; `trilhaRestore` (só conta a data do app dada antes do 1º movimento dela) | TR18j |
 
 ### C.8 · Passagem pelos oito
 
@@ -127,8 +129,8 @@ Entregue antes do merge, como pedido ("bateria completa verde, `cmp` do `index.h
 3. **O seletor oferece esta semana e a próxima** para a etapa movida. As seguintes podem ir mais longe, até 01/01.
 4. **Uma aula pode cair no dia leve pelo fio**, só por movimento dela (o motor nunca faz isso). Ela aparece com o 🌿.
 5. **Etapa movida para um dia passado fica ⏳**, como decidido. O caminho para ela continua sendo marcar no bloco ou "Ver como recolocar".
-6. **Não testei um fio aplicado dentro da semana final (29/12–01/01).** Lá o app recoloca sozinho, uma vez por dia, com as regras de sempre (ver C.6.6).
-7. **Só o "Deixar neste dia" do fio (ou o próprio movimento dele) fica guardado como escolha.** "Mover só esta etapa" e "Mover assim mesmo" para uma sexta de simulado continuam como antes do PR: a etapa aparece no ⏳ ("que virou simulado").
+6. **Semana final, depois de um "Pular" a partir de 01/01.** As etapas que ficaram sem dia são recolocadas pela recolocação automática do dia seguinte, que é a regra da semana final. Só o "Deixar" fica (C.11, TR18j).
+7. **"Mover só esta etapa" para uma sexta de simulado continua virando ⏳, como antes do PR.** O mesmo vale para "Mover assim mesmo". Só o "Deixar neste dia" do fio (ou o próprio movimento do fio) fica guardado como escolha dela e não vira ⏳.
 8. **"Pular +1 dia" numa etapa anterior pode cair no dia da etapa movida.** Ao adiantar, a prévia diz então que a ordem não pode ser preservada. O caminho é "Deixar neste dia" ou "Mover só esta etapa".
 
 ### C.10 · Revisão adversarial (4 lentes, cada achado verificado por um segundo revisor)
@@ -148,10 +150,37 @@ A revisão independente usou quatro lentes: motor, interface, interações com o
 | — | Textos: "não podem voltar" (questões); "Responda à/às pergunta(s)"; "a etapa seguinte (selagem) fica sem dia"; "pulou 1 dia / 2 dias" | corrigidos | TR18e, TR18f |
 
 Achados refutados pelo verificador:
-- **A recolocação automática da semana final pode desfazer um "Deixar" em 01/01.** É a regra da semana final, pedida por ela. Está apresentado em C.6.6.
+- **A recolocação automática da semana final pode desfazer um "Deixar" em 01/01.** O verificador classificou como regra pedida por ela; ficou apresentado em C.6.6. **No aval de 08/11 a equipe decidiu o contrário:** a escolha agora é respeitada (C.11).
 - **"Pular" numa etapa anterior pode cair no dia da etapa movida.** O invariante vale e a prévia diz que a ordem não pode ser preservada. Está em C.9.8.
 
-### C.11 · Bateria e `cmp`
+### C.11 · Aval de 08/11 — a escolha 6 mudou e os testes da semana final
+**Decisão (equipe, 08/11):**
+- as escolhas 1 a 5 de C.6 ficam como estão;
+- **a 6 muda:** uma etapa que ela deixou em 01/01 com "Deixar neste dia" não pode ser recolocada pela recolocação automática da semana final.
+
+**Como ficou:**
+- **A escolha fica registrada** em `trilhaPlan[id].keep` (C.3).
+- **`trilhaFinalPlan` a trata como fixa**, como já fazia com a etapa que a restauração deixa no bloco do dia (`trilhaFinalKeep`). Ela não entra na recolocação e serve de âncora: as etapas antes dela só vão até o dia anterior a ela (teto `before`, também no `placeChain`), e as depois dela nunca vão para antes dela (modo guloso). Antes, o modo guloso ancorava só na etapa anterior.
+- **Dia editado à mão** continua fora da recolocação, como antes.
+
+**Ajuste na restauração** (achado ao testar o fio na semana final):
+- **Antes:** a restauração mantinha toda data dada pela recolocação automática. Depois de um fio, ela misturava a data `orig` de uma etapa com a data que o app tinha dado em reação ao fio, e isso podia deixar duas etapas no mesmo dia.
+- **Agora:** só conta a data do app dada **antes** do 1º movimento dela no módulo. A que veio depois foi reação ao movimento e sai junto com ele. É o que a decisão 75 já dizia ("o que ela moveu depois volta para lá").
+
+**Testes pedidos:**
+- **TR18k — "Deixar" em 01/01 e a recolocação diária.**
+  - Em 22/12, a aula do módulo 21 vai de 27/12 para 29/12 (+2). A apostila iria para 01/01; ela toca "Deixar neste dia", e a selagem fica sem dia.
+  - Em **29/12** e **31/12**, a recolocação automática rodou: a apostila continua em 01/01, com a escolha guardada e sem nenhuma entrada "final" para ela.
+  - Em 29/12, a recolocação levou a aula para 30/12 (29/12 é o dia leve) e as questões para 31/12, em ordem. SEX 01/01 mostra a apostila com "⚠️ último dia de acesso — só selagem — escolha sua".
+- **TR18j — fio dentro da semana final (29/12).** Dois módulos com a mesma cadeia: aula 28/12 feita, questões 29/12, apostila 30/12, selagem 01/01. Em 29/12, ela leva as questões dos dois para 31/12 (+2):
+  - **módulo 18:** a apostila iria para 01/01 → "Deixar neste dia". Fica questões 31/12, apostila 01/01 (guardada) e selagem sem dia;
+  - **módulo 20:** "Pular +1 dia" a partir de 01/01 é "não cabe". Ficam a apostila e a selagem sem dia.
+  - **Depois da recolocação automática de 30/12:**
+    - módulo 18: aula 28/12 · questões **30/12** · apostila **01/01 (ficou)** · selagem sem dia. A selagem não cabe depois de 01/01, como a prévia avisou;
+    - módulo 20: aula 28/12 · questões 30/12 · apostila 31/12 · selagem 01/01, recolocadas pela regra da semana final (C.9.6).
+  - **Depois de restaurar (em 30/12):** os dois módulos voltam ao plano original (28/12 · 29/12 · 30/12 · 01/01), sem a escolha guardada e sem o histórico dela nem a recolocação que veio por causa do fio. Nenhum dia fica com duas etapas.
+
+### C.12 · Bateria e `cmp`
 
 | Suíte | Checks |
 |---|---|

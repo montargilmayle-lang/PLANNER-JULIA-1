@@ -646,6 +646,53 @@ const DEFAULT12 = [5, 6, 14, 19, 24, 32, 34, 85, 86, 1, 2, 3];
         check('TR18h · "Mover assim mesmo": selagem 20/11 (fica ⏳), hist "mover"', p.seal === '2026-11-20' && p.hist.slice(-1)[0].why === 'mover', JSON.stringify(p));
     });
 
+    // TR18k · aval de 08/11 (escolha 6): a etapa que ela deixou em 01/01 com "Deixar neste dia" não sai de lá com a recolocação automática da semana final
+    const markExcept = (c, t, iso, skip) => Object.entries(c.trilhaPlan).forEach(([id, pl]) => { if (skip.includes(Number(id))) return; STG.forEach(x => { if (pl[x] && pl[x] < iso) { t[id] = t[id] || {}; t[id][FIELD[x]] = true; t[id][STAMP[x]] = pl[x]; } }); });
+    const chainOk = (p) => { const ds = STG.map(x => p[x]).filter(Boolean); return ds.every((d, k) => k === 0 || d > ds[k - 1]) && ds.every(d => d <= '2027-01-01') && !['aula', 'quest', 'apost'].some(x => p[x] === '2027-01-01' && (p.keep || {})[x] !== '2027-01-01'); }; // em 01/01 só selagem — ou a etapa que ela deixou lá
+    await scenario(browser, 'TR18k-deixar-0101-recolocacao-diaria', '2026-10-26', {}, async (S) => {
+        let page = await prepT(S, '2026-12-22', (c, t) => markExcept(c, t, '2026-12-29', [21])); // tudo antes de 29/12 feito, menos o módulo 21 (aula DOM 27/12, questões SEG 28/12, apostila QUA 30/12, selagem SEX 01/01)
+        const nav = mkNav(page, '2026-12-22');
+        await moveStageT(page, nav, 21, 'aula', '2026-12-27', '2026-12-29'); await clickAsk(page, 'Mover o fio todo (+2 dias)'); await answerQ(page, 'apost', 'Deixar neste dia'); await clickAsk(page, 'Aplicar o deslocamento parcial'); await pronto(page);
+        let p = (await getLS(page, CFG)).trilhaPlan[21];
+        check('TR18k · 22/12: "Deixar neste dia" com a apostila em 01/01 — aula 29/12, questões 30/12, apostila 01/01 (escolha guardada: keep), selagem sem dia', p.aula === '2026-12-29' && p.quest === '2026-12-30' && p.apost === '2027-01-01' && p.seal === null && JSON.stringify(p.keep) === JSON.stringify({ apost: '2027-01-01' }), JSON.stringify(p));
+        for (const day of ['2026-12-29', '2026-12-31']) {
+            if (day === '2026-12-31') { const c0 = await getLS(page, CFG), t0 = (await getLS(page, TRL)) || {}; const q = c0.trilhaPlan[21]; t0[21] = { ...(t0[21] || {}), aula: true, aulaAt: q.aula, questoesD2: true, questoesD2At: q.quest }; await setLS(page, TRL, t0); } // ela fez a aula e as questões nos dias delas (30 e 31/12)
+            page = await S.reopen(day); const c = await getLS(page, CFG); p = c.trilhaPlan[21]; console.log('   📦', day, JSON.stringify({ aula: p.aula, quest: p.quest, apost: p.apost, seal: p.seal, hist: p.hist.filter(h => h.why === 'final') }));
+            check('TR18k · ' + br(day) + ': a recolocação automática da semana final rodou (' + c.trilhaFinalAutoAt + ') e a apostila continua em 01/01, com a escolha guardada; nada depois de 01/01, ordem mantida', new RegExp('^' + day + '\\|').test(c.trilhaFinalAutoAt || '') && p.apost === '2027-01-01' && JSON.stringify(p.keep) === JSON.stringify({ apost: '2027-01-01' }) && !p.hist.some(h => h.why === 'final' && h.ts === 'apost') && chainOk(p), JSON.stringify(p));
+        }
+        await mkNav(page, '2026-12-31')('2027-01-01'); const d1 = await readDay(page);
+        check('TR18k · SEX 01/01 mostra a apostila deixada por ela, com "⚠️ último dia de acesso — só selagem — escolha sua"', d1.blocks.some(x => x.tm === 21 && x.ts === 'apost' && /⚠️ último dia de acesso — só selagem — escolha sua/.test(x.text)), JSON.stringify(d1.blocks.map(x => x.text.slice(0, 80))));
+    });
+
+    // TR18j · fio aplicado dentro da semana final (29/12): módulo 18 com a apostila deixada em 01/01, módulo 20 com a apostila pulando +1 dia (de 01/01: sem dia).
+    //          Depois, a recolocação automática de 30/12 e a restauração do plano
+    await scenario(browser, 'TR18j-fio-semana-final', '2026-10-26', {}, async (S) => {
+        await S.reopen('2026-12-22'); let page = await S.reopen('2026-12-28');
+        { const c = await getLS(page, CFG), t = (await getLS(page, TRL)) || {}; const d = ['2026-12-28', '2026-12-29', '2026-12-30', '2027-01-01'];
+          [18, 20].forEach(id => { const x = { aula: d[0], quest: d[1], apost: d[2], seal: d[3] }; c.trilhaPlan[id] = { ...c.trilhaPlan[id], ...x, orig: { ...x }, hist: [] }; }); // como o motor teria planejado (orig igual)
+          markExcept(c, t, '2026-12-29', []); await setLS(page, CFG, c); await setLS(page, TRL, t); }
+        page = await S.reopen('2026-12-29'); const nav = mkNav(page, '2026-12-29');
+        let c = await getLS(page, CFG);
+        check('TR18j · premissa: em 29/12 a recolocação automática rodou e não mexeu nos módulos 18 e 20 (aula 28/12 feita, questões 29/12, apostila 30/12, selagem 01/01)', /^2026-12-29\|/.test(c.trilhaFinalAutoAt || '') && [18, 20].every(id => ['quest', 'apost', 'seal'].map(x => c.trilhaPlan[id][x]).join() === '2026-12-29,2026-12-30,2027-01-01' && !c.trilhaPlan[id].hist.length), JSON.stringify([c.trilhaPlan[18], c.trilhaPlan[20]]));
+        await moveStageT(page, nav, 18, 'quest', '2026-12-29', '2026-12-31'); await clickAsk(page, 'Mover o fio todo (+2 dias)'); let sh = await readShift(page); logSh(sh);
+        check('TR18j · módulo 18: questões para QUI 31/12 (+2): a apostila iria para SEX 01/01 — o app pergunta', !!sh && sh.qs.length === 1 && sh.qs[0].ts === 'apost' && /⛔ A apostila iria para SEX 01\/01, que é último dia de acesso — só selagem\./.test(sh.qs[0].text), sh && JSON.stringify(sh.qs));
+        await answerQ(page, 'apost', 'Deixar neste dia'); await clickAsk(page, 'Aplicar o deslocamento parcial'); await pronto(page);
+        await moveStageT(page, nav, 20, 'quest', '2026-12-29', '2026-12-31'); await clickAsk(page, 'Mover o fio todo (+2 dias)'); await answerQ(page, 'apost', 'Pular +1 dia'); sh = await readShift(page); logSh(sh);
+        check('TR18j · módulo 20: "Pular +1 dia" a partir de 01/01 = não cabe: apostila e selagem sem dia, deslocamento parcial', !!sh && /sem dia/.test(rowT(sh, 'apost')) && /sem dia/.test(rowT(sh, 'seal')) && sh.btns.includes('Aplicar o deslocamento parcial'), sh && JSON.stringify(sh.rows));
+        await clickAsk(page, 'Aplicar o deslocamento parcial'); await pronto(page);
+        c = await getLS(page, CFG); const a18 = c.trilhaPlan[18], a20 = c.trilhaPlan[20];
+        check('TR18j · aplicado em 29/12: 18 = questões 31/12, apostila 01/01 (keep), selagem sem dia; 20 = questões 31/12, apostila e selagem sem dia', a18.quest === '2026-12-31' && a18.apost === '2027-01-01' && a18.seal === null && JSON.stringify(a18.keep) === JSON.stringify({ apost: '2027-01-01' }) && a20.quest === '2026-12-31' && a20.apost === null && a20.seal === null && !a20.keep, JSON.stringify([a18, a20]));
+        page = await S.reopen('2026-12-30'); c = await getLS(page, CFG); const b18 = c.trilhaPlan[18], b20 = c.trilhaPlan[20];
+        const show = (p) => ['aula', 'quest', 'apost', 'seal'].map(x => x + ' ' + (p[x] ? br(p[x]) : 'sem dia')).join(', ');
+        console.log('   📦 30/12, depois da recolocação automática · 18:', show(b18), '· 20:', show(b20), '· log:', JSON.stringify(c.trilhaFinalLog && { moved: c.trilhaFinalLog.moved.filter(m => [18, 20].includes(m.id)), nocabe: c.trilhaFinalLog.nocabe.filter(m => [18, 20].includes(m.id)) }));
+        check('TR18j · 30/12, recolocação automática: a apostila do módulo 18 continua em 01/01 (escolha dela); as etapas dele seguem em ordem e nada passa de 01/01', /^2026-12-30\|/.test(c.trilhaFinalAutoAt || '') && b18.apost === '2027-01-01' && JSON.stringify(b18.keep) === JSON.stringify({ apost: '2027-01-01' }) && !b18.hist.some(h => h.why === 'final' && h.ts === 'apost') && chainOk(b18) && b18.seal === null, JSON.stringify(b18));
+        check('TR18j · 30/12, recolocação automática: o módulo 20 (sem dia depois do "Pular") é recolocado pela regra da semana final — em ordem, nada depois de 01/01, só a selagem em 01/01', chainOk(b20) && b20.hist.some(h => h.why === 'final'), JSON.stringify(b20));
+        const btnRe = async (re) => { const ok = await page.evaluate((src) => { const b = [...document.querySelectorAll('button')].find(x => new RegExp(src).test(x.innerText.trim())); if (!b) return false; b.click(); return true; }, re.source); if (!ok) throw new Error('botão não encontrado: ' + re); await page.waitForTimeout(450); };
+        await clickTab(page, 'TRILHA'); await btnRe(/^Ver o que mudou desde a atualização$/); await btnRe(/^Aplicar a restauração$/); if (await page.evaluate(() => [...document.querySelectorAll('button')].some(b => b.innerText.trim() === 'Aplicar mesmo assim'))) await btnRe(/^Aplicar mesmo assim$/);
+        c = await getLS(page, CFG); const r18 = c.trilhaPlan[18], r20 = c.trilhaPlan[20]; console.log('   🧹 restaurado · 18:', show(r18), '· 20:', show(r20));
+        check('TR18j · restaurar (em 30/12): os dois módulos voltam ao plano original (28/12, 29/12, 30/12, 01/01), sem a escolha guardada e sem o histórico dela nem a recolocação que veio por causa do fio; nenhum dia com duas etapas', [r18, r20].every(p => ['aula', 'quest', 'apost', 'seal'].map(x => p[x]).join() === '2026-12-28,2026-12-29,2026-12-30,2027-01-01' && !p.keep && !(p.hist || []).length && chainOk(p)), JSON.stringify([r18, r20]));
+    });
+
 
     await scenario(browser, 'TR11-mover-2610', '2026-10-26', {}, async (S) => {
         let page = S.page;

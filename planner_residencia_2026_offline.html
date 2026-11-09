@@ -1303,7 +1303,7 @@ function placeChain(st, rem, fixed, from, lastFirst, end, opt) {
     let lo0 = from, hi0 = lastFirst;
     if (prev0) { const g = GAP_T[rem[0]]; const alo = addDaysISO(prev0, g[0]), ahi = addDaysISO(prev0, g[1]); if (alo > lo0) lo0 = alo; if (lo0 <= ahi) { if (ahi < hi0) hi0 = ahi; } else { const h6 = addDaysISO(lo0, 6); if (h6 < hi0) hi0 = h6; } } // âncora atrasada: o quanto antes, em até 7 dias
     if (hi0 > end) hi0 = end;
-    const ok = (ts, d) => d >= from && d <= end && dayOpenT(d, cfg) && !(opt.edited && opt.edited[d]) && !(ts === "aula" && prot[d]) && !(d === TRILHA_END && ts !== "seal") && (!opt.hard || fitsT(st, d, HRS_T[ts]));
+    const ok = (ts, d) => d >= from && d <= end && dayOpenT(d, cfg) && !(opt.edited && opt.edited[d]) && !(ts === "aula" && prot[d]) && !(d === TRILHA_END && ts !== "seal") && !(opt.before && opt.before[ts] && d >= opt.before[ts]) && (!opt.hard || fitsT(st, d, HRS_T[ts])); // before[ts]: teto (uma etapa fixa depois dela)
     const dd = (a, b) => (days[a] && days[b]) ? diffDays(days[a], days[b]) : null;
     const score = () => {
         let protW = 0, overH = 0, overS = 0, clash = 0;
@@ -1506,18 +1506,20 @@ function trilhaFinalPlan(P, cfg, trail, hoje, edited) { // 📦 semana final (29
     const ids = Object.keys(P.plan).map(Number).filter(id => P.frozen.has(id)).sort((a, b) => (P.qpos[a] || 0) - (P.qpos[b] || 0));
     for (const id of ids) {
         const p = P.plan[id]; const t = trail[id] || {}, keepD = cfg.trilhaFinalKeep || null; // restaurou na semana final (decisão 75): etapa de dia anterior à restauração fica no bloco do dia, para ela marcar
-        const kept = (ts) => !!(keepD && p[ts] && p[ts] < keepD && !t[TS_FIELD[ts]]);
+        const kpT = trilhaKeptOf(cfg, id), mine = (ts) => !!(p[ts] && kpT[ts] === p[ts] && !t[TS_FIELD[ts]]); // "Deixar neste dia" (decisão 76, aval de 08/11): a escolha dela fica — a recolocação diária não a tira de lá, como não mexe em dia editado
+        const kept = (ts) => !!(keepD && p[ts] && p[ts] < keepD && !t[TS_FIELD[ts]]) || mine(ts);
+        const before = {}; STAGES_T.forEach((ts, i) => { const nx = STAGES_T.slice(i + 1).find(mine); if (nx) before[ts] = p[nx]; }); // antes de uma etapa que ela deixou: só até o dia anterior a ela
         const rem = STAGES_T.filter(ts => !t[TS_FIELD[ts]] && !kept(ts)); if (!rem.length) continue;
         const fixed = {}; STAGES_T.forEach(ts => { const f = TS_FIELD[ts]; if (t[f]) fixed[ts] = t[STAMP_OF[f]] || p[ts]; else if (kept(ts)) fixed[ts] = p[ts]; });
         const prevOf = (ts) => { const i = STAGES_T.indexOf(ts); return i > 0 ? (fixed[STAGES_T[i - 1]] || p[STAGES_T[i - 1]]) : null; };
         const valid = rem.every(ts => { const d = p[ts]; if (!d || d < hoje || d > TRILHA_END || !dayOpenT(d, cfg) || (edited && edited[d]) || (ts === "aula" && P.prot[d]) || (d === TRILHA_END && ts !== "seal")) return false; const pv = prevOf(ts); if (!pv) return ts === "aula"; const g = diffDays(pv, d); return g >= GAP_T[ts][0] && g <= GAP_T[ts][1]; });
         if (valid) continue;
         rem.forEach(ts => stAdd(st, p[ts], ts, -1));
-        let ch = placeChain(st, rem, fixed, hoje, TRILHA_END, TRILHA_END, { prot: P.prot, hard: true, edited }), how = "ok";
-        if (!ch) { ch = placeChain(st, rem, fixed, hoje, TRILHA_END, TRILHA_END, { prot: P.prot, hard: true, edited, compress: true }); how = "compress"; }
+        let ch = placeChain(st, rem, fixed, hoje, TRILHA_END, TRILHA_END, { prot: P.prot, hard: true, edited, before }), how = "ok";
+        if (!ch) { ch = placeChain(st, rem, fixed, hoje, TRILHA_END, TRILHA_END, { prot: P.prot, hard: true, edited, compress: true, before }); how = "compress"; }
         if (!ch) { // guloso: uma etapa por dia livre, em ordem; o que sobrar fica para o novo cursinho
             ch = {}; how = "greedy"; let last = null;
-            for (const ts of rem) { let d = hoje; const pv = last || prevOf(ts); if (pv && addDaysISO(pv, 1) > d) d = addDaysISO(pv, 1); let got = null; for (; d <= TRILHA_END; d = addDaysISO(d, 1)) { if (dayOpenT(d, cfg) && !(edited && edited[d]) && !(ts === "aula" && P.prot[d]) && !(d === TRILHA_END && ts !== "seal") && fitsT(st, d, HRS_T[ts])) { got = d; break; } } if (!got) break; ch[ts] = got; last = got; stAdd(st, got, ts); }
+            for (const ts of rem) { let d = hoje; const fx = STAGES_T.slice(0, STAGES_T.indexOf(ts)).map(x => fixed[x]).filter(Boolean).sort().pop() || null; const pv = [last, fx].filter(Boolean).sort().pop() || prevOf(ts); if (pv && addDaysISO(pv, 1) > d) d = addDaysISO(pv, 1); let got = null; for (; d <= TRILHA_END; d = addDaysISO(d, 1)) { if (before[ts] && d >= before[ts]) break; if (dayOpenT(d, cfg) && !(edited && edited[d]) && !(ts === "aula" && P.prot[d]) && !(d === TRILHA_END && ts !== "seal") && fitsT(st, d, HRS_T[ts])) { got = d; break; } } if (!got) break; ch[ts] = got; last = got; stAdd(st, got, ts); } // depois de uma etapa fixa (marcada ou deixada por ela), nunca antes dela
             Object.keys(ch).forEach(ts => stAdd(st, ch[ts], ts, -1));
         }
         const np = { ...(patch[id] || p), hist: (p.hist || []).slice() };
@@ -1681,12 +1683,13 @@ function trilhaRestore(cfg, sov, trail, opts) {
         const p = plan[id] || {}, o = p.orig || {};
         if (p.via === "adv" || p.via === "rise" || gone.has(Number(id))) { pCh = true; return; } // ⏩/🔓: sai (fica no arquivo)
         if (!STAGES_T.every(ts => Object.prototype.hasOwnProperty.call(o, ts))) { d.noOrig.push({ id: Number(id), name: nameOf(id) }); np[id] = p; return; } // sem data original: fica onde está (e o diagnóstico avisa)
-        const H = Array.isArray(p.hist) ? p.hist : [], app = (h) => !!h && h.why === "final";
+        const H = Array.isArray(p.hist) ? p.hist : [], her0 = H.findIndex(h => !!h && h.why !== "final"); // 1º movimento dela no módulo
+        const app = (h, k) => !!h && h.why === "final" && (her0 < 0 || k < her0); // a recolocação do app que veio depois de um movimento dela foi reação a ele: sai junto (decisão 76)
         const tgt = {}; STAGES_T.forEach(ts => { tgt[ts] = o[ts] || null; });
-        H.forEach(h => { if (app(h) && STAGES_T.indexOf(h.ts) >= 0) tgt[h.ts] = h.to || null; });
+        H.forEach((h, k) => { if (app(h, k) && STAGES_T.indexOf(h.ts) >= 0) tgt[h.ts] = h.to || null; });
         const q = { ...p }; let ch = false;
         STAGES_T.forEach(ts => { if ((p[ts] || null) !== tgt[ts]) { d.moved.push({ id: Number(id), name: nameOf(id), ts, cur: p[ts] || null, orig: tgt[ts] }); q[ts] = tgt[ts]; ch = true; } });
-        const keepH = H.filter(app); if (keepH.length !== H.length) { d.histN++; q.hist = keepH; ch = true; }
+        const keepH = H.filter((h, k) => app(h, k)); if (keepH.length !== H.length) { d.histN++; q.hist = keepH; ch = true; }
         if (p.keep) { delete q.keep; ch = true; } // "Deixar neste dia" (decisão 76) sai com o histórico de movimentos dela
         np[id] = ch ? q : p; if (ch) pCh = true;
     });
