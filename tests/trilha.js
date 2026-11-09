@@ -446,6 +446,253 @@ const DEFAULT12 = [5, 6, 14, 19, 24, 32, 34, 85, 86, 1, 2, 3];
     };
     const readAsk = (page) => page.evaluate(() => { const el = document.querySelector('[data-pw="move-ask"]'); if (!el) return null; return { text: el.innerText, btns: [...el.querySelectorAll('button')].map(b => b.innerText.trim()) }; });
     const clickAsk = async (page, label) => { const ok = await page.evaluate((l) => { const el = document.querySelector('[data-pw="move-ask"]'); const b = el && [...el.querySelectorAll('button')].find(b => b.innerText.trim() === l); if (!b) return false; b.click(); return true; }, label); if (!ok) throw new Error('botão do diálogo: ' + label); await page.waitForTimeout(350); };
+    const clickMove = async (page) => { const a = await readAsk(page); await clickAsk(page, a && a.btns.includes('Mover só esta etapa') ? 'Mover só esta etapa' : 'Mover assim mesmo'); }; // só esta etapa (o diálogo curto do PR 2 diz "Mover só esta etapa")
+    // ── TR18 · "Mover o fio todo junto" (paciente, 07/11 — PR 2): mover uma etapa com etapas sem marca depois dela abre o diálogo (curto, se os intervalos
+    //    ficam); "Mover o fio todo (±N)" leva a etapa e as seguintes sem marca o mesmo N dias; dia bloqueado pergunta; nada depois de 01/01; grava só com "Aplicar" ──
+    const wiT = (iso) => iso < '2026-11-03' ? 0 : 1 + Math.floor(dd('2026-11-03', iso) / 7); // semana da Trilha (TER→SEG; a 1ª tem 8 dias)
+    const mkNav = (page, today) => { let off = 0; return async (iso) => { await clickTab(page, 'CRONOGRAMA'); const k = wiT(iso) - wiT(today); if (k !== off) { await navWeek(page, k - off); off = k; } await clickDate(page, br(iso)); }; };
+    const escT = (t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const prepT = async (S, clock, mut, via) => { if (via) await S.reopen(via); let page = await S.reopen(clock); const c = await getLS(page, CFG); const t = (await getLS(page, TRL)) || {}; mut(c, t); await setLS(page, CFG, c); await setLS(page, TRL, t); return S.reopen(clock); };
+    const setP = (c, id, d) => { c.trilhaPlan[id] = { ...c.trilhaPlan[id], aula: d[0], quest: d[1], apost: d[2], seal: d[3] }; };
+    const moveStageT = async (page, nav, id, ts, fromIso, to) => { await nav(fromIso); const day = await readDay(page); const b = day.blocks.find(x => x.tm === id && x.ts === ts && !x.au); if (!b) throw new Error('bloco ' + id + '.' + ts + ' não está em ' + fromIso); await moveT(page, new RegExp('^' + escT(b.text.slice(0, 60))), to); return b; };
+    const pronto = async (page) => { await page.evaluate(() => { const x = [...document.querySelectorAll('button')].find(y => y.innerText.trim() === '✓ Pronto'); if (x) x.click(); }); await page.waitForTimeout(200); };
+    const readShift = (page) => page.evaluate(() => { const el = document.querySelector('[data-t="shift-prev"]'); if (!el) return null; const tx = (s) => { const e = el.querySelector(s); return e ? e.innerText.trim() : null; };
+        return { text: el.innerText, rows: [...el.querySelectorAll('[data-t="shift-row"]')].map(r => ({ ts: r.getAttribute('data-ts'), text: r.innerText.trim() })), qs: [...el.querySelectorAll('[data-t="shift-q"]')].map(r => ({ ts: r.getAttribute('data-ts'), text: r.innerText.trim(), btns: [...r.querySelectorAll('button')].map(b => b.innerText.trim()) })),
+            gaps: tx('[data-t="shift-gaps"]'), order: tx('[data-t="shift-order"]'), nofit: tx('[data-t="shift-nofit"]'), end: tx('[data-t="shift-end"]'), past: tx('[data-t="shift-past"]'), btns: [...document.querySelectorAll('[data-pw="move-ask"] > div:last-child button')].map(b => b.innerText.trim()) }; });
+    const answerQ = async (page, ts, label) => { const ok = await page.evaluate(([t, l]) => { const q = document.querySelector('[data-t="shift-q"][data-ts="' + t + '"]'); const b = q && [...q.querySelectorAll('button')].find(x => x.innerText.trim() === l); if (!b) return false; b.click(); return true; }, [ts, label]); if (!ok) throw new Error('pergunta ' + ts + ': ' + label); await page.waitForTimeout(300); };
+    const rowT = (sh, ts) => ((sh && sh.rows.find(r => r.ts === ts)) || {}).text || '';
+    const others = (a, b, id) => Object.keys(a.trilhaPlan).filter(k => k !== String(id)).every(k => JSON.stringify(a.trilhaPlan[k]) === JSON.stringify(b.trilhaPlan[k]));
+    const logSh = (sh) => console.log('   💡', sh ? sh.text.replace(/\n/g, ' | ') : '(sem prévia)');
+
+    // TR18a · caso A (aula QUA, questões QUI, apostila SEX, selagem na TER seguinte): diálogo curto quando os intervalos ficam; aula → QUI com "+1 dia" leva tudo,
+    //          intervalos idênticos; Cancelar não grava; orig preservado; hist "fio"; outro módulo intacto
+    await scenario(browser, 'TR18a-fio-caso-A', '2026-10-26', {}, async (S) => {
+        let page = await prepT(S, '2026-11-17', (c) => setP(c, 1, ['2026-11-18', '2026-11-19', '2026-11-20', '2026-11-24']));
+        const nav = mkNav(page, '2026-11-17'); const c0 = await getLS(page, CFG), t0 = await getLS(page, TRL);
+        const b = await moveStageT(page, nav, 1, 'aula', '2026-11-18', '2026-11-17');
+        let ask = await readAsk(page); console.log('   ', b.text.slice(0, 70), '|', ask && ask.text.replace(/\n/g, ' | '));
+        check('TR18a · mover a aula de QUA 18/11 para TER 17/11 (aula → questões 2d, dentro de 1–2) ⇒ diálogo curto "Este movimento mantém os intervalos." com Mover só esta etapa / Mover o fio todo (−1 dia) / Cancelar', !!ask && /Este movimento mantém os intervalos\./.test(ask.text) && JSON.stringify(ask.btns) === JSON.stringify(['Mover só esta etapa', 'Mover o fio todo (−1 dia)', 'Cancelar']) && !/⚠️ Isso deixa/.test(ask.text), ask && JSON.stringify(ask));
+        await clickAsk(page, 'Cancelar');
+        check('TR18a · Cancelar no diálogo curto não grava nada', JSON.stringify(await getLS(page, CFG)) === JSON.stringify(c0) && JSON.stringify(await getLS(page, TRL)) === JSON.stringify(t0) && !(await getLS(page, SCH)));
+        await moveStageT(page, nav, 1, 'aula', '2026-11-18', '2026-11-19'); ask = await readAsk(page); console.log('   ', ask && ask.text.replace(/\n/g, ' | '));
+        check('TR18a · caso A: aula de QUA 18/11 para QUI 19/11 (dia das questões) ⇒ o aviso atual continua (mesmo dia) + a opção nova "Mover o fio todo (+1 dia)"', !!ask && /⚠️ Isso deixa/.test(ask.text) && ['Mover assim mesmo', 'Ver como reorganizar o fio', 'Mover o fio todo (+1 dia)', 'Cancelar'].every(x => ask.btns.includes(x)), ask && JSON.stringify(ask.btns));
+        await clickAsk(page, 'Mover o fio todo (+1 dia)'); let sh = await readShift(page); logSh(sh);
+        check('TR18a · prévia: aula QUI 19/11 (seu movimento), questões SEX 20/11, apostila SÁB 21/11 (dia leve: 🌿, sem pergunta), selagem QUA 25/11 — cada uma com dia e carga; a carga já tira a etapa do módulo que sai do dia (sem ⚠️ falso na aula e nas questões)', !!sh && /^· Aula: QUA 18\/11 → QUI 19\/11 \(.*\) \(seu movimento\)$/.test(rowT(sh, 'aula')) && /^· Questões: QUI 19\/11 → SEX 20\/11 \(/.test(rowT(sh, 'quest')) && /^· Apostila: SEX 20\/11 → .*🌿 SÁB 21\/11 \(/.test(rowT(sh, 'apost')) && /^· Selagem: TER 24\/11 → .*QUA 25\/11 \(/.test(rowT(sh, 'seal')) && sh.qs.length === 0 && /🌿 SÁB 21\/11 é o dia leve da semana/.test(sh.text), sh && JSON.stringify(sh.rows));
+        check('TR18a · intervalos antes → depois idênticos (1d → 1d · 1d → 1d · 4d → 4d), sem ⚠️; "Aplicar" disponível', !!sh && sh.gaps === 'Intervalos (antes → depois): aula → questões 1d → 1d · questões → apostila 1d → 1d · apostila → selagem 4d → 4d' && !sh.order && JSON.stringify(sh.btns) === JSON.stringify(['Aplicar', 'Voltar às outras opções', 'Cancelar']), sh && sh.gaps + ' ' + JSON.stringify(sh.btns));
+        check('TR18a · a prévia não grava nada', JSON.stringify(await getLS(page, CFG)) === JSON.stringify(c0));
+        await clickAsk(page, 'Cancelar');
+        check('TR18a · Cancelar na prévia do fio não grava nada', JSON.stringify(await getLS(page, CFG)) === JSON.stringify(c0) && JSON.stringify(await getLS(page, TRL)) === JSON.stringify(t0) && !(await getLS(page, SCH)));
+        await moveStageT(page, nav, 1, 'aula', '2026-11-18', '2026-11-19'); await clickAsk(page, 'Mover o fio todo (+1 dia)'); await clickAsk(page, 'Aplicar'); await pronto(page);
+        const c1 = await getLS(page, CFG), p1 = c1.trilhaPlan[1], h = p1.hist.slice(-4);
+        check('TR18a · Aplicar: trilhaPlan[1] = 19/11, 20/11, 21/11, 25/11; orig preservado; hist com 4 entradas de motivo "fio" (de → para, em 17/11)', p1.aula === '2026-11-19' && p1.quest === '2026-11-20' && p1.apost === '2026-11-21' && p1.seal === '2026-11-25' && JSON.stringify(p1.orig) === JSON.stringify(c0.trilhaPlan[1].orig) && p1.hist.length === (c0.trilhaPlan[1].hist || []).length + 4 && h.every(x => x.why === 'fio' && x.at === '2026-11-17') && h.map(x => x.ts + ':' + x.from + '>' + x.to).join() === 'aula:2026-11-18>2026-11-19,quest:2026-11-19>2026-11-20,apost:2026-11-20>2026-11-21,seal:2026-11-24>2026-11-25', JSON.stringify(p1));
+        check('TR18a · só o módulo tocado muda: os outros módulos do plano, o registro e as semanas ficam iguais; nenhum dia materializado', others(c1, c0, 1) && JSON.stringify(c1.trilhaWeeks) === JSON.stringify(c0.trilhaWeeks) && JSON.stringify(await getLS(page, TRL)) === JSON.stringify(t0) && !(await getLS(page, SCH)));
+        await nav('2026-11-21'); const d21 = await readDay(page);
+        check('TR18a · SÁB 21/11 mostra a apostila do módulo com o selo 🌿', d21.blocks.some(x => x.tm === 1 && x.ts === 'apost' && /🌿 dia leve/.test(x.text)), JSON.stringify(d21.blocks.filter(x => x.tm === 1).map(x => x.text.slice(-60))));
+        const btnRe = async (re) => { const ok = await page.evaluate((src) => { const b = [...document.querySelectorAll('button')].find(x => new RegExp(src).test(x.innerText.trim())); if (!b) return false; b.click(); return true; }, re.source); if (!ok) throw new Error('botão não encontrado: ' + re); await page.waitForTimeout(450); };
+        await clickTab(page, 'TRILHA'); await btnRe(/^Ver o que mudou desde a atualização$/); const dg = await page.evaluate(() => { const el = document.querySelector('[data-t="restore-diag"]'); return el ? el.innerText : ''; });
+        check('TR18a · a restauração vê as etapas do fio fora da data original', /Etapas fora da data original: 4/.test(dg), dg.slice(0, 400));
+        await btnRe(/^Aplicar a restauração$/); if (await page.evaluate(() => [...document.querySelectorAll('button')].some(b => b.innerText.trim() === 'Aplicar mesmo assim'))) await btnRe(/^Aplicar mesmo assim$/);
+        const pr = (await getLS(page, CFG)).trilhaPlan[1];
+        check('TR18a · Restaurar devolve o módulo ao orig (17/11, 18/11, 19/11, 22/11)', ['aula', 'quest', 'apost', 'seal'].map(x => pr[x]).join() === ['aula', 'quest', 'apost', 'seal'].map(x => c0.trilhaPlan[1].orig[x]).join() && pr.aula === '2026-11-17', JSON.stringify(pr));
+        await moveStageT(page, nav, 1, 'apost', '2026-11-19', '2026-11-20'); const askS = await readAsk(page);
+        check('TR18a · apostila QUI 19/11 → SEX 20/11 (questões → apostila 2d, apostila → selagem 2d): diálogo curto', !!askS && /Este movimento mantém os intervalos\./.test(askS.text) && askS.btns.includes('Mover só esta etapa') && askS.btns.includes('Mover o fio todo (+1 dia)'), askS && JSON.stringify(askS.btns));
+        await clickAsk(page, 'Mover só esta etapa'); await pronto(page); const ps = (await getLS(page, CFG)).trilhaPlan[1];
+        check('TR18a · "Mover só esta etapa": só a apostila muda (20/11), hist "mover"; selagem fica em 22/11', ps.apost === '2026-11-20' && ps.seal === '2026-11-22' && ps.quest === '2026-11-18' && ps.hist.slice(-1)[0].why === 'mover' && ps.hist.slice(-1)[0].ts === 'apost', JSON.stringify(ps));
+    });
+
+    // TR18b · caso B (aula e questões marcadas, apostila SEX, selagem TER): apostila → DOM só leva apostila e selagem (+2); questões → apostila vira 3 dias, com ⚠️
+    await scenario(browser, 'TR18b-fio-caso-B', '2026-10-26', {}, async (S) => {
+        let page = await prepT(S, '2026-11-19', (c, t) => { setP(c, 1, ['2026-11-18', '2026-11-19', '2026-11-20', '2026-11-24']); t[1] = { aula: true, aulaAt: '2026-11-18', questoesD2: true, questoesD2At: '2026-11-19' }; });
+        const nav = mkNav(page, '2026-11-19'); const c0 = await getLS(page, CFG), t0 = await getLS(page, TRL);
+        await moveStageT(page, nav, 1, 'apost', '2026-11-20', '2026-11-22'); const ask = await readAsk(page); console.log('   ', ask && ask.text.replace(/\n/g, ' | '));
+        check('TR18b · apostila de SEX 20/11 para DOM 22/11 ⇒ aviso (3 dias após as questões) + "Mover o fio todo (+2 dias)"', !!ask && /⚠️ Isso deixa/.test(ask.text) && ask.btns.includes('Mover o fio todo (+2 dias)'), ask && JSON.stringify(ask.btns));
+        await clickAsk(page, 'Mover o fio todo (+2 dias)'); const sh = await readShift(page); logSh(sh);
+        check('TR18b · prévia: só apostila (DOM 22/11, seu movimento) e selagem (TER 24/11 → QUI 26/11); aula e questões marcadas não andam', !!sh && sh.rows.map(r => r.ts).join() === 'apost,seal' && /DOM 22\/11 .*\(seu movimento\)/.test(rowT(sh, 'apost')) && /^· Selagem: TER 24\/11 → .*QUI 26\/11 \(/.test(rowT(sh, 'seal')), sh && JSON.stringify(sh.rows));
+        check('TR18b · intervalos: questões → apostila 1d → 3d com ⚠️ fora de 1–2; apostila → selagem 4d → 4d; o ⚠️ só informa ("Aplicar" está lá)', !!sh && sh.gaps === 'Intervalos (antes → depois): aula → questões 1d → 1d · questões → apostila 1d → 3d ⚠️ fora de 1–2 · apostila → selagem 4d → 4d' && sh.btns.includes('Aplicar'), sh && sh.gaps);
+        await clickAsk(page, 'Aplicar'); const c1 = await getLS(page, CFG), p1 = c1.trilhaPlan[1];
+        check('TR18b · Aplicar: apostila 22/11 e selagem 26/11; aula/questões e seus carimbos intactos; hist "fio" só das duas', p1.aula === '2026-11-18' && p1.quest === '2026-11-19' && p1.apost === '2026-11-22' && p1.seal === '2026-11-26' && JSON.stringify(await getLS(page, TRL)) === JSON.stringify(t0) && p1.hist.filter(x => x.why === 'fio').map(x => x.ts).join() === 'apost,seal' && others(c1, c0, 1), JSON.stringify(p1));
+        await moveStageT(page, nav, 1, 'quest', '2026-11-19', '2026-11-21'); const askM = await readAsk(page); console.log('   ', askM && askM.text.replace(/\n/g, ' | '));
+        check('TR18b · mover o bloco das questões já marcadas não oferece "Mover o fio todo" (etapa marcada nunca anda)', !askM || !askM.btns.some(b => /^Mover o fio todo/.test(b)), askM && JSON.stringify(askM.btns));
+        if (askM) await clickAsk(page, 'Cancelar'); await pronto(page);
+    });
+
+    // TR18c · etapa posterior que já passou sem marca anda com o fio, a partir de amanhã; mover para um dia passado mostra a linha do ⏳
+    await scenario(browser, 'TR18c-fio-passado', '2026-10-26', {}, async (S) => {
+        let page = await prepT(S, '2026-11-19', (c, t) => { Object.entries(c.trilhaPlan).forEach(([id, pl]) => { if (id === '1') return; STG.forEach(x => { if (pl[x] && pl[x] < '2026-11-19') { t[id] = t[id] || {}; t[id][FIELD[x]] = true; t[id][STAMP[x]] = pl[x]; } }); }); }, '2026-11-17'); // a semana congela em 17/11 // plano do motor: aula TER 17/11, questões QUA 18/11, apostila QUI 19/11, selagem DOM 22/11 — nada marcado no módulo 1 (os outros, feitos em dia)
+        const nav = mkNav(page, '2026-11-19'); const c0 = await getLS(page, CFG);
+        check('TR18c · premissa: módulo 1 com aula 17/11, questões 18/11, apostila 19/11, selagem 22/11, sem marca', ['aula', 'quest', 'apost', 'seal'].map(x => c0.trilhaPlan[1][x]).join() === '2026-11-17,2026-11-18,2026-11-19,2026-11-22', JSON.stringify(c0.trilhaPlan[1]));
+        await moveStageT(page, nav, 1, 'aula', '2026-11-17', '2026-11-18'); const ask = await readAsk(page); console.log('   ', ask && ask.text.replace(/\n/g, ' | '));
+        check('TR18c · mover a aula para QUA 18/11 (dia passado) mostra a linha: "Esse dia já passou. Se você fez a etapa nele, marque o ✓ no bloco desse dia, assim o carimbo fica com a data certa. Mover para um dia passado só deixa a etapa como pendente (⏳)."', !!ask && ask.text.includes('Esse dia já passou. Se você fez a etapa nele, marque o ✓ no bloco desse dia, assim o carimbo fica com a data certa. Mover para um dia passado só deixa a etapa como pendente (⏳).') && ask.btns.includes('Mover o fio todo (+1 dia)'), ask && ask.text);
+        await clickAsk(page, 'Mover o fio todo (+1 dia)'); const sh = await readShift(page); logSh(sh);
+        check('TR18c · as questões (QUA 18/11, ⏳ sem marca) andam junto, a partir de amanhã (SEX 20/11); a apostila (+1 cairia no dia delas) vai logo depois (SÁB 21/11); a selagem só +1 (SEG 23/11 — o empurrão do ⏳ não se espalha); a linha do dia passado continua na prévia', !!sh && /^· Questões: QUA 18\/11 → .*SEX 20\/11 \(.*a partir de amanhã/.test(rowT(sh, 'quest')) && /^· Apostila: QUI 19\/11 → .*SÁB 21\/11 \(.*logo depois da etapa anterior/.test(rowT(sh, 'apost')) && /^· Selagem: DOM 22\/11 → .*SEG 23\/11 \(/.test(rowT(sh, 'seal')) && !/a partir de amanhã/.test(rowT(sh, 'seal')) && /^Esse dia já passou\./.test(sh.past || '') && sh.btns.includes('Aplicar'), sh && JSON.stringify(sh.rows));
+        await clickAsk(page, 'Aplicar'); await pronto(page); const p1 = (await getLS(page, CFG)).trilhaPlan[1];
+        check('TR18c · Aplicar: aula 18/11 (fica ⏳), questões 20/11, apostila 21/11, selagem 23/11; orig intacto', ['aula', 'quest', 'apost', 'seal'].map(x => p1[x]).join() === '2026-11-18,2026-11-20,2026-11-21,2026-11-23' && JSON.stringify(p1.orig) === JSON.stringify(c0.trilhaPlan[1].orig), JSON.stringify(p1));
+        const pend = await banner(page, 'trilha-pending');
+        check('TR18c · a aula movida para o dia passado fica no ⏳ (1 etapa pendente: a aula de QUA 18/11); as que andaram não', !!pend && /Ficaram para trás 1 etapa \(.*aula de QUA 18\/11\)/.test(pend.text), pend && pend.text.slice(0, 300));
+    });
+
+    // TR18d · etapa posterior já marcada: o fio não anda além dela, e o app avisa; se a ordem quebra, diz e as outras opções continuam
+    await scenario(browser, 'TR18d-fio-marcada-segura', '2026-10-26', {}, async (S) => {
+        let page = await prepT(S, '2026-11-21', (c, t) => { setP(c, 1, ['2026-11-17', '2026-11-20', '2026-11-21', '2026-11-24']); t[1] = { questoesD2: true, questoesD2At: '2026-11-20' }; }); // questões feitas em 20/11; aula ⏳ de 17/11
+        const nav = mkNav(page, '2026-11-21'); const c0 = await getLS(page, CFG);
+        await moveStageT(page, nav, 1, 'aula', '2026-11-17', '2026-11-18'); await clickAsk(page, 'Mover o fio todo (+1 dia)'); let sh = await readShift(page); logSh(sh);
+        check('TR18d · questões marcadas depois da aula: a prévia só leva a aula; aviso "⚠️ As questões já estão marcadas: o fio não anda além delas."', !!sh && sh.rows.map(r => r.ts).join() === 'aula' && /⚠️ As questões já estão marcadas: o fio não anda além delas\./.test(sh.text) && !sh.order && sh.btns.includes('Aplicar'), sh && sh.text);
+        await clickAsk(page, 'Aplicar'); await pronto(page); const p1 = (await getLS(page, CFG)).trilhaPlan[1];
+        check('TR18d · Aplicar grava só a aula (18/11); apostila 21/11 e selagem 24/11, depois da marcada, não andam', p1.aula === '2026-11-18' && p1.apost === '2026-11-21' && p1.seal === '2026-11-24' && p1.hist.filter(x => x.why === 'fio').length === 1, JSON.stringify(p1));
+        await moveStageT(page, nav, 1, 'aula', '2026-11-18', '2026-11-22'); const ask = await readAsk(page);
+        await clickAsk(page, 'Mover o fio todo (+4 dias)'); sh = await readShift(page); logSh(sh); const c2 = await getLS(page, CFG);
+        check('TR18d · aula para DOM 22/11, depois das questões marcadas (20/11): "⚠️ A ordem não pode ser preservada: as questões ficariam antes da aula. As outras opções continuam." — sem "Aplicar"', !!sh && sh.order === '⚠️ A ordem não pode ser preservada: as questões ficariam antes da aula. As outras opções continuam.' && JSON.stringify(sh.btns) === JSON.stringify(['Voltar às outras opções', 'Cancelar']), sh && JSON.stringify([sh.order, sh.btns]));
+        await clickAsk(page, 'Voltar às outras opções'); const ask2 = await readAsk(page);
+        check('TR18d · "Voltar às outras opções" devolve o diálogo com Mover assim mesmo / Mover o fio todo / Cancelar; nada gravado', !!ask2 && JSON.stringify(ask2.btns) === JSON.stringify(ask.btns) && ask2.btns.includes('Mover assim mesmo') && JSON.stringify(await getLS(page, CFG)) === JSON.stringify(c2), ask2 && JSON.stringify(ask2.btns));
+        await clickAsk(page, 'Cancelar');
+    });
+
+    // TR18e · dias bloqueados: o app pergunta ("Deixar neste dia" / "Pular +1 dia"); pular empurra as seguintes e pergunta de novo se o próximo também é bloqueado
+    //          (SEX 13/11 com o simulado religado: QUI 12/11 plantão longo e SEX 13/11 simulado, dois bloqueados em sequência). A resposta vale para o dia perguntado:
+    //          se a etapa cair em outro dia bloqueado, o app pergunta de novo. "Deixar" na sexta de simulado é escolha dela: não vira ⏳; a etapa que o app pôs lá continua ⏳
+    const markBefore = (c, t, iso) => Object.entries(c.trilhaPlan).forEach(([id, pl]) => STG.forEach(x => { if (pl[x] && pl[x] < iso) { t[id] = t[id] || {}; t[id][FIELD[x]] = true; t[id][STAMP[x]] = pl[x]; } })); // o que já passou, feito em dia
+    await scenario(browser, 'TR18e-fio-dias-bloqueados', '2026-10-26', {}, async (S) => {
+        let page = await prepT(S, '2026-11-07', (c, t) => { c.simOverrides = { ...(c.simOverrides || {}), '2026-11-13': true }; markBefore(c, t, '2026-11-07'); }); // CIR2 · 19, 24 e CIR3 · 32: aula SEG 09/11, questões QUA 11/11, apostila SEX 13/11, selagem SEG 16/11
+        const nav = mkNav(page, '2026-11-07'); const c0 = await getLS(page, CFG), t0 = await getLS(page, TRL);
+        check('TR18e · premissa: módulo 19 com aula 09/11, questões 11/11, apostila 13/11, selagem 16/11', ['aula', 'quest', 'apost', 'seal'].map(x => c0.trilhaPlan[19][x]).join() === '2026-11-09,2026-11-11,2026-11-13,2026-11-16', JSON.stringify(c0.trilhaPlan[19]));
+        let pend = await banner(page, 'trilha-pending'); console.log('   ⏳', pend && pend.text.slice(0, 200));
+        check('TR18e · premissa: com o simulado religado em SEX 13/11, as 3 apostilas que o app pôs lá aparecem no ⏳ ("que virou simulado")', !!pend && /Ficaram para trás 3 etapas/.test(pend.text), pend && pend.text.slice(0, 300));
+        await moveStageT(page, nav, 19, 'aula', '2026-11-09', '2026-11-08'); await clickAsk(page, 'Mover o fio todo (−1 dia)'); let sh = await readShift(page); logSh(sh);
+        check('TR18e · questões iriam para TER 10/11 (plantão longo): "⛔ As questões iriam para TER 10/11, que é plantão longo." com Deixar neste dia / Pular +1 dia; sem "Aplicar" até responder', !!sh && sh.qs.length === 2 && sh.qs[0].ts === 'quest' && sh.qs[0].text.startsWith('⛔ As questões iriam para TER 10/11, que é plantão longo.') && JSON.stringify(sh.qs[0].btns) === JSON.stringify(['Deixar neste dia', 'Pular +1 dia']) && sh.qs[1].ts === 'apost' && /⛔ A apostila iria para QUI 12\/11, que é plantão longo\./.test(sh.qs[1].text) && !sh.btns.includes('Aplicar') && /Responda às perguntas acima para aplicar\./.test(sh.text), sh && JSON.stringify(sh.qs));
+        // fora de ordem: "Deixar" na apostila (QUI 12/11) e depois "Pular" nas questões — a apostila passa a cair em SEX 13/11, outro dia: o app pergunta de novo
+        await answerQ(page, 'apost', 'Deixar neste dia'); await answerQ(page, 'quest', 'Pular +1 dia'); sh = await readShift(page); logSh(sh);
+        check('TR18e · respondendo fora de ordem: o "Deixar" da apostila valia para QUI 12/11; empurrada para SEX 13/11 (sexta de simulado), ela é perguntada de novo — sem "Aplicar"', !!sh && sh.qs.length === 1 && sh.qs[0].ts === 'apost' && /⛔ A apostila iria para SEX 13\/11, que é sexta de simulado\./.test(sh.qs[0].text) && !sh.btns.includes('Aplicar'), sh && JSON.stringify([sh.rows, sh.qs]));
+        await clickAsk(page, 'Voltar às outras opções'); await clickAsk(page, 'Mover o fio todo (−1 dia)'); sh = await readShift(page);
+        check('TR18e · "Voltar às outras opções" e de novo "Mover o fio todo": as perguntas recomeçam', !!sh && sh.qs.length === 2, sh && JSON.stringify(sh.qs));
+        await answerQ(page, 'quest', 'Deixar neste dia'); sh = await readShift(page); logSh(sh);
+        check('TR18e · "Deixar neste dia": as questões ficam em TER 10/11 com ⚠️ plantão longo — escolha sua; a pergunta da apostila continua (independente)', !!sh && /^· Questões: QUA 11\/11 → .*TER 10\/11 .*⚠️ plantão longo — escolha sua/.test(rowT(sh, 'quest')) && sh.qs.length === 1 && sh.qs[0].ts === 'apost' && !sh.btns.includes('Aplicar'), sh && JSON.stringify(sh.rows));
+        await answerQ(page, 'apost', 'Pular +1 dia'); sh = await readShift(page); logSh(sh);
+        check('TR18e · "Pular +1 dia" na apostila cai em SEX 13/11, também bloqueada (sexta de simulado): o app pergunta de novo', !!sh && sh.qs.length === 1 && sh.qs[0].ts === 'apost' && /⛔ A apostila iria para SEX 13\/11, que é sexta de simulado\./.test(sh.qs[0].text), sh && JSON.stringify(sh.qs));
+        await answerQ(page, 'apost', 'Pular +1 dia'); sh = await readShift(page); logSh(sh);
+        check('TR18e · pulou de novo: apostila SÁB 14/11 (dia leve: 🌿, sem pergunta), "pulou 2 dias"; a selagem também é empurrada (SEG 16/11 → TER 17/11); "Aplicar" liberado', !!sh && sh.qs.length === 0 && /^· Apostila: SEX 13\/11 → .*🌿 SÁB 14\/11 .*pulou 2 dias/.test(rowT(sh, 'apost')) && /^· Selagem: SEG 16\/11 → .*TER 17\/11 /.test(rowT(sh, 'seal')) && sh.btns.includes('Aplicar') && /questões → apostila 2d → 4d ⚠️ fora de 1–2/.test(sh.gaps), sh && JSON.stringify(sh.rows) + sh.gaps);
+        await clickAsk(page, 'Aplicar'); await pronto(page); const c1 = await getLS(page, CFG), p = c1.trilhaPlan[19];
+        check('TR18e · Aplicar: 08/11, 10/11, 14/11, 17/11; orig preservado; hist "fio"; a escolha "Deixar" guardada (keep: questões em 10/11); módulos 24 e 32 (mesma semana) intactos', ['aula', 'quest', 'apost', 'seal'].map(x => p[x]).join() === '2026-11-08,2026-11-10,2026-11-14,2026-11-17' && JSON.stringify(p.orig) === JSON.stringify(c0.trilhaPlan[19].orig) && p.hist.slice(-4).every(x => x.why === 'fio') && JSON.stringify(p.keep) === JSON.stringify({ quest: '2026-11-10' }) && others(c1, c0, 19) && JSON.stringify(await getLS(page, TRL)) === JSON.stringify(t0), JSON.stringify(p));
+        await nav('2026-11-10'); const d10 = await readDay(page);
+        check('TR18e · TER 10/11 (plantão longo) mostra o bloco das questões deixado ali, com "⚠️ plantão longo — escolha sua"; o 🚑 diz "etapa deixada aqui por escolha sua (⚠️ no bloco)" e a linha 🗓️ também (não "nenhuma etapa de mesa hoje")', d10.blocks.some(x => x.tm === 19 && x.ts === 'quest' && /⚠️ plantão longo — escolha sua/.test(x.text)) && d10.blocks.some(x => /^🚑 Plantão 06h–19h — etapa deixada aqui por escolha sua \(⚠️ no bloco\); fora ela, só Anki e áudio nos tempos mortos/.test(x.text)) && /etapa deixada aqui por escolha sua \(⚠️ no bloco\)/.test(d10.dayType) && !/nenhuma etapa de mesa/.test(d10.dayType), JSON.stringify([d10.dayType, d10.blocks.map(x => x.text.slice(0, 90))]));
+        // o outro caminho: "Pular +1 dia" nas questões empurra a apostila para SEX 13/11 (bloqueada) → pergunta → "Deixar neste dia" → Aplicar
+        await moveStageT(page, nav, 24, 'aula', '2026-11-09', '2026-11-08'); await clickAsk(page, 'Mover o fio todo (−1 dia)');
+        await answerQ(page, 'quest', 'Pular +1 dia'); sh = await readShift(page); logSh(sh);
+        check('TR18e · módulo 24: "Pular +1 dia" nas questões (QUA 11/11) leva a apostila de volta para SEX 13/11, bloqueada — o app pergunta por ela', !!sh && /^· Questões: QUA 11\/11 → .*QUA 11\/11 .*pulou 1 dia$/.test(rowT(sh, 'quest')) && sh.qs.length === 1 && sh.qs[0].ts === 'apost' && /⛔ A apostila iria para SEX 13\/11, que é sexta de simulado\./.test(sh.qs[0].text), sh && JSON.stringify([sh.rows, sh.qs]));
+        await answerQ(page, 'apost', 'Deixar neste dia'); sh = await readShift(page); logSh(sh);
+        check('TR18e · "Deixar neste dia": apostila fica em SEX 13/11 com ⚠️ sexta de simulado — escolha sua; selagem SEG 16/11; "Aplicar" liberado', !!sh && /SEX 13\/11 .*⚠️ sexta de simulado — escolha sua/.test(rowT(sh, 'apost')) && /^· Selagem: SEG 16\/11 → .*SEG 16\/11/.test(rowT(sh, 'seal')) && sh.btns.includes('Aplicar'), sh && JSON.stringify(sh.rows));
+        await clickAsk(page, 'Aplicar'); await pronto(page); const p24 = (await getLS(page, CFG)).trilhaPlan[24];
+        check('TR18e · Aplicar (módulo 24): 08/11, 11/11, 13/11, 16/11; keep = apostila em 13/11', ['aula', 'quest', 'apost', 'seal'].map(x => p24[x]).join() === '2026-11-08,2026-11-11,2026-11-13,2026-11-16' && JSON.stringify(p24.keep) === JSON.stringify({ apost: '2026-11-13' }), JSON.stringify(p24));
+        await nav('2026-11-13'); const d13 = await readDay(page);
+        check('TR18e · SEX 13/11: a apostila que ela deixou tem "⚠️ sexta de simulado — escolha sua"; a que o app pôs lá (módulo 32, simulado religado depois) não tem "escolha sua"; a linha 🗓️ diz "etapa deixada aqui por escolha sua"', d13.blocks.some(x => x.tm === 24 && x.ts === 'apost' && /⚠️ sexta de simulado — escolha sua/.test(x.text)) && d13.blocks.some(x => x.tm === 32 && x.ts === 'apost' && !/escolha sua/.test(x.text)) && /etapa deixada aqui por escolha sua/.test(d13.dayType), JSON.stringify([d13.dayType, d13.blocks.filter(x => x.tm != null).map(x => x.tm + ':' + x.text.slice(-60))]));
+        await nav('2026-11-07'); pend = await banner(page, 'trilha-pending'); console.log('   ⏳', pend && pend.text.slice(0, 200)); // o ⏳ fica no topo da semana de hoje
+        check('TR18e · ⏳: só a apostila do módulo 32 (o app pôs, o simulado veio depois); a que ela deixou não vira pendente', !!pend && /Ficaram para trás 1 etapa \(CIR3 · apostila de SEX 13\/11/.test(pend.text), pend && pend.text.slice(0, 300));
+    });
+
+    // TR18i · dia editado à mão: "Deixar neste dia" põe o bloco com o mesmo ⚠️ e o mesmo 🚑 do dia gerado
+    await scenario(browser, 'TR18i-fio-dia-editado', '2026-10-26', {}, async (S) => {
+        let page = await prepT(S, '2026-11-07', (c, t) => markBefore(c, t, '2026-11-07'));
+        const nav = mkNav(page, '2026-11-07');
+        await nav('2026-11-10'); await moveT(page, /^Anki/, '2026-11-11'); await pronto(page); // TER 10/11 vira dia editado à mão (o Anki foi para QUA 11/11)
+        check('TR18i · premissa: TER 10/11 e QUA 11/11 editados à mão', !!((await getLS(page, SCH)) || {})['2026-11-10'], JSON.stringify(Object.keys((await getLS(page, SCH)) || {})));
+        await moveStageT(page, nav, 19, 'aula', '2026-11-09', '2026-11-08'); await clickAsk(page, 'Mover o fio todo (−1 dia)'); await answerQ(page, 'quest', 'Deixar neste dia'); await answerQ(page, 'apost', 'Deixar neste dia'); await clickAsk(page, 'Aplicar'); await pronto(page);
+        await nav('2026-11-10'); const d10 = await readDay(page);
+        check('TR18i · TER 10/11 (editado, plantão longo): o bloco das questões entra com "⚠️ plantão longo — escolha sua", o 🚑 diz "etapa deixada aqui por escolha sua" e a linha 🗓️ também', d10.blocks.some(x => x.tm === 19 && x.ts === 'quest' && /⚠️ plantão longo — escolha sua/.test(x.text)) && d10.blocks.some(x => /^🚑 Plantão 06h–19h — etapa deixada aqui por escolha sua/.test(x.text)) && /etapa deixada aqui por escolha sua/.test(d10.dayType) && !d10.blocks.some(x => /^Anki/.test(x.text)), JSON.stringify([d10.dayType, d10.blocks.map(x => x.text.slice(0, 90))]));
+    });
+
+    // TR18f · fim do acesso: nada depois de 01/01 — deslocamento parcial; deixar uma apostila em 01/01 avisa que as seguintes ficam sem dia
+    await scenario(browser, 'TR18f-fio-01-01', '2026-10-26', {}, async (S) => {
+        let page = await prepT(S, '2026-12-22', () => {}); // módulo 21: aula DOM 27/12, questões SEG 28/12, apostila QUA 30/12, selagem SEX 01/01
+        const nav = mkNav(page, '2026-12-22'); const c0 = await getLS(page, CFG);
+        check('TR18f · premissa: módulo 21 com aula 27/12, questões 28/12, apostila 30/12, selagem 01/01', ['aula', 'quest', 'apost', 'seal'].map(x => c0.trilhaPlan[21][x]).join() === '2026-12-27,2026-12-28,2026-12-30,2027-01-01', JSON.stringify(c0.trilhaPlan[21]));
+        await moveStageT(page, nav, 21, 'aula', '2026-12-27', '2026-12-29'); await clickAsk(page, 'Mover o fio todo (+2 dias)'); let sh = await readShift(page); logSh(sh);
+        check('TR18f · apostila iria para SEX 01/01: "⛔ A apostila iria para SEX 01/01, que é último dia de acesso — só selagem." (os avisos de 01/01 só depois da resposta)', !!sh && sh.qs.length === 1 && sh.qs[0].ts === 'apost' && sh.qs[0].text.startsWith('⛔ A apostila iria para SEX 01/01, que é último dia de acesso — só selagem.') && !sh.end && !sh.nofit, sh && JSON.stringify(sh.qs));
+        await answerQ(page, 'apost', 'Pular +1 dia'); sh = await readShift(page); logSh(sh);
+        check('TR18f · "Pular" = não cabe antes do fim do acesso: apostila e selagem sem dia; aviso "Estas etapas não cabem antes do fim do acesso (01/01)" com deslocamento parcial ou cancelar', !!sh && /sem dia — não cabe antes do fim do acesso \(01\/01\)/.test(rowT(sh, 'apost')) && /sem dia/.test(rowT(sh, 'seal')) && /^⚠️ Estas etapas não cabem antes do fim do acesso \(01\/01\): apostila, selagem\. Você pode aplicar o deslocamento parcial/.test(sh.nofit || '') && JSON.stringify(sh.btns) === JSON.stringify(['Aplicar o deslocamento parcial', 'Voltar às outras opções', 'Cancelar']), sh && JSON.stringify([sh.rows, sh.nofit, sh.btns]));
+        await clickAsk(page, 'Voltar às outras opções'); await clickAsk(page, 'Mover o fio todo (+2 dias)'); await answerQ(page, 'apost', 'Deixar neste dia'); sh = await readShift(page); logSh(sh);
+        check('TR18f · "Deixar neste dia" com a apostila em 01/01: aviso explícito "⚠️ Deixando a apostila em 01/01 (último dia de acesso), a etapa seguinte (selagem) fica sem dia." e a selagem sem dia', !!sh && sh.end === '⚠️ Deixando a apostila em 01/01 (último dia de acesso), a etapa seguinte (selagem) fica sem dia.' && /sem dia/.test(rowT(sh, 'seal')) && /SEX 01\/01 .*⚠️ último dia de acesso — só selagem — escolha sua/.test(rowT(sh, 'apost')), sh && JSON.stringify([sh.rows, sh.end]));
+        await clickAsk(page, 'Voltar às outras opções'); await clickAsk(page, 'Mover o fio todo (+2 dias)'); await answerQ(page, 'apost', 'Pular +1 dia'); await clickAsk(page, 'Aplicar o deslocamento parcial'); await pronto(page);
+        const p = (await getLS(page, CFG)).trilhaPlan[21];
+        check('TR18f · deslocamento parcial: aula 29/12, questões 30/12; apostila e selagem sem dia (null), registradas no hist "fio"; orig intacto', p.aula === '2026-12-29' && p.quest === '2026-12-30' && p.apost === null && p.seal === null && p.hist.filter(x => x.why === 'fio').map(x => x.ts + '>' + x.to).join() === 'aula>2026-12-29,quest>2026-12-30,apost>null,seal>null' && JSON.stringify(p.orig) === JSON.stringify(c0.trilhaPlan[21].orig), JSON.stringify(p));
+    });
+
+    // TR18g · a selagem (nada depois dela) segue movendo direto, sem diálogo
+    await scenario(browser, 'TR18g-fio-selagem-direto', '2026-10-26', {}, async (S) => {
+        let page = await prepT(S, '2026-11-17', () => {}); const nav = mkNav(page, '2026-11-17'); const c0 = await getLS(page, CFG);
+        await moveStageT(page, nav, 1, 'seal', '2026-11-22', '2026-11-23'); const ask = await readAsk(page); await pronto(page);
+        const p = (await getLS(page, CFG)).trilhaPlan[1];
+        check('TR18g · selagem de DOM 22/11 para SEG 23/11 (apostila → selagem 4d, na faixa): move direto, sem diálogo; hist "mover"', !ask && p.seal === '2026-11-23' && p.hist.slice(-1)[0].why === 'mover' && p.aula === c0.trilhaPlan[1].aula && p.apost === c0.trilhaPlan[1].apost, JSON.stringify({ ask, p }));
+        // mover para hoje: as questões vão para TER 17/11; a aula (sem marca, de hoje) teria de ir para antes de amanhã — o app diz que não pode voltar
+        await moveStageT(page, nav, 1, 'quest', '2026-11-18', '2026-11-17'); await clickAsk(page, 'Mover o fio todo (−1 dia)'); const sh = await readShift(page); logSh(sh); const c1 = await getLS(page, CFG);
+        check('TR18g · questões para hoje (TER 17/11): a aula teria de ir para SEG 16/11 — "⚠️ A ordem não pode ser preservada: a aula iria para antes de amanhã — não pode voltar. As outras opções continuam." (sem "Aplicar"); apostila e selagem andam a partir de amanhã', !!sh && /^· Aula: TER 17\/11 → .*SEG 16\/11/.test(rowT(sh, 'aula')) && /TER 17\/11 .*\(seu movimento\)/.test(rowT(sh, 'quest')) && /^· Apostila: QUI 19\/11 → .*QUA 18\/11/.test(rowT(sh, 'apost')) && sh.order === '⚠️ A ordem não pode ser preservada: a aula iria para antes de amanhã — não pode voltar. As outras opções continuam.' && !sh.btns.includes('Aplicar'), sh && JSON.stringify([sh.rows, sh.order]));
+        await clickAsk(page, 'Cancelar');
+        check('TR18g · Cancelar: nada gravado', JSON.stringify(await getLS(page, CFG)) === JSON.stringify(c1));
+        // um par fora de ordem que o fio não toca (questões no dia da aula, por "Mover assim mesmo") não bloqueia o fio da apostila
+        await moveStageT(page, nav, 2, 'quest', '2026-11-22', '2026-11-20'); await clickAsk(page, 'Mover assim mesmo'); await pronto(page);
+        const p2a = (await getLS(page, CFG)).trilhaPlan[2];
+        check('TR18g · premissa: módulo 2 com aula e questões no mesmo dia (SEX 20/11), apostila 23/11, selagem 26/11', p2a.aula === '2026-11-20' && p2a.quest === '2026-11-20' && p2a.apost === '2026-11-23' && p2a.seal === '2026-11-26', JSON.stringify(p2a));
+        await moveStageT(page, nav, 2, 'apost', '2026-11-23', '2026-11-22'); const ask2 = await readAsk(page); const fio2 = ask2 && ask2.btns.find(b => /^Mover o fio todo/.test(b)); if (fio2) await clickAsk(page, fio2); const sh2 = await readShift(page); logSh(sh2);
+        check('TR18g · fio da apostila (−1 dia) com o par antigo aula/questões no mesmo dia: a prévia não culpa o movimento ("A ordem não pode ser preservada" não aparece) e "Aplicar" está lá', !!sh2 && !sh2.order && sh2.btns.includes('Aplicar') && sh2.rows.map(r => r.ts).join() === 'apost,seal', sh2 && JSON.stringify([sh2.rows, sh2.order, sh2.btns]));
+        if (sh2 && sh2.btns.includes('Aplicar')) await clickAsk(page, 'Aplicar'); await pronto(page); const p2b = (await getLS(page, CFG)).trilhaPlan[2];
+        check('TR18g · Aplicar: apostila 22/11, selagem 25/11; aula e questões como estavam', p2b.apost === '2026-11-22' && p2b.seal === '2026-11-25' && p2b.aula === '2026-11-20' && p2b.quest === '2026-11-20', JSON.stringify(p2b));
+    });
+
+    // TR18h · a selagem para um dia passado: sem etapa depois dela, não há "fio"; o diálogo abre só para a linha do dia passado (Mover assim mesmo / Cancelar)
+    await scenario(browser, 'TR18h-selagem-dia-passado', '2026-10-26', {}, async (S) => {
+        let page = await prepT(S, '2026-11-21', (c, t) => { setP(c, 1, ['2026-11-14', '2026-11-15', '2026-11-17', '2026-11-22']); t[1] = { aula: true, aulaAt: '2026-11-14', questoesD2: true, questoesD2At: '2026-11-15', apostila: true, apostilaAt: '2026-11-17' }; }, '2026-11-17');
+        const nav = mkNav(page, '2026-11-21');
+        await moveStageT(page, nav, 1, 'seal', '2026-11-22', '2026-11-20'); const ask = await readAsk(page); console.log('   ', ask && ask.text.replace(/\n/g, ' | '));
+        check('TR18h · selagem de DOM 22/11 para SEX 20/11 (já passou; apostila → selagem 3d, na faixa): o diálogo mostra só a linha do dia passado, com Mover assim mesmo / Cancelar (sem "fio")', !!ask && ask.text.includes('Esse dia já passou. Se você fez a etapa nele, marque o ✓ no bloco desse dia') && JSON.stringify(ask.btns) === JSON.stringify(['Mover assim mesmo', 'Cancelar']) && !/Este movimento mantém/.test(ask.text), ask && JSON.stringify(ask));
+        await clickAsk(page, 'Mover assim mesmo'); await pronto(page); const p = (await getLS(page, CFG)).trilhaPlan[1];
+        check('TR18h · "Mover assim mesmo": selagem 20/11 (fica ⏳), hist "mover"', p.seal === '2026-11-20' && p.hist.slice(-1)[0].why === 'mover', JSON.stringify(p));
+    });
+
+    // TR18k · aval de 08/11 (escolha 6): a etapa que ela deixou em 01/01 com "Deixar neste dia" não sai de lá com a recolocação automática da semana final
+    const markExcept = (c, t, iso, skip) => Object.entries(c.trilhaPlan).forEach(([id, pl]) => { if (skip.includes(Number(id))) return; STG.forEach(x => { if (pl[x] && pl[x] < iso) { t[id] = t[id] || {}; t[id][FIELD[x]] = true; t[id][STAMP[x]] = pl[x]; } }); });
+    const chainOk = (p) => { const ds = STG.map(x => p[x]).filter(Boolean); return ds.every((d, k) => k === 0 || d > ds[k - 1]) && ds.every(d => d <= '2027-01-01') && !['aula', 'quest', 'apost'].some(x => p[x] === '2027-01-01' && (p.keep || {})[x] !== '2027-01-01'); }; // em 01/01 só selagem — ou a etapa que ela deixou lá
+    await scenario(browser, 'TR18k-deixar-0101-recolocacao-diaria', '2026-10-26', {}, async (S) => {
+        let page = await prepT(S, '2026-12-22', (c, t) => markExcept(c, t, '2026-12-29', [21])); // tudo antes de 29/12 feito, menos o módulo 21 (aula DOM 27/12, questões SEG 28/12, apostila QUA 30/12, selagem SEX 01/01)
+        const nav = mkNav(page, '2026-12-22');
+        await moveStageT(page, nav, 21, 'aula', '2026-12-27', '2026-12-29'); await clickAsk(page, 'Mover o fio todo (+2 dias)'); await answerQ(page, 'apost', 'Deixar neste dia'); await clickAsk(page, 'Aplicar o deslocamento parcial'); await pronto(page);
+        let p = (await getLS(page, CFG)).trilhaPlan[21];
+        check('TR18k · 22/12: "Deixar neste dia" com a apostila em 01/01 — aula 29/12, questões 30/12, apostila 01/01 (escolha guardada: keep), selagem sem dia', p.aula === '2026-12-29' && p.quest === '2026-12-30' && p.apost === '2027-01-01' && p.seal === null && JSON.stringify(p.keep) === JSON.stringify({ apost: '2027-01-01' }), JSON.stringify(p));
+        for (const day of ['2026-12-29', '2026-12-31']) {
+            if (day === '2026-12-31') { const c0 = await getLS(page, CFG), t0 = (await getLS(page, TRL)) || {}; const q = c0.trilhaPlan[21]; t0[21] = { ...(t0[21] || {}), aula: true, aulaAt: q.aula, questoesD2: true, questoesD2At: q.quest }; await setLS(page, TRL, t0); } // ela fez a aula e as questões nos dias delas (30 e 31/12)
+            page = await S.reopen(day); const c = await getLS(page, CFG); p = c.trilhaPlan[21]; console.log('   📦', day, JSON.stringify({ aula: p.aula, quest: p.quest, apost: p.apost, seal: p.seal, hist: p.hist.filter(h => h.why === 'final') }));
+            check('TR18k · ' + br(day) + ': a recolocação automática da semana final rodou (' + c.trilhaFinalAutoAt + ') e a apostila continua em 01/01, com a escolha guardada; nada depois de 01/01, ordem mantida', new RegExp('^' + day + '\\|').test(c.trilhaFinalAutoAt || '') && p.apost === '2027-01-01' && JSON.stringify(p.keep) === JSON.stringify({ apost: '2027-01-01' }) && !p.hist.some(h => h.why === 'final' && h.ts === 'apost') && chainOk(p), JSON.stringify(p));
+        }
+        await mkNav(page, '2026-12-31')('2027-01-01'); const d1 = await readDay(page);
+        check('TR18k · SEX 01/01 mostra a apostila deixada por ela, com "⚠️ último dia de acesso — só selagem — escolha sua"', d1.blocks.some(x => x.tm === 21 && x.ts === 'apost' && /⚠️ último dia de acesso — só selagem — escolha sua/.test(x.text)), JSON.stringify(d1.blocks.map(x => x.text.slice(0, 80))));
+    });
+
+    // TR18j · fio aplicado dentro da semana final (29/12): módulo 18 com a apostila deixada em 01/01, módulo 20 com a apostila pulando +1 dia (de 01/01: sem dia).
+    //          Depois, a recolocação automática de 30/12 e a restauração do plano
+    await scenario(browser, 'TR18j-fio-semana-final', '2026-10-26', {}, async (S) => {
+        await S.reopen('2026-12-22'); let page = await S.reopen('2026-12-28');
+        { const c = await getLS(page, CFG), t = (await getLS(page, TRL)) || {}; const d = ['2026-12-28', '2026-12-29', '2026-12-30', '2027-01-01'];
+          [18, 20].forEach(id => { const x = { aula: d[0], quest: d[1], apost: d[2], seal: d[3] }; c.trilhaPlan[id] = { ...c.trilhaPlan[id], ...x, orig: { ...x }, hist: [] }; }); // como o motor teria planejado (orig igual)
+          markExcept(c, t, '2026-12-29', []); await setLS(page, CFG, c); await setLS(page, TRL, t); }
+        page = await S.reopen('2026-12-29'); const nav = mkNav(page, '2026-12-29');
+        let c = await getLS(page, CFG);
+        check('TR18j · premissa: em 29/12 a recolocação automática rodou e não mexeu nos módulos 18 e 20 (aula 28/12 feita, questões 29/12, apostila 30/12, selagem 01/01)', /^2026-12-29\|/.test(c.trilhaFinalAutoAt || '') && [18, 20].every(id => ['quest', 'apost', 'seal'].map(x => c.trilhaPlan[id][x]).join() === '2026-12-29,2026-12-30,2027-01-01' && !c.trilhaPlan[id].hist.length), JSON.stringify([c.trilhaPlan[18], c.trilhaPlan[20]]));
+        await moveStageT(page, nav, 18, 'quest', '2026-12-29', '2026-12-31'); await clickAsk(page, 'Mover o fio todo (+2 dias)'); let sh = await readShift(page); logSh(sh);
+        check('TR18j · módulo 18: questões para QUI 31/12 (+2): a apostila iria para SEX 01/01 — o app pergunta', !!sh && sh.qs.length === 1 && sh.qs[0].ts === 'apost' && /⛔ A apostila iria para SEX 01\/01, que é último dia de acesso — só selagem\./.test(sh.qs[0].text), sh && JSON.stringify(sh.qs));
+        await answerQ(page, 'apost', 'Deixar neste dia'); await clickAsk(page, 'Aplicar o deslocamento parcial'); await pronto(page);
+        await moveStageT(page, nav, 20, 'quest', '2026-12-29', '2026-12-31'); await clickAsk(page, 'Mover o fio todo (+2 dias)'); await answerQ(page, 'apost', 'Pular +1 dia'); sh = await readShift(page); logSh(sh);
+        check('TR18j · módulo 20: "Pular +1 dia" a partir de 01/01 = não cabe: apostila e selagem sem dia, deslocamento parcial', !!sh && /sem dia/.test(rowT(sh, 'apost')) && /sem dia/.test(rowT(sh, 'seal')) && sh.btns.includes('Aplicar o deslocamento parcial'), sh && JSON.stringify(sh.rows));
+        await clickAsk(page, 'Aplicar o deslocamento parcial'); await pronto(page);
+        c = await getLS(page, CFG); const a18 = c.trilhaPlan[18], a20 = c.trilhaPlan[20];
+        check('TR18j · aplicado em 29/12: 18 = questões 31/12, apostila 01/01 (keep), selagem sem dia; 20 = questões 31/12, apostila e selagem sem dia', a18.quest === '2026-12-31' && a18.apost === '2027-01-01' && a18.seal === null && JSON.stringify(a18.keep) === JSON.stringify({ apost: '2027-01-01' }) && a20.quest === '2026-12-31' && a20.apost === null && a20.seal === null && !a20.keep, JSON.stringify([a18, a20]));
+        page = await S.reopen('2026-12-30'); c = await getLS(page, CFG); const b18 = c.trilhaPlan[18], b20 = c.trilhaPlan[20];
+        const show = (p) => ['aula', 'quest', 'apost', 'seal'].map(x => x + ' ' + (p[x] ? br(p[x]) : 'sem dia')).join(', ');
+        console.log('   📦 30/12, depois da recolocação automática · 18:', show(b18), '· 20:', show(b20), '· log:', JSON.stringify(c.trilhaFinalLog && { moved: c.trilhaFinalLog.moved.filter(m => [18, 20].includes(m.id)), nocabe: c.trilhaFinalLog.nocabe.filter(m => [18, 20].includes(m.id)) }));
+        check('TR18j · 30/12, recolocação automática: a apostila do módulo 18 continua em 01/01 (escolha dela); as etapas dele seguem em ordem e nada passa de 01/01', /^2026-12-30\|/.test(c.trilhaFinalAutoAt || '') && b18.apost === '2027-01-01' && JSON.stringify(b18.keep) === JSON.stringify({ apost: '2027-01-01' }) && !b18.hist.some(h => h.why === 'final' && h.ts === 'apost') && chainOk(b18) && b18.seal === null, JSON.stringify(b18));
+        check('TR18j · 30/12, recolocação automática: o módulo 20 (sem dia depois do "Pular") é recolocado pela regra da semana final — em ordem, nada depois de 01/01, só a selagem em 01/01', chainOk(b20) && b20.hist.some(h => h.why === 'final'), JSON.stringify(b20));
+        const btnRe = async (re) => { const ok = await page.evaluate((src) => { const b = [...document.querySelectorAll('button')].find(x => new RegExp(src).test(x.innerText.trim())); if (!b) return false; b.click(); return true; }, re.source); if (!ok) throw new Error('botão não encontrado: ' + re); await page.waitForTimeout(450); };
+        await clickTab(page, 'TRILHA'); await btnRe(/^Ver o que mudou desde a atualização$/); await btnRe(/^Aplicar a restauração$/); if (await page.evaluate(() => [...document.querySelectorAll('button')].some(b => b.innerText.trim() === 'Aplicar mesmo assim'))) await btnRe(/^Aplicar mesmo assim$/);
+        c = await getLS(page, CFG); const r18 = c.trilhaPlan[18], r20 = c.trilhaPlan[20]; console.log('   🧹 restaurado · 18:', show(r18), '· 20:', show(r20));
+        check('TR18j · restaurar (em 30/12): os dois módulos voltam ao plano original (28/12, 29/12, 30/12, 01/01), sem a escolha guardada e sem o histórico dela nem a recolocação que veio por causa do fio; nenhum dia com duas etapas', [r18, r20].every(p => ['aula', 'quest', 'apost', 'seal'].map(x => p[x]).join() === '2026-12-28,2026-12-29,2026-12-30,2027-01-01' && !p.keep && !(p.hist || []).length && chainOk(p)), JSON.stringify([r18, r20]));
+    });
+
 
     await scenario(browser, 'TR11-mover-2610', '2026-10-26', {}, async (S) => {
         let page = S.page;
@@ -784,7 +1031,7 @@ const DEFAULT12 = [5, 6, 14, 19, 24, 32, 34, 85, 86, 1, 2, 3];
         const restoreCard = () => rCard(page);
         const clickBtn = (re) => rClick(page, re);
         const arcList = () => rArc(page);
-        const moveAny = async (re, to) => { await moveT(page, re, to); const ask = await readAsk(page); if (ask) await clickAsk(page, 'Mover assim mesmo'); await page.evaluate(() => { const b = [...document.querySelectorAll('button')].find(x => x.innerText.trim() === '✓ Pronto'); if (b) b.click(); }); await page.waitForTimeout(250); };
+        const moveAny = async (re, to) => { await moveT(page, re, to); const ask = await readAsk(page); if (ask) await clickMove(page); await page.evaluate(() => { const b = [...document.querySelectorAll('button')].find(x => x.innerText.trim() === '✓ Pronto'); if (b) b.click(); }); await page.waitForTimeout(250); };
         const sub = subX;
         const cfgA = await getLS(page, CFG); // 1º acesso 27/10: a T1 congela (CIR1 · Trauma I, Trauma II, CIR2 · Urologia)
         check('ponto de partida: 1º acesso 27/10, T1 congelada com 5, 6, 14', cfgA.trilhaFirstOpen === '2026-10-27' && JSON.stringify(cfgA.trilhaWeeks['2026-10-26'].mods) === '[5,6,14]', JSON.stringify(cfgA.trilhaWeeks));
@@ -1129,8 +1376,8 @@ const DEFAULT12 = [5, 6, 14, 19, 24, 32, 34, 85, 86, 1, 2, 3];
         let off = 0; const wk = (iso) => iso < '2026-11-03' ? -1 : iso < '2026-11-10' ? 0 : iso < '2026-11-17' ? 1 : 2; // em relação à semana de hoje (03–09/11)
         const goto = async (iso) => { await clickTab(page, 'CRONOGRAMA'); const k = wk(iso); if (k !== off) { await navWeek(page, k - off); off = k; } await clickDate(page, br(iso)); };
         const esc = (t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        const moveStage = async (id, ts, to) => { const c = await getLS(page, CFG); const from = c.trilhaPlan[id][ts]; await goto(from); const day = await readDay(page); const b = day.blocks.find(x => x.tm === id && x.ts === ts && !x.au); if (!b) throw new Error('bloco ' + id + '.' + ts + ' não está em ' + from); await moveT(page, new RegExp('^' + esc(b.text.slice(0, 60))), to); const ask = await readAsk(page); if (ask) await clickAsk(page, 'Mover assim mesmo'); await page.evaluate(() => { const x = [...document.querySelectorAll('button')].find(y => y.innerText.trim() === '✓ Pronto'); if (x) x.click(); }); await page.waitForTimeout(250); return { from, ask: ask ? ask.text.split('\n')[0] : '(sem aviso)' }; };
-        const moveBlock = async (re, fromIso, to) => { await goto(fromIso); await moveT(page, re, to); const ask = await readAsk(page); if (ask) await clickAsk(page, 'Mover assim mesmo'); await page.evaluate(() => { const x = [...document.querySelectorAll('button')].find(y => y.innerText.trim() === '✓ Pronto'); if (x) x.click(); }); await page.waitForTimeout(250); };
+        const moveStage = async (id, ts, to) => { const c = await getLS(page, CFG); const from = c.trilhaPlan[id][ts]; await goto(from); const day = await readDay(page); const b = day.blocks.find(x => x.tm === id && x.ts === ts && !x.au); if (!b) throw new Error('bloco ' + id + '.' + ts + ' não está em ' + from); await moveT(page, new RegExp('^' + esc(b.text.slice(0, 60))), to); const ask = await readAsk(page); if (ask) await clickMove(page); await page.evaluate(() => { const x = [...document.querySelectorAll('button')].find(y => y.innerText.trim() === '✓ Pronto'); if (x) x.click(); }); await page.waitForTimeout(250); return { from, ask: ask ? ask.text.split('\n')[0] : '(sem aviso)' }; };
+        const moveBlock = async (re, fromIso, to) => { await goto(fromIso); await moveT(page, re, to); const ask = await readAsk(page); if (ask) await clickMove(page); await page.evaluate(() => { const x = [...document.querySelectorAll('button')].find(y => y.innerText.trim() === '✓ Pronto'); if (x) x.click(); }); await page.waitForTimeout(250); };
         const P0 = cfgF.trilhaPlan; const stg = []; Object.keys(P0).forEach(id => STG.forEach(ts => stg.push({ id: Number(id), ts, d: P0[id][ts], q: P0[id].quest })));
         const inRange = (d) => d >= '2026-11-03' && d <= '2026-11-16';
         const aMod = Object.keys(P0).map(Number).find(id => P0[id].aula >= '2026-11-05' && inRange(P0[id].aula) && inRange(P0[id].quest));
