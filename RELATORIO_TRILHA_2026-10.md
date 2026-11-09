@@ -156,7 +156,7 @@ Achados refutados pelo verificador:
 | Suíte | Checks |
 |---|---|
 | audit | 396 |
-| trilha (com TR18a–h: mover o fio todo junto) | 385 |
+| trilha (com TR18a–i: mover o fio todo junto) | 399 |
 | historico | 148 |
 | coverage41 | 80 |
 | coverageTrilha | 8 |
@@ -165,9 +165,9 @@ Achados refutados pelo verificador:
 | loads16 | 12 |
 | simTrilha | 6 |
 
-**1053 checks verdes.** `cmp planner_residencia_2026_offline.html index.html`: idênticos. O histórico até 19/10 continua idêntico (historico, 148).
+**1067 checks verdes.** `cmp planner_residencia_2026_offline.html index.html`: idênticos. O histórico até 19/10 continua idêntico (historico, 148).
 
-Os testes novos (TR18a–h, 44 checks) mexem só pela interface:
+Os testes novos (TR18a–i, 58 checks) mexem só pela interface:
 - mover pelo seletor do bloco;
 - os botões do diálogo e da prévia, e as perguntas dos dias bloqueados.
 
