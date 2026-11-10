@@ -20,7 +20,7 @@ async function scenario(browser, name, dateISO, seeds, fn, opts) {
 }
 async function readWeekT(page) { const out = {}; for (const t of await listDayTabs(page)) { await clickDate(page, t.date); out[t.date] = await readDay(page); } return out; }
 async function trailMap(page, nWeeks) { // navega da semana visível por n semanas e devolve { id: { aula, quest, apost, seal } } pelas etiquetas data-tm/data-ts e a data da aba
-    const map = {}; const year = (dm) => (dm.slice(3) === '01' ? '2027' : '2026') + '-' + dm.slice(3) + '-' + dm.slice(0, 2);
+    const map = {}; const year = (dm) => (dm.slice(3) <= '06' ? '2027' : '2026') + '-' + dm.slice(3) + '-' + dm.slice(0, 2); // jan–jun = 2027 (cauda até 28/06/2027; §10.1 a, testes I1)
     for (let k = 0; k < nWeeks; k++) { const w = await readWeekT(page); Object.entries(w).forEach(([dm, d]) => d.blocks.forEach(b => { if (b.tm != null && b.ts && !b.au) { (map[b.tm] = map[b.tm] || {}); if (map[b.tm][b.ts]) map[b.tm][b.ts + '_dup'] = year(dm); else map[b.tm][b.ts] = year(dm); } })); if (k < nWeeks - 1) await navWeek(page, 1); }
     return map;
 }
@@ -70,8 +70,11 @@ const DEFAULT12 = [5, 6, 14, 19, 24, 32, 34, 85, 86, 1, 2, 3];
         await page.setViewportSize({ width: 420, height: 900 });
         await navWeek(page, 9); const h52 = await headerWeek(page); const t52 = await listDayTabs(page);
         check('Sem.52 = 29/12–01/01, 4 abas (TER a SEX), badge "Trilha 10/10"', h52.week === 52 && h52.range === '29/12–01/01' && t52.length === 4 && t52.map(t => t.code).join() === 'TER,QUA,QUI,SEX' && /Trilha 10\/10/.test(await bodyText(page)), JSON.stringify([h52, t52]));
-        await navWeek(page, 1); const h53 = await headerWeek(page);
-        check('▶ além da Sem.52 continua na 52 (o acesso termina em 01/01)', h53.week === 52, JSON.stringify(h53));
+        await navWeek(page, 1); const h53 = await headerWeek(page); const t53 = await listDayTabs(page); const b53 = await bodyText(page); const c1 = await readWeekT(page);
+        const seals = Object.entries(c1).flatMap(([d, x]) => x.blocks.filter(b => b.ts === 'seal' && !b.au).map(b => d + ' ' + (b.mod || '').split(' · ')[0])); // a prévia de 19/10 tem etapa em janeiro: teto por etapa + decisão 7 (selagens até 03/01)
+        check('▶ além da Sem.52 vai para a C1 = Sem.53, SÁB 02/01 a SEG 04/01 (3 abas, badge "Janeiro · C1"), porque a prévia de 19/10 tem selagem em janeiro (HEM1 em 03/01, pela decisão 7)', h53.week === 53 && h53.range === '02/01–04/01' && t53.map(t => t.code + ' ' + t.date).join() === 'SAB 02/01,DOM 03/01,SEG 04/01' && /Janeiro · C1/.test(b53) && seals.includes('03/01 HEM1'), JSON.stringify([h53, t53.map(t => t.code + ' ' + t.date), seals]));
+        await navWeek(page, 1); const h54 = await headerWeek(page);
+        check('▶ além da última semana visível (a C1) fica nela', h54.week === 53, JSON.stringify(h54));
     });
 
     // ── TR0c · as duas segundas da T1 ao navegar: de SEG 09/11 ◀ cai na SEG 02/11 (a mais perto), de 02/11 ▶ volta a 09/11; tocar 26/10 fica em 26/10 ──
@@ -111,7 +114,7 @@ const DEFAULT12 = [5, 6, 14, 19, 24, 32, 34, 85, 86, 1, 2, 3];
         check('nenhum texto com horário de Venvanse/estimulante na transição', !days.some(d => VENV_TIME.test(allText(d))));
         const t = await trilhaRows(page); const trn = await banner(page, 'trilha-transition');
         check('aba Trilha na transição: aviso "🗓️ Dias de transição (20/10–25/10): a trilha começa na segunda 26/10 — a fila, a rampa e o alcance abaixo são a prévia."', !!trn && trn.text === '🗓️ Dias de transição (20/10–25/10): a trilha começa na segunda 26/10 — a fila, a rampa e o alcance abaixo são a prévia.', trn && trn.text);
-        check('aba Trilha na transição: "No ritmo atual cabem 36 módulos" e a rampa tem 10 semanas, T1 = 26/10–02/11, todas editáveis (nada congelado)', /cabem 36 módulos/.test(t.counts) && (t.ramp.match(/^T\d+ · /gm) || []).length === 10 && /T1 · 26\/10–02\/11/.test(t.ramp) && /T10 · 29\/12–01\/01/.test(t.ramp) && !/congelada/.test(t.ramp), t.ramp.split('\n').slice(0, 6).join(' | '));
+        check('aba Trilha na transição: "No ritmo atual cabem 32 módulos" (1 aula por dia: a T2 fica com 1 "não coube"; K: a T3 com 1 "espera"; teto por etapa: as selagens de PED2 e HEM1 vão para janeiro e saem da conta "até 01/01" — o S5 troca a conta) e a rampa tem 10 semanas, T1 = 26/10–02/11, todas editáveis (nada congelado)', /cabem 32 módulos/.test(t.counts) && (t.ramp.match(/^T\d+ · /gm) || []).length === 10 && /T1 · 26\/10–02\/11/.test(t.ramp) && /T10 · 29\/12–01\/01/.test(t.ramp) && !/congelada/.test(t.ramp), t.ramp.split('\n').slice(0, 6).join(' | '));
     });
 
     // ── TR1 · semana de 26/10 (1º acesso no 1º dia da T1, 8 dias): congelamento, cota cheia, plantões, aula em áudio, simulado religado ──
@@ -176,8 +179,8 @@ const DEFAULT12 = [5, 6, 14, 19, 24, 32, 34, 85, 86, 1, 2, 3];
         check('fila começa por cirurgia e segue a ordem do curso: [' + DEFAULT12.join(',') + '] (a ordem não muda com o início em 26/10)', JSON.stringify(t.rows.slice(0, 12).map(r => r.id)) === JSON.stringify(DEFAULT12), t.rows.slice(0, 12).map(r => r.id).join(','));
         check('#1 a #3 = NESTA SEMANA, sem ↑↓ nem 📌 (já planejados)', t.rows.slice(0, 3).every(r => r.planned && /NESTA SEMANA/.test(r.text) && !r.btns.length));
         const N = Number((t.counts.match(/cabem (\d+) módulos/) || [])[1]);
-        check('"No ritmo atual cabem N módulos até 01/01/2027" com N = 36 (10 semanas: 3·4·4·4·4·4·4·5·4·0) e a linha de alcance depois do #36', N === 36 && t.lineAfter === 36 && /LINHA DE ALCANCE — até 01\/01: 36 módulos/.test(t.line), t.counts.split('\n').slice(0, 6).join(' | '));
-        check('contagem: fechados 0 · dentro 36 · fora ' + (t.rows.length - 36), /0\nFechados na Trilha/.test(t.counts) && /36\nDentro do alcance/.test(t.counts) && new RegExp((t.rows.length - 36) + '\\nFora').test(t.counts), t.counts.slice(0, 160));
+        check('"No ritmo atual cabem N módulos até 01/01/2027" com N = 32 (rampa 3·4·4·4·4·4·4·5·4·0; 1 aula por dia: T2 "1 não coube"; K: T3 "1 espera"; teto por etapa: selagens de PED2 e HEM1 em janeiro, fora da conta "até 01/01" até o S5) e a linha de alcance depois do #32', N === 32 && t.lineAfter === 32 && /LINHA DE ALCANCE — até 01\/01: 32 módulos/.test(t.line), t.counts.split('\n').slice(0, 6).join(' | '));
+        check('contagem: fechados 0 · dentro 32 · fora ' + (t.rows.length - 32), /0\nFechados na Trilha/.test(t.counts) && /32\nDentro do alcance/.test(t.counts) && new RegExp((t.rows.length - 32) + '\\nFora').test(t.counts), t.counts.slice(0, 160));
         check('cabeçalho "🛤️ TRILHA AUTÔNOMA — 26/10/2026 → 01/01/2027"', /🛤️ TRILHA AUTÔNOMA — 26\/10\/2026 → 01\/01\/2027/.test(t.counts));
         const rampRows = await page.evaluate(() => [...document.querySelectorAll('[data-t="trilha-ramp"] [data-tue]')].map(r => r.getAttribute('data-tue') + ' ' + r.innerText.replace(/\n/g, ' ')));
         check('rampa: 10 semanas, 1º dia 26/10 (8 dias) e depois as terças 03/11 … 29/12; valores 3·4·4·4·4·4·4·5·4·0', rampRows.length === 10 && rampRows[0].startsWith('2026-10-26 T1 · 26/10–02/11') && rampRows[1].startsWith('2026-11-03 T2 · 03/11–09/11') && rampRows[9].startsWith('2026-12-29 T10 · 29/12–01/01') && JSON.stringify(rampRows.map(r => Number((r.match(/^\S+ T\d+ · \S+ (?:− )?(\d)/) || [])[1]))) === '[3,4,4,4,4,4,4,5,4,0]', rampRows.join(' | '));
@@ -192,7 +195,8 @@ const DEFAULT12 = [5, 6, 14, 19, 24, 32, 34, 85, 86, 1, 2, 3];
         const rampBefore = t2.counts.match(/cabem (\d+)/)[1];
         await page.evaluate(() => { const r = document.querySelector('[data-t="trilha-ramp"] [data-tue="2026-12-15"]'); const b = [...r.querySelectorAll('button')].find(b => b.innerText.trim() === '+'); b.click(); }); await page.waitForTimeout(400);
         const cfgC = await getLS(page, CFG); const t3 = await trilhaRows(page);
-        check('+ na T8 (15/12) ⇒ trilhaRamp[15/12] = 6 e a conta muda (' + rampBefore + ' → ' + t3.counts.match(/cabem (\d+)/)[1] + ')', cfgC.trilhaRamp && cfgC.trilhaRamp['2026-12-15'] === 6 && Number(t3.counts.match(/cabem (\d+)/)[1]) === Number(rampBefore) + 1, JSON.stringify(cfgC.trilhaRamp));
+        const t8row = await page.evaluate(() => ((document.querySelector('[data-t="trilha-ramp"] [data-tue="2026-12-15"]') || {}).innerText || '').replace(/\n/g, ' '));
+        check('+ na T8 (15/12) ⇒ trilhaRamp[15/12] = 6; com 1 aula por dia a 6ª aula não cabe na T8 (15, 16, 17, 19 e 20/12 já têm aula; 18/12 é simulado e 21/12 o dia leve) e o gatilho estrito não vale ⇒ a linha da T8 diz "1 não coube" e a conta fica (' + rampBefore + ' → ' + t3.counts.match(/cabem (\d+)/)[1] + ')', cfgC.trilhaRamp && cfgC.trilhaRamp['2026-12-15'] === 6 && Number(t3.counts.match(/cabem (\d+)/)[1]) === Number(rampBefore) && /1 não coube/.test(t8row), JSON.stringify(cfgC.trilhaRamp) + ' · ' + t8row);
         const frozenRow = await page.evaluate(() => { const r = document.querySelector('[data-t="trilha-ramp"] [data-tue="2026-10-26"]'); return r ? [...r.querySelectorAll('button')].map(b => b.innerText.trim()) : null; });
         check('semana congelada (T1, chave 26/10) não tem − / +', Array.isArray(frozenRow) && !frozenRow.length, JSON.stringify(frozenRow));
         check('nenhuma linha de rampa para a semana de transição (20/10)', !(await page.evaluate(() => !!document.querySelector('[data-t="trilha-ramp"] [data-tue="2026-10-20"]'))));
@@ -210,7 +214,7 @@ const DEFAULT12 = [5, 6, 14, 19, 24, 32, 34, 85, 86, 1, 2, 3];
         await markUntil(S.page, '2026-11-02'); await S.page.evaluate(() => { const t = JSON.parse(localStorage.getItem('medplanner_trail_v1')); t[5].accSelagem = 85; t[6].accSelagem = 85; localStorage.setItem('medplanner_trail_v1', JSON.stringify(t)); });
         let page = await S.reopen('2026-11-03');
         const cfg = await getLS(page, CFG); const W = cfg.trilhaWeeks['2026-11-03'] || {};
-        check('T2 congelada: trilhaWeeks[03/11] = { q: 4, base: 4, held: false, mods: [19, 24, 32, 34] } (a T1 de 8 dias fechou)', W.q === 4 && W.base === 4 && W.held === false && JSON.stringify(W.mods) === '[19,24,32,34]', JSON.stringify(W));
+        check('T2 congelada: trilhaWeeks[03/11] = { q: 4, base: 4, held: false, mods: [19, 24, 32], short 1 } (a T1 de 8 dias fechou; 1 aula por dia: o 4º não coube — 03/11 plantão longo, a cadeia por 04 ou 05/11 passaria de 14,5h em 05/11, 06/11 simulado, 07/11 dia leve, 09/11 com aula e plantão; o gatilho estrito só valeu para a 2ª aula de 08/11)', W.q === 4 && W.base === 4 && W.held === false && JSON.stringify(W.mods) === '[19,24,32]' && W.short === 1 && !W.shortWhy, JSON.stringify(W));
         check('sem ⏳ (tudo marcado até 02/11)', !(await banner(page, 'trilha-pending')));
         const w = await readWeekT(page); Object.values(w).forEach(d => console.log(fmt(d)));
         const ter = w['03/11'], sex = w['06/11'];
@@ -219,8 +223,8 @@ const DEFAULT12 = [5, 6, 14, 19, 24, 32, 34, 85, 86, 1, 2, 3];
         const map = await trailMap(page, 2);
         const bad = Object.entries(map).filter(([, m]) => ['2026-11-03', '2026-11-06', '2026-11-10', '2026-11-12'].some(d => Object.values(m).includes(d)));
         check('nenhuma etapa em 03/11, 06/11, 10/11 e 12/11 (plantões longos e simulado)', !bad.length, JSON.stringify(bad));
-        const okChain = [19, 24, 32, 34].every(id => { const m = map[id] || {}; return m.aula && m.quest && m.apost && m.seal && !Object.keys(m).some(k => /_dup/.test(k)) && dd(m.aula, m.quest) >= 1 && dd(m.aula, m.quest) <= 2 && dd(m.quest, m.apost) >= 1 && dd(m.quest, m.apost) <= 2 && dd(m.apost, m.seal) >= 2 && dd(m.apost, m.seal) <= 5; });
-        check('módulos novos (19, 24, 32, 34): 4 etapas em dias distintos, dentro das faixas', okChain, JSON.stringify([19, 24, 32, 34].map(id => [id, map[id]])));
+        const okChain = [19, 24, 32].every(id => { const m = map[id] || {}; return m.aula && m.quest && m.apost && m.seal && !Object.keys(m).some(k => /_dup/.test(k)) && dd(m.aula, m.quest) >= 1 && dd(m.aula, m.quest) <= 2 && dd(m.quest, m.apost) >= 1 && dd(m.quest, m.apost) <= 2 && dd(m.apost, m.seal) >= 2 && dd(m.apost, m.seal) <= 5; }); // 1 aula por dia (S3b): a T2 abre 3
+        check('módulos novos (19, 24, 32): 4 etapas em dias distintos, dentro das faixas', okChain, JSON.stringify([19, 24, 32].map(id => [id, map[id]])));
         // CIR1 · Trauma II selado em 02/11 com 85% ⇒ D+7 em +10 dias = QUI 12/11 (plantão longo)
         await page.evaluate(() => { const c = JSON.parse(localStorage.getItem('medplanner_config_v1')); c.manualWeek = null; localStorage.setItem('medplanner_config_v1', JSON.stringify(c)); });
         page = await S.reopen('2026-11-10'); await markUntil(page, '2026-11-11'); page = await S.reopen('2026-11-12');
@@ -281,48 +285,64 @@ const DEFAULT12 = [5, 6, 14, 19, 24, 32, 34, 85, 86, 1, 2, 3];
         const cfg = await getLS(page, CFG); const W = cfg.trilhaWeeks['2026-12-29'] || {};
         check('Sem.52 congela com q 0 (nenhum módulo novo) e a recolocação automática roda: trilhaFinalAutoAt = "2026-12-29|0"', W.q === 0 && JSON.stringify(W.mods) === '[]' && cfg.trilhaFinalAutoAt === '2026-12-29|0', JSON.stringify([W, cfg.trilhaFinalAutoAt]));
         const P = cfg.trilhaPlan; console.log('   plano final:', JSON.stringify({ 6: P[6], 14: P[14], 19: P[19] }));
-        const inWin = (d) => d == null || (d >= '2026-12-29' && d <= '2027-01-01');
-        check('etapas abertas de 6, 14 e 19 recolocadas entre 29/12 e 01/01 (ou listadas como fora), com hist "final"', [6, 14, 19].every(id => STG.every(ts => (tr5[id] && tr5[id][FIELD[ts]]) || inWin(P[id][ts]))) && [6, 14, 19].every(id => (P[id].hist || []).some(h => h.why === 'final')), JSON.stringify([6, 14, 19].map(id => [id, P[id].hist])));
+        const inWin = (ts, d) => d == null || (d >= '2026-12-29' && (ts !== 'aula' || d <= '2027-01-01')); // regra de 01/01 (S3b; DELA 8): aula só até 01/01; questões, apostila e selagem podem ir para janeiro
+        check('etapas abertas de 6, 14 e 19 recolocadas a partir de 29/12 — aula até 01/01; questões, apostila e selagem podem ir para janeiro (ou sem dia) — com hist "final"', [6, 14, 19].every(id => STG.every(ts => (tr5[id] && tr5[id][FIELD[ts]]) || inWin(ts, P[id][ts]))) && [6, 14, 19].every(id => (P[id].hist || []).some(h => h.why === 'final')), JSON.stringify([6, 14, 19].map(id => [id, P[id].hist])));
         check('nada em ordem errada: datas crescentes na cadeia de cada módulo', [6, 14, 19].every(id => { const ds = STG.map(ts => (tr5[id] && tr5[id][STAMP[ts]]) || P[id][ts]).filter(Boolean); return ds.every((d, i) => i === 0 || d > ds[i - 1]); }));
         const log = cfg.trilhaFinalLog || {}; const fin = await banner(page, 'trilha-final');
-        check('aviso 📦 da semana final com o que mudou e a carga dia a dia', !!fin && /📦 Semana final \(29\/12\)/.test(fin.text) && /Carga dia a dia: TER 29\/12 [\d,]+h · QUA 30\/12 [\d,]+h · QUI 31\/12 [\d,]+h · SEX 01\/01 [\d,]+h/.test(fin.text), fin && fin.text);
+        check('aviso 📦 da semana final com o que mudou e a carga dia a dia, de 29/12 até o último dia com etapa das cadeias abertas (janeiro inclusive; X23, sem "01/01 só selagem")', !!fin && /📦 Semana final \(29\/12\)/.test(fin.text) && /Carga dia a dia: TER 29\/12 [\d,]+h · QUA 30\/12 [\d,]+h · QUI 31\/12 [\d,]+h · SEX 01\/01 [\d,]+h( · (SÁB|DOM|SEG|TER|QUA|QUI|SEX) \d\d\/01 [\d,]+h)*\.$/.test(fin.text.trim()) && !/só selagem/.test(fin.text), fin && fin.text);
         const w = await readWeekT(page); Object.values(w).forEach(d => console.log(fmt(d)));
         check('nenhuma aula no dia leve (29/12) nem no feriado 31/12; nenhum módulo novo na semana', !w['29/12'].blocks.some(b => b.ts === 'aula' && !b.au) && !w['31/12'].blocks.some(b => b.ts === 'aula') && !Object.values(w).some(d => d.blocks.some(b => b.tm != null && ![5, 6, 14, 19].includes(b.tm))));
-        check('TER 29/12: bloco 📦 de exportação', has(w['29/12'], /^📦 Exportar da plataforma o que é seu/));
+        check('TER 29/12: bloco 📦 da última semana de aula nova (X05: o que segue em janeiro e o que continua disponível; nada a exportar)', has(w['29/12'], /^📦 Última semana de aula nova \(até 01\/01\)/) && !has(w['29/12'], /Exportar/));
         check('QUI 31/12: feriado mais leve (🎄, 📚 a partir de 3h)', /🎄 Feriado \(véspera de Ano-Novo\) — dia mais leve, só o que couber sem estragar o dia · 📚 a partir de 3h/.test(w['31/12'].dayType), w['31/12'].dayType);
         const sexta = w['01/01'];
-        check('SEX 01/01: só selagens + 🏁 Encerramento; sem simulado pela regra (último dia)', sexta.blocks.filter(b => b.tm != null).every(b => b.ts === 'seal') && has(sexta, /^🏁 Encerramento: conferir selagens pendentes · exportar os materiais da plataforma · 💾 backup final/) && !has(sexta, /SIMULADO NA ÍNTEGRA/) && /01\/01 — último dia de acesso: sem simulado pela regra/.test(sexta.simBtn || '') && /Último dia de acesso à plataforma/.test(sexta.dayType), sexta.simBtn + ' | ' + sexta.dayType);
+        check('SEX 01/01 é dia comum (aceita qualquer etapa) e sem simulado pela regra: 🏁 "Último dia de aula nova…" (X06), botão "01/01 — último dia de aula nova" (X32), dayType "Último dia de aula nova — sem simulado pela regra…" (X07)', has(sexta, /^🏁 Último dia de aula nova: confira as cadeias que seguem abertas para janeiro · 💾 backup do app — o balanço das aulas está na aba Trilha$/) && !has(sexta, /SIMULADO NA ÍNTEGRA/) && /01\/01 — último dia de aula nova: sem simulado pela regra/.test(sexta.simBtn || '') && /^Último dia de aula nova — sem simulado pela regra: etapas planejadas abaixo/.test(sexta.dayType), sexta.simBtn + ' | ' + sexta.dayType + ' | etapas: ' + sexta.blocks.filter(b => b.tm != null && !b.au).map(b => b.tm + ':' + b.ts).join(' '));
         // 💾 backup pelo banner 📦
         const [dl] = await Promise.all([page.waitForEvent('download'), clickIn(page, 'trilha-export', '💾 Baixar backup do app')]);
         const data = JSON.parse(require('fs').readFileSync(await dl.path(), 'utf8'));
         check('💾 pelo 📦: medplanner_last_backup = 29/12 e o arquivo traz medplanner_trail_v1', (await page.evaluate(() => localStorage.getItem('medplanner_last_backup'))) === '2026-12-29' && !!data.data['medplanner_trail_v1'], Object.keys(data.data).join(','));
         // ligar o simulado de 01/01 ⇒ a recolocação roda de novo (chave |1) e nenhuma etapa fica em 01/01
-        await clickDate(page, '01/01'); await page.evaluate(() => { const b = [...document.querySelectorAll('button')].find(x => /01\/01 — último dia de acesso/.test(x.innerText)); b.click(); }); await page.waitForTimeout(400);
+        await clickDate(page, '01/01'); await page.evaluate(() => { const b = [...document.querySelectorAll('button')].find(x => /01\/01 — último dia de aula nova/.test(x.innerText)); b.click(); }); await page.waitForTimeout(400); // X32
         page = await S.reopen('2026-12-29');
         const cfgB = await getLS(page, CFG);
-        check('simulado em 01/01 ligado ⇒ trilhaFinalAutoAt = "2026-12-29|1" e nenhuma etapa planejada em 01/01', cfgB.trilhaFinalAutoAt === '2026-12-29|1' && !Object.values(cfgB.trilhaPlan).some(p => STG.some(ts => p[ts] === '2027-01-01')), cfgB.trilhaFinalAutoAt);
+        const on0101 = Object.entries(cfgB.trilhaPlan).filter(([, p]) => STG.some(ts => p[ts] === '2027-01-01')).map(([id, p]) => id + ':' + STG.filter(ts => p[ts] === '2027-01-01').join('+')); console.log('   plano em 01/01 com o simulado religado:', on0101.join(' · ') || 'nada', '·', JSON.stringify(Object.fromEntries([6, 14, 19].map(id => [id, STG.map(ts => cfgB.trilhaPlan[id][ts]).join(' ')]))));
+        const pendB = (await banner(page, 'trilha-pending')) || { text: '' }, aulas0101 = Object.entries(cfgB.trilhaPlan).filter(([id, p]) => p.aula === '2027-01-01' && !(tr5[id] || {}).aula).map(([id]) => id); // testes I3 (S3b): aula em 01/01 só de módulo sem outro dia até 01/01 (C4), e então como ⏳ "que virou simulado"
+        check('simulado em 01/01 ligado ⇒ trilhaFinalAutoAt = "2026-12-29|1" e nenhuma questão, apostila ou selagem em 01/01; aula em 01/01 só de módulo sem outro dia até 01/01, como ⏳ "que virou simulado" (C4)', cfgB.trilhaFinalAutoAt === '2026-12-29|1' && !Object.values(cfgB.trilhaPlan).some(p => ['quest', 'apost', 'seal'].some(ts => p[ts] === '2027-01-01')) && (!aulas0101.length || /aula de SEX 01\/01, que virou simulado/.test(pendB.text)), cfgB.trilhaFinalAutoAt + ' · em 01/01: ' + (on0101.join(' · ') || 'nada'));
         // Adiantar na semana final = desfecho C (sem botão Aplicar)
         await markUntil(page, '2027-01-01'); page = await S.reopen('2026-12-29');
         const adv = await banner(page, 'trilha-adv');
         if (adv) { await clickIn(page, 'trilha-adv', '⏩ Adiantar próximo módulo'); }
         const adv2 = await banner(page, 'trilha-adv');
-        check('Adiantar na semana final: "Semana final: sem módulo novo — o acesso termina em 01/01/2027" e só "Fechar"', !!adv2 && /Semana final: sem módulo novo — o acesso termina em 01\/01\/2027/.test(adv2.text) && !adv2.btns.includes('Aplicar') && adv2.btns.includes('Fechar'), adv2 && adv2.text);
+        check('Adiantar na semana final: "Semana de 29/12: o ⏩ não abre módulo novo (o ritmo desta semana é o da rampa: 0)." (X20 "final") e só "Fechar"', !!adv2 && /Semana de 29\/12: o ⏩ não abre módulo novo \(o ritmo desta semana é o da rampa: 0\)\./.test(adv2.text) && !adv2.btns.includes('Aplicar') && adv2.btns.includes('Fechar'), adv2 && adv2.text);
         S.lastLS = await page.evaluate(() => { const o = {}; for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); o[k] = localStorage.getItem(k); } return o; });
-        // TR5b · 02/01/2027: tela de encerramento com o balanço, nada novo gravado
+        // TR5b · 02/01/2027 (cauda; regra de 01/01, S2): o Cronograma abre na C1 ("Janeiro · C1"), ainda com a tela de encerramento (o balanço muda no S5);
+        // a C1 congela (q 0) e o trilhaPlan não muda; "nada mais é gravado" passa para o dia depois do fim da cauda (horizonte de revisões R-a, §2.2 e §5)
         page = await S.reopen('2027-01-02');
         const bal = await banner(page, 'trilha-balanco');
         check('TR5b 02/01/2027: o Cronograma mostra a tela de encerramento com o balanço (fechados com %, fora do alcance, lembrete do backup)', !!bal && /🏁 Encerramento da Trilha \(26\/10\/2026 → 01\/01\/2027\)/.test(bal.text) && /Módulos fechados \(as 4 etapas\): \d+/.test(bal.text) && /✓ CIR1 · Trauma I/.test(bal.text) && /Fora do alcance \(seguem no novo cursinho a partir de 04\/01\)/.test(bal.text) && /💾 Lembrete/.test(bal.text), bal && bal.text.slice(0, 300));
+        const hwC1 = await headerWeek(page), tabsC1 = await listDayTabs(page), bodyC1 = await bodyText(page);
+        check('TR5b 02/01/2027: o Cronograma abre na C1 (Sem.53 = SÁB 02/01 a SEG 04/01, 3 abas) com o badge "Janeiro · C1" e sem "prévia — congela quando a semana começar"', hwC1.week === 53 && hwC1.range === '02/01–04/01' && tabsC1.map(t => t.code + ' ' + t.date).join() === 'SAB 02/01,DOM 03/01,SEG 04/01' && /Janeiro · C1/.test(bodyC1) && !/prévia — congela quando a semana começar/.test(bodyC1), JSON.stringify([hwC1, tabsC1.map(t => t.code + ' ' + t.date)]));
         const after = await page.evaluate(() => { const o = {}; for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); o[k] = localStorage.getItem(k); } return o; });
-        check('TR5b: depois de 01/01 nada novo é gravado (config igual)', after[CFG] === S.lastLS[CFG]);
+        const cA = JSON.parse(after[CFG]), cB = JSON.parse(S.lastLS[CFG]); const chg = [...new Set(Object.keys(cA).concat(Object.keys(cB)))].filter(k => JSON.stringify(cA[k]) !== JSON.stringify(cB[k])); const C1 = (cA.trilhaWeeks || {})['2027-01-02'] || null;
+        check('TR5b: em 02/01 a C1 congela com q 0 (nenhum módulo, sem dia leve previsto) e o trilhaPlan não muda — o config só ganha a C1 em trilhaWeeks; o registro não muda', JSON.stringify(chg) === '["trilhaWeeks"]' && !!C1 && C1.q === 0 && JSON.stringify(C1.mods) === '[]' && C1.light === null && JSON.stringify(Object.keys(cA.trilhaWeeks).filter(k => !(k in (cB.trilhaWeeks || {})))) === '["2027-01-02"]' && JSON.stringify(cA.trilhaPlan) === JSON.stringify(cB.trilhaPlan) && after[TRL] === S.lastLS[TRL], JSON.stringify({ chg, C1 }));
+        // fim da cauda: cadeia aberta mantém a cauda viva (o simulado religado em 01/01 deixou etapas sem dia); ela fecha em 02/01 o que ficou aberto (carimbo 02/01) —
+        // então o último lembrete é a revisão D+30 mais tardia (sem a R1: fechamento + 30) e, no dia seguinte, nada é gravado
+        const trF = JSON.parse(after[TRL] || '{}'); const openIds = Object.keys(cA.trilhaPlan).filter(id => !STG.every(ts => (trF[id] || {})[FIELD[ts]]));
+        openIds.forEach(id => { const r = (trF[id] = trF[id] || {}); STG.forEach(ts => { if (!r[FIELD[ts]]) { r[FIELD[ts]] = true; r[STAMP[ts]] = '2027-01-02'; } }); if (!r.completedAt) r.completedAt = '2027-01-02'; });
+        await setLS(page, TRL, trF);
+        const revEnd = Object.values(trF).filter(r => r.completedAt && !r.reviewD30Done && !r.r1DoneAt).map(r => addDays(r.completedAt, 30)).sort().pop() || null, dEnd = revEnd ? addDays(revEnd, 1) : null;
+        check('TR5b (premissa): ' + Object.keys(cA.trilhaPlan).length + ' cadeias no plano, abertas em 02/01: ' + (openIds.join(', ') || 'nenhuma') + ' (fechadas por ela em 02/01); nenhuma revisão feita; último lembrete (D+30) = ' + (revEnd ? br(revEnd) : '—'), !!revEnd && Object.values(trF).every(r => !r.reviewD7Done && !r.reviewD30Done) && Object.keys(cA.trilhaPlan).every(id => STG.every(ts => (trF[id] || {})[FIELD[ts]])), 'abertas: ' + openIds.join(','));
+        if (dEnd) { page = await S.reopen(dEnd); const lsEnd = await page.evaluate(() => { const o = {}; for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); o[k] = localStorage.getItem(k); } return o; });
+            check('TR5b: no dia depois do fim da cauda (' + br(dEnd) + ') nada é gravado (config igual ao de 02/01; registro igual ao que ela marcou)', lsEnd[CFG] === after[CFG] && JSON.stringify(JSON.parse(lsEnd[TRL])) === JSON.stringify(trF), lsEnd[CFG] === after[CFG] ? 'config igual' : 'config mudou: ' + Object.keys(JSON.parse(lsEnd[CFG])).filter(k => JSON.stringify(JSON.parse(lsEnd[CFG])[k]) !== JSON.stringify(cA[k])).join(',')); }
     });
 
 
     // ── Simulados na janela = exatamente 06/11 e 18/12 (20/11 e 04/12 caem em plantão; 01/01 sem simulado; 23/10, na transição, nem tem botão) ──
     await scenario(browser, 'TRsim-simulados-janela', '2026-10-19', {}, async (S) => {
-        const page = S.page; await navWeek(page, 1); const sims = [], btn = {};
-        for (let k = 0; k < 11; k++) { const w = await readWeekT(page); Object.entries(w).forEach(([d, x]) => { if (has(x, /SIMULADO NA ÍNTEGRA/)) sims.push(d); if (x.simBtn) btn[d] = x.simBtn; }); if (k < 10) await navWeek(page, 1); }
-        check('simulados de 20/10 a 01/01 = exatamente 06/11 e 18/12', sims.join() === '06/11,18/12', sims.join());
-        check('20/11 e 04/12: "Sexta de plantão: sem simulado pela regra"; 01/01: "último dia de acesso: sem simulado pela regra"; 23/10 (transição): sem botão', ['20/11', '04/12'].every(d => /Sexta de plantão: sem simulado pela regra/.test(btn[d] || '')) && /01\/01 — último dia de acesso: sem simulado pela regra/.test(btn['01/01'] || '') && !btn['23/10'], JSON.stringify(btn));
+        const page = S.page; await navWeek(page, 1); const sims = [], btn = {}; let nW = 0;
+        for (let k = 0; k < 40; k++) { const h0 = await headerWeek(page); const w = await readWeekT(page); nW++; Object.entries(w).forEach(([d, x]) => { if (has(x, /SIMULADO NA ÍNTEGRA/)) sims.push(d); if (x.simBtn) btn[d] = x.simBtn; }); await navWeek(page, 1); if ((await headerWeek(page)).week === h0.week) break; } // até a última semana visível (§10.1 a; regra de 01/01, S3b)
+        const jan = sims.filter(d => d.slice(3) === '01');
+        check('simulados de 20/10 a 01/01 = exatamente 06/11 e 18/12; em janeiro, pela mesma quinzena, só 15/01 e 29/01 (se a semana estiver no calendário) — ' + nW + ' semanas lidas', sims.filter(d => d.slice(3) !== '01').join() === '06/11,18/12' && jan.every(d => ['15/01', '29/01'].includes(d)) && (!btn['08/01'] || /📚 Sexta de estudo ativo/.test(btn['08/01'])), sims.join());
+        check('20/11 e 04/12: "Sexta de plantão: sem simulado pela regra"; 01/01: "último dia de aula nova: sem simulado pela regra" (X32); 23/10 (transição): sem botão', ['20/11', '04/12'].every(d => /Sexta de plantão: sem simulado pela regra/.test(btn[d] || '')) && /01\/01 — último dia de aula nova: sem simulado pela regra/.test(btn['01/01'] || '') && !btn['23/10'], JSON.stringify(btn));
     });
 
     // ── TR6 · fechar a semana pela interface e Adiantar (cadeia inserida nos dias, linha de alcance +1, Cancelar não grava) ──
@@ -330,7 +350,7 @@ const DEFAULT12 = [5, 6, 14, 19, 24, 32, 34, 85, 86, 1, 2, 3];
         const cfg0 = await getLS(S.page, CFG); const T1 = cfg0.trilhaWeeks['2026-10-26'];
         const stagesT1 = []; Object.entries(cfg0.trilhaPlan).forEach(([id, p]) => STG.forEach(ts => { if (p[ts] >= '2026-10-26' && p[ts] <= '2026-11-02') stagesT1.push([Number(id), ts, p[ts]]); }));
         stagesT1.sort((a, b) => a[2] < b[2] ? -1 : 1); const last = stagesT1[stagesT1.length - 1];
-        await markUntil(S.page, '2026-11-02', [[last[0], last[1]]]); let page = await S.reopen('2026-10-28');
+        await markUntil(S.page, '2026-11-02', [[last[0], last[1]]]); await S.page.evaluate(() => { const t = JSON.parse(localStorage.getItem('medplanner_trail_v1') || '{}'); Object.values(t).forEach(r => Object.keys(r).forEach(k => { if (/At$/.test(k) && r[k] > '2026-10-28') r[k] = '2026-10-28'; })); localStorage.setItem('medplanner_trail_v1', JSON.stringify(t)); }); let page = await S.reopen('2026-10-28'); // premissa (S3b): ela marcou a T1 até hoje (28/10) — carimbo = min(data do bloco, hoje), a regra do app. Com o carimbo nos dias futuros planejados (28 e 30/10 com aula, 29/10 de plantão), a cadeia do #4 não caberia na semana com 1 aula por dia e o ⏩ daria B (B-P1 ganha de A-P2; DELA 2) — o TR7 cobre o B
         const t0 = await trilhaRows(page); const N0 = Number(t0.counts.match(/cabem (\d+)/)[1]); await clickTab(page, 'CRONOGRAMA');
         check('com uma etapa da semana (8 dias, até SEG 02/11) ainda aberta, o ⏩ não aparece', !(await banner(page, 'trilha-adv')));
         await clickDate(page, br(last[2]));
@@ -353,7 +373,7 @@ const DEFAULT12 = [5, 6, 14, 19, 24, 32, 34, 85, 86, 1, 2, 3];
         check('a aula de CIR2 Cicatrização aparece no dia proposto (cadeia inserida nos dias)', dA.blocks.some(b => b.tm === 19 && b.ts === 'aula'));
         check('o ⏩ some (a semana tem etapa aberta de novo)', !(await banner(page, 'trilha-adv')));
         const t1 = await trilhaRows(page); const N1 = Number(t1.counts.match(/cabem (\d+)/)[1]);
-        check('linha de alcance avança um: N ' + N0 + ' → ' + N1, N1 === N0 + 1 && N0 === 36 && t1.lineAfter === N1, t1.line);
+        check('linha de alcance avança um: N ' + N0 + ' → ' + N1 + ' (N = 32 na prévia: 1 aula por dia, K e as selagens de janeiro fora da conta "até 01/01")', N1 === N0 + 1 && N0 === 32 && t1.lineAfter === N1, t1.line);
     });
 
     // ── TR7 · Adiantar com dias insuficientes (SEG 02/11, último dia da T1): desfecho B "Começar agora"; na terça a T2 abre sem o 19 ──
@@ -367,7 +387,7 @@ const DEFAULT12 = [5, 6, 14, 19, 24, 32, 34, 85, 86, 1, 2, 3];
         check('Começar agora: trilhaPlan[19].via = "adv", aula 02/11', cfg.trilhaPlan[19] && cfg.trilhaPlan[19].via === 'adv' && cfg.trilhaPlan[19].aula === '2026-11-02', JSON.stringify(cfg.trilhaPlan[19]));
         page = await S.reopen('2026-11-03');
         const W = (await getLS(page, CFG)).trilhaWeeks['2026-11-03'];
-        check('na terça 03/11 a T2 abre os próximos da fila: mods [24, 32, 34, 85] (o adiantado não conta para fechar a semana)', W && JSON.stringify(W.mods) === '[24,32,34,85]' && W.q === 4, JSON.stringify(W));
+        check('na terça 03/11 a T2 abre os próximos da fila: mods [24, 32, 34], q 4 e 1 "não coube" (o adiantado não conta para fechar a semana; 1 aula por dia — a 4ª aula não cabe na T2)', W && JSON.stringify(W.mods) === '[24,32,34]' && W.q === 4 && W.short === 1 && !W.shortWhy, JSON.stringify(W));
     });
 
     // ── TR8 · subida destravada 🔓 (a semana passada fechou depois do congelamento) ──
@@ -380,9 +400,11 @@ const DEFAULT12 = [5, 6, 14, 19, 24, 32, 34, 85, 86, 1, 2, 3];
         const rise = await banner(page, 'trilha-rise');
         check('marcar a selagem de CIR1 no card ⇒ "🔓 A semana passada fechou — o ritmo desta semana pode subir para 4."', !!rise && /🔓 A semana passada fechou — o ritmo desta semana pode subir para 4\./.test(rise.text) && rise.btns.includes('Ver proposta') && rise.btns.includes('Agora não'), rise && rise.text);
         await clickIn(page, 'trilha-rise', 'Ver proposta'); const pv = await banner(page, 'trilha-rise'); console.log('   💡', pv.text.replace(/\n/g, ' '));
-        await clickIn(page, 'trilha-rise', 'Aplicar');
+        const cfgP = await getLS(page, CFG); // regra de 01/01 (S3b): 1 aula por dia + gatilho estrito no 🔓 (C1) — a 4ª aula da T2 não cabe (como no TR2): 04 e 05/11 passariam de 14,5h (plantões curtos), 08/11 já tem 2 aulas, 09/11 tem plantão (sem 2ª aula)
+        check('🔓 "Ver proposta": #7 CIR3 Hérnias da Parede Abdominal não cabe com 1 aula por dia (X19 "cap": "não cabe nos dias desta semana sem quebrar os intervalos ou passar de 14,5h"), sem "Aplicar"', /#7 CIR3 Hérnias da Parede Abdominal: não cabe nos dias desta semana sem quebrar os intervalos ou passar de 14,5h/.test(pv.text) && !pv.btns.includes('Aplicar') && pv.btns.includes('Cancelar'), pv.text);
+        await clickIn(page, 'trilha-rise', 'Cancelar');
         const cfg = await getLS(page, CFG); const W2 = cfg.trilhaWeeks['2026-11-03'];
-        check('Aplicar: q 4, held false, rise [34], trilhaPlan[34].via = "rise"', W2.q === 4 && W2.held === false && JSON.stringify(W2.rise) === '[34]' && cfg.trilhaPlan[34] && cfg.trilhaPlan[34].via === 'rise', JSON.stringify(W2));
+        check('Cancelar: nada gravado — a T2 continua { q 3, held true } e o 34 fica fora do plano', JSON.stringify(cfg) === JSON.stringify(cfgP) && W2.q === 3 && W2.held === true && !cfg.trilhaPlan[34], JSON.stringify(W2));
     });
     await scenario(browser, 'TR8b-subida-agora-nao', '2026-10-26', {}, async (S) => {
         await markUntil(S.page, '2026-11-02', [[5, 'seal']]); let page = await S.reopen('2026-11-03');
@@ -426,10 +448,10 @@ const DEFAULT12 = [5, 6, 14, 19, 24, 32, 34, 85, 86, 1, 2, 3];
         const before = await getLS(page, CFG);
         await page.evaluate(() => { const b = [...document.querySelectorAll('[data-t="trilha-gap"] button')].find(x => /^Propor a aula primeiro$/.test(x.innerText.trim())); b.click(); }); await page.waitForTimeout(350);
         const pv2 = await banner(page, 'trilha-pending'); console.log('   💡', pv2.text.replace(/\n/g, ' '));
-        check('"Propor a aula primeiro": a proposta reabre a cadeia de CIR2 · Urologia a partir da aula (aula, apostila e selagem de hoje em diante), e diz que as questões marcadas ficam como estão; nada gravado ainda', /CIR2 · Urologia · aula \S+ \d\d\/11/.test(pv2.text) && /↺ CIR2 · Urologia: cadeia reaberta a partir da aula — questões \(já marcadas\) ficam como estão/.test(pv2.text) && !(await page.$('[data-t="trilha-gap"]')) && JSON.stringify(await getLS(page, CFG)) === JSON.stringify(before), pv2.text.slice(0, 400));
+        check('"Propor a aula primeiro": a cadeia de CIR2 · Urologia é reaberta a partir da aula, mas com 1 aula por dia a aula não tem dia nos próximos 7 dias (04 e 05/11 ficam com as aulas de CIR1 · Trauma I e II; 06/11 simulado; 07/11 dia leve; 08/11 já tem 2 aulas e 09/11 uma; 10/11 plantão longo) ⇒ X17 "a aula não cabe nos próximos 7 dias com 1 aula por dia…", sem a linha ↺; nada gravado ainda', /CIR2 · Urologia: a aula não cabe nos próximos 7 dias com 1 aula por dia sem passar de 14,5h — mova o bloco da aula para o dia que quiser \(o app avisa se ela ficar como 2ª aula do dia\)\./.test(pv2.text) && !/↺ CIR2 · Urologia/.test(pv2.text) && !(await page.$('[data-t="trilha-gap"]')) && JSON.stringify(await getLS(page, CFG)) === JSON.stringify(before), pv2.text.slice(0, 600));
         await clickIn(page, 'trilha-pending', 'Aplicar');
-        const p14 = (await getLS(page, CFG)).trilhaPlan[14], t14 = (await getLS(page, TRL))[14];
-        check('Aplicar: aula ≥ 04/11, apostila e selagem depois, nas faixas; as questões continuam marcadas (01/11); orig preservado; histórico "recolocar"', p14.aula >= '2026-11-04' && p14.apost > p14.aula && p14.seal > p14.apost && dd(p14.apost, p14.seal) >= 2 && dd(p14.apost, p14.seal) <= 5 && t14.questoesD2 === true && t14.questoesD2At === '2026-11-01' && p14.orig.aula === '2026-10-30' && p14.hist.some(h => h.ts === 'aula' && h.why === 'recolocar'), JSON.stringify({ p14, t14 }));
+        const p14 = (await getLS(page, CFG)).trilhaPlan[14], t14 = (await getLS(page, TRL))[14], c14 = await getLS(page, CFG);
+        check('Aplicar grava só as propostas com dia (CIR1 · Trauma I e II, hist "recolocar"); CIR2 · Urologia fica como estava: aula 30/10 (⏳), questões marcadas (01/11), sem histórico', p14.aula === '2026-10-30' && JSON.stringify(p14.hist) === '[]' && t14.questoesD2 === true && t14.questoesD2At === '2026-11-01' && !t14.aula && [5, 6].every(id => c14.trilhaPlan[id].hist.some(h => h.why === 'recolocar')), JSON.stringify({ p14, t14 }));
     });
     await scenario(browser, 'TR9c-recolocar-marca-fora-de-ordem-marcar', '2026-10-26', {}, async (S) => {
         await setLS(S.page, TRL, seedGap); let page = await S.reopen('2026-11-04'); await clickTab(page, 'CRONOGRAMA');
@@ -437,6 +459,21 @@ const DEFAULT12 = [5, 6, 14, 19, 24, 32, 34, 85, 86, 1, 2, 3];
         await page.evaluate(() => { const b = [...document.querySelectorAll('[data-t="trilha-gap"] button')].find(x => /^Marquei a aula/.test(x.innerText.trim())); b.click(); }); await page.waitForTimeout(400);
         const t14 = (await getLS(page, TRL))[14], pv = await banner(page, 'trilha-pending');
         check('"Marquei a aula": a aula fica marcada com o carimbo do dia planejado (SEX 30/10, antes das questões); o aviso some e CIR2 · Urologia entra na proposta pelo que falta (apostila e selagem)', t14.aula === true && t14.aulaAt === '2026-10-30' && !(await page.$('[data-t="trilha-gap"]')) && /CIR2 · Urologia · apostila/.test(pv.text), JSON.stringify({ t14, pv: pv && pv.text.slice(0, 300) }));
+    });
+    // ── TR9c (regra de 01/01, S3b; §10.1 a, RM9, X16): depois de 01/01, com a aula em "missing", só "Marquei a aula (carimbo …)" — sem "Propor a aula primeiro" (seria aula nova);
+    //    com questões e selagem marcadas e a apostila não, "Propor a apostila primeiro" continua e propõe dias em janeiro ──
+    const gapT9 = (dt) => { const x = { aula: dt[0], quest: dt[1], apost: dt[2], seal: dt[3] }; return { wk: '2026-12-22', via: 'ramp', ...x, orig: { ...x }, hist: [] }; };
+    const cfgGap = { ...baseCfg, trilhaFirstOpen: '2026-10-26', trilhaWeeks: { '2026-12-22': { q: 2, base: 4, held: false, why: null, mods: [26, 27], adv: [], rise: [], short: 0, light: '2026-12-26', at: '2026-12-22' } }, trilhaPlan: { 26: gapT9(['2026-12-27', '2026-12-28', '2026-12-30', '2027-01-02']), 27: gapT9(['2026-12-28', '2026-12-30', '2027-01-01', '2027-01-03']) } };
+    const trGap = { 26: { questoesD2: true, questoesD2At: '2026-12-30' }, 27: { aula: true, aulaAt: '2026-12-28', questoesD2: true, questoesD2At: '2026-12-30', smartcard: true, smartcardAt: '2027-01-02' } };
+    await scenario(browser, 'TR9c-0301-aula-sem-marca-depois-de-0101', '2027-01-03', { [CFG]: cfgGap, [TRL]: trGap }, async (S) => {
+        const page = S.page; await clickIn(page, 'trilha-pending', 'Ver como recolocar'); const pv = await banner(page, 'trilha-pending'); console.log('   💡', pv.text.replace(/\n/g, ' '));
+        const gaps = await page.evaluate(() => [...document.querySelectorAll('[data-t="trilha-gap"]')].map(el => ({ id: el.getAttribute('data-id'), text: el.innerText, btns: [...el.querySelectorAll('button')].map(b => b.innerText.trim()) })));
+        const g26 = gaps.find(g => g.id === '26'), g27 = gaps.find(g => g.id === '27');
+        check('03/01 · PED2 (questões marcadas, aula não): X16 "⚠️ PED2 — Aleitamento Materno tem questões marcadas, mas a aula não. Se você assistiu, marque a aula no bloco do dia em que assistiu (aula nova só até 01/01)." — só "Marquei a aula (carimbo …)", sem "Propor a aula primeiro"', !!g26 && /^⚠️ PED2 — Aleitamento Materno tem questões marcadas, mas a aula não\. Se você assistiu, marque a aula no bloco do dia em que assistiu \(aula nova só até 01\/01\)\./.test(g26.text) && g26.btns.length === 1 && /^Marquei a aula \(carimbo /.test(g26.btns[0]) && !gaps.some(g => g.btns.some(b => /^Propor a aula primeiro$/.test(b))), JSON.stringify(gaps));
+        check('03/01 · HEM1 (selagem marcada, apostila não): o texto de sempre e "Propor a apostila primeiro" continua (RM9: o botão só some com a aula em missing)', !!g27 && /⚠️ HEM1 — Anemias I — Ferropriva, Megaloblástica, Doença Crônica tem selagem marcada, mas a apostila não\. Marque a apostila se você a fez, ou o app propõe a apostila primeiro\./.test(g27.text) && g27.btns.includes('Propor a apostila primeiro'), JSON.stringify(g27));
+        await page.evaluate(() => { const b = [...document.querySelectorAll('[data-t="trilha-gap"][data-id="27"] button')].find(x => /^Propor a apostila primeiro$/.test(x.innerText.trim())); b.click(); }); await page.waitForTimeout(350);
+        const pv2 = await banner(page, 'trilha-pending'); console.log('   💡', pv2.text.replace(/\n/g, ' '));
+        check('03/01 · "Propor a apostila primeiro": a cadeia de HEM1 reabre a partir da apostila, com dia em janeiro (teto por etapa), e diz que a selagem marcada fica', /💡 HEM1 · Anemias I — Ferropriva, Megaloblástica, Doença Crônica · apostila \S+ \d\d\/01 /.test(pv2.text) && /↺ HEM1 · Anemias I — Ferropriva, Megaloblástica, Doença Crônica: cadeia reaberta a partir de a apostila — selagem \(já marcada\) fica como está/.test(pv2.text), pv2.text.slice(0, 700));
     });
     // ── TR11 · mover etapa da Trilha com aviso de espaçamento (pode cruzar semanas; grava no plano, não materializa dias) ──
     const moveT = async (page, blockRe, toISO) => {
@@ -449,11 +486,13 @@ const DEFAULT12 = [5, 6, 14, 19, 24, 32, 34, 85, 86, 1, 2, 3];
     const clickMove = async (page) => { const a = await readAsk(page); await clickAsk(page, a && a.btns.includes('Mover só esta etapa') ? 'Mover só esta etapa' : 'Mover assim mesmo'); }; // só esta etapa (o diálogo curto do PR 2 diz "Mover só esta etapa")
     // ── TR18 · "Mover o fio todo junto" (paciente, 07/11 — PR 2): mover uma etapa com etapas sem marca depois dela abre o diálogo (curto, se os intervalos
     //    ficam); "Mover o fio todo (±N)" leva a etapa e as seguintes sem marca o mesmo N dias; dia bloqueado pergunta; nada depois de 01/01; grava só com "Aplicar" ──
-    const wiT = (iso) => iso < '2026-11-03' ? 0 : 1 + Math.floor(dd('2026-11-03', iso) / 7); // semana da Trilha (TER→SEG; a 1ª tem 8 dias)
+    const T_STARTS = (() => { const a = ['2026-10-20', '2026-10-26']; for (let d = '2026-11-03'; d <= '2026-12-29'; d = addDays(d, 7)) a.push(d); a.push('2027-01-02'); for (let d = '2027-01-05'; d <= '2027-06-28'; d = addDays(d, 7)) a.push(d); return a; })(); // inícios de POST_WEEKS do planner: transição, T1 (8 dias), terças até a T10 (29/12), C1 (SÁB 02/01–SEG 04/01) e as terças da cauda até PLAN_HZ (§10.1 a, testes I2)
+    const wiT = (iso) => T_STARTS.filter(s => s <= iso).length - 2; // semana da Trilha pela grade (T1 = 0, T10 = 9, C1 = 10): igual à conta antiga em 26/10–01/01; antes, wiT('2027-01-02') = wiT('2026-12-29') = 9
     const mkNav = (page, today) => { let off = 0; return async (iso) => { await clickTab(page, 'CRONOGRAMA'); const k = wiT(iso) - wiT(today); if (k !== off) { await navWeek(page, k - off); off = k; } await clickDate(page, br(iso)); }; };
     const escT = (t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const prepT = async (S, clock, mut, via) => { if (via) await S.reopen(via); let page = await S.reopen(clock); const c = await getLS(page, CFG); const t = (await getLS(page, TRL)) || {}; mut(c, t); await setLS(page, CFG, c); await setLS(page, TRL, t); return S.reopen(clock); };
     const setP = (c, id, d) => { c.trilhaPlan[id] = { ...c.trilhaPlan[id], aula: d[0], quest: d[1], apost: d[2], seal: d[3] }; };
+    const walkT = async (S, until) => { let page = S.page; for (let d = '2026-11-03'; d <= until; d = addDays(d, 7)) { await markUntil(page, addDays(d, -1)); page = await S.reopen(d); } return page; }; // premissa (S3b): "ela fez tudo no dia" até a terça `until` (como o TR17e). Com o app fechado desde 26/10 e nada marcado, as selagens atrasadas contam como cadeias abertas e o K (5) segura a rampa (C2/R10) — o NEF1 nem entraria na T4
     const moveStageT = async (page, nav, id, ts, fromIso, to) => { await nav(fromIso); const day = await readDay(page); const b = day.blocks.find(x => x.tm === id && x.ts === ts && !x.au); if (!b) throw new Error('bloco ' + id + '.' + ts + ' não está em ' + fromIso); await moveT(page, new RegExp('^' + escT(b.text.slice(0, 60))), to); return b; };
     const pronto = async (page) => { await page.evaluate(() => { const x = [...document.querySelectorAll('button')].find(y => y.innerText.trim() === '✓ Pronto'); if (x) x.click(); }); await page.waitForTimeout(200); };
     const readShift = (page) => page.evaluate(() => { const el = document.querySelector('[data-t="shift-prev"]'); if (!el) return null; const tx = (s) => { const e = el.querySelector(s); return e ? e.innerText.trim() : null; };
@@ -467,7 +506,7 @@ const DEFAULT12 = [5, 6, 14, 19, 24, 32, 34, 85, 86, 1, 2, 3];
     // TR18a · caso A (aula QUA, questões QUI, apostila SEX, selagem na TER seguinte): diálogo curto quando os intervalos ficam; aula → QUI com "+1 dia" leva tudo,
     //          intervalos idênticos; Cancelar não grava; orig preservado; hist "fio"; outro módulo intacto
     await scenario(browser, 'TR18a-fio-caso-A', '2026-10-26', {}, async (S) => {
-        let page = await prepT(S, '2026-11-17', (c) => setP(c, 1, ['2026-11-18', '2026-11-19', '2026-11-20', '2026-11-24']));
+        await walkT(S, '2026-11-17'); let page = await prepT(S, '2026-11-17', (c) => setP(c, 1, ['2026-11-18', '2026-11-19', '2026-11-20', '2026-11-24'])); // premissa (S3b): walkT — o NEF1 congela na T4 com 17, 18, 19 e 22/11
         const nav = mkNav(page, '2026-11-17'); const c0 = await getLS(page, CFG), t0 = await getLS(page, TRL);
         const b = await moveStageT(page, nav, 1, 'aula', '2026-11-18', '2026-11-17');
         let ask = await readAsk(page); console.log('   ', b.text.slice(0, 70), '|', ask && ask.text.replace(/\n/g, ' | '));
@@ -477,7 +516,8 @@ const DEFAULT12 = [5, 6, 14, 19, 24, 32, 34, 85, 86, 1, 2, 3];
         await moveStageT(page, nav, 1, 'aula', '2026-11-18', '2026-11-19'); ask = await readAsk(page); console.log('   ', ask && ask.text.replace(/\n/g, ' | '));
         check('TR18a · caso A: aula de QUA 18/11 para QUI 19/11 (dia das questões) ⇒ o aviso atual continua (mesmo dia) + a opção nova "Mover o fio todo (+1 dia)"', !!ask && /⚠️ Isso deixa/.test(ask.text) && ['Mover assim mesmo', 'Ver como reorganizar o fio', 'Mover o fio todo (+1 dia)', 'Cancelar'].every(x => ask.btns.includes(x)), ask && JSON.stringify(ask.btns));
         await clickAsk(page, 'Mover o fio todo (+1 dia)'); let sh = await readShift(page); logSh(sh);
-        check('TR18a · prévia: aula QUI 19/11 (seu movimento), questões SEX 20/11, apostila SÁB 21/11 (dia leve: 🌿, sem pergunta), selagem QUA 25/11 — cada uma com dia e carga; a carga já tira a etapa do módulo que sai do dia (sem ⚠️ falso na aula e nas questões)', !!sh && /^· Aula: QUA 18\/11 → QUI 19\/11 \(.*\) \(seu movimento\)$/.test(rowT(sh, 'aula')) && /^· Questões: QUI 19\/11 → SEX 20\/11 \(/.test(rowT(sh, 'quest')) && /^· Apostila: SEX 20\/11 → .*🌿 SÁB 21\/11 \(/.test(rowT(sh, 'apost')) && /^· Selagem: TER 24\/11 → .*QUA 25\/11 \(/.test(rowT(sh, 'seal')) && sh.qs.length === 0 && /🌿 SÁB 21\/11 é o dia leve da semana/.test(sh.text), sh && JSON.stringify(sh.rows));
+        const qRow18a = rowT(sh, 'quest'), qH18a = Number(((qRow18a.match(/SEX 20\/11 \(([\d,]+)h/) || [])[1] || 'NaN').replace(',', '.')); // premissa (S3b, walkT): SEX 20/11 (📚 5h) já tem a aula de outro módulo da T4 (1 aula por dia), a apostila de outro e uma selagem — o ⚠️ das questões ali é real
+        check('TR18a · prévia: aula QUI 19/11 (seu movimento), questões SEX 20/11, apostila SÁB 21/11 (dia leve: 🌿, sem pergunta), selagem QUA 25/11 — cada uma com dia e carga; a carga já tira a etapa do módulo que sai do dia (sem ⚠️ falso: a aula em QUI 19/11 sem ⚠️; nas questões o ⚠️ só se SEX 20/11 passar do 📚 de 5h mesmo sem a apostila do módulo)', !!sh && /^· Aula: QUA 18\/11 → QUI 19\/11 \(.*\) \(seu movimento\)$/.test(rowT(sh, 'aula')) && /^· Questões: QUI 19\/11 → (⚠️ )?SEX 20\/11 \(/.test(qRow18a) && /⚠️/.test(qRow18a) === (qH18a > 5) && /^· Apostila: SEX 20\/11 → .*🌿 SÁB 21\/11 \(/.test(rowT(sh, 'apost')) && /^· Selagem: TER 24\/11 → .*QUA 25\/11 \(/.test(rowT(sh, 'seal')) && sh.qs.length === 0 && /🌿 SÁB 21\/11 é o dia leve da semana/.test(sh.text), sh && JSON.stringify(sh.rows));
         check('TR18a · intervalos antes → depois idênticos (1d → 1d · 1d → 1d · 4d → 4d), sem ⚠️; "Aplicar" disponível', !!sh && sh.gaps === 'Intervalos (antes → depois): aula → questões 1d → 1d · questões → apostila 1d → 1d · apostila → selagem 4d → 4d' && !sh.order && JSON.stringify(sh.btns) === JSON.stringify(['Aplicar', 'Voltar às outras opções', 'Cancelar']), sh && sh.gaps + ' ' + JSON.stringify(sh.btns));
         check('TR18a · a prévia não grava nada', JSON.stringify(await getLS(page, CFG)) === JSON.stringify(c0));
         await clickAsk(page, 'Cancelar');
@@ -518,7 +558,7 @@ const DEFAULT12 = [5, 6, 14, 19, 24, 32, 34, 85, 86, 1, 2, 3];
 
     // TR18c · etapa posterior que já passou sem marca anda com o fio, a partir de amanhã; mover para um dia passado mostra a linha do ⏳
     await scenario(browser, 'TR18c-fio-passado', '2026-10-26', {}, async (S) => {
-        let page = await prepT(S, '2026-11-19', (c, t) => { Object.entries(c.trilhaPlan).forEach(([id, pl]) => { if (id === '1') return; STG.forEach(x => { if (pl[x] && pl[x] < '2026-11-19') { t[id] = t[id] || {}; t[id][FIELD[x]] = true; t[id][STAMP[x]] = pl[x]; } }); }); }, '2026-11-17'); // a semana congela em 17/11 // plano do motor: aula TER 17/11, questões QUA 18/11, apostila QUI 19/11, selagem DOM 22/11 — nada marcado no módulo 1 (os outros, feitos em dia)
+        await walkT(S, '2026-11-17'); let page = await prepT(S, '2026-11-19', (c, t) => { Object.entries(c.trilhaPlan).forEach(([id, pl]) => { if (id === '1') return; STG.forEach(x => { if (pl[x] && pl[x] < '2026-11-19') { t[id] = t[id] || {}; t[id][FIELD[x]] = true; t[id][STAMP[x]] = pl[x]; } }); }); }); // premissa (S3b): walkT até a T4 (17/11) // a semana congela em 17/11 // plano do motor: aula TER 17/11, questões QUA 18/11, apostila QUI 19/11, selagem DOM 22/11 — nada marcado no módulo 1 (os outros, feitos em dia)
         const nav = mkNav(page, '2026-11-19'); const c0 = await getLS(page, CFG);
         check('TR18c · premissa: módulo 1 com aula 17/11, questões 18/11, apostila 19/11, selagem 22/11, sem marca', ['aula', 'quest', 'apost', 'seal'].map(x => c0.trilhaPlan[1][x]).join() === '2026-11-17,2026-11-18,2026-11-19,2026-11-22', JSON.stringify(c0.trilhaPlan[1]));
         await moveStageT(page, nav, 1, 'aula', '2026-11-17', '2026-11-18'); const ask = await readAsk(page); console.log('   ', ask && ask.text.replace(/\n/g, ' | '));
@@ -552,7 +592,7 @@ const DEFAULT12 = [5, 6, 14, 19, 24, 32, 34, 85, 86, 1, 2, 3];
     //          se a etapa cair em outro dia bloqueado, o app pergunta de novo. "Deixar" na sexta de simulado é escolha dela: não vira ⏳; a etapa que o app pôs lá continua ⏳
     const markBefore = (c, t, iso) => Object.entries(c.trilhaPlan).forEach(([id, pl]) => STG.forEach(x => { if (pl[x] && pl[x] < iso) { t[id] = t[id] || {}; t[id][FIELD[x]] = true; t[id][STAMP[x]] = pl[x]; } })); // o que já passou, feito em dia
     await scenario(browser, 'TR18e-fio-dias-bloqueados', '2026-10-26', {}, async (S) => {
-        let page = await prepT(S, '2026-11-07', (c, t) => { c.simOverrides = { ...(c.simOverrides || {}), '2026-11-13': true }; markBefore(c, t, '2026-11-07'); }); // CIR2 · 19, 24 e CIR3 · 32: aula SEG 09/11, questões QUA 11/11, apostila SEX 13/11, selagem SEG 16/11
+        await walkT(S, '2026-11-03'); let page = await prepT(S, '2026-11-07', (c, t) => { c.simOverrides = { ...(c.simOverrides || {}), '2026-11-13': true }; [24, 32].forEach(id => { const x = { aula: '2026-11-09', quest: '2026-11-11', apost: '2026-11-13', seal: '2026-11-16' }; c.trilhaPlan[id] = { ...c.trilhaPlan[id], ...x, orig: { ...x }, hist: [] }; }); markBefore(c, t, '2026-11-07'); }); // CIR2 · 19, 24 e CIR3 · 32: aula SEG 09/11, questões QUA 11/11, apostila SEX 13/11, selagem SEG 16/11 — premissa (S3b): walkT até a T2 e as cadeias de 24 e 32 gravadas no seed (com 1 aula por dia o motor novo põe as aulas delas em 08/11); o TR18e testa o fio, não a colocação
         const nav = mkNav(page, '2026-11-07'); const c0 = await getLS(page, CFG), t0 = await getLS(page, TRL);
         check('TR18e · premissa: módulo 19 com aula 09/11, questões 11/11, apostila 13/11, selagem 16/11', ['aula', 'quest', 'apost', 'seal'].map(x => c0.trilhaPlan[19][x]).join() === '2026-11-09,2026-11-11,2026-11-13,2026-11-16', JSON.stringify(c0.trilhaPlan[19]));
         let pend = await banner(page, 'trilha-pending'); console.log('   ⏳', pend && pend.text.slice(0, 200));
@@ -599,25 +639,27 @@ const DEFAULT12 = [5, 6, 14, 19, 24, 32, 34, 85, 86, 1, 2, 3];
         check('TR18i · TER 10/11 (editado, plantão longo): o bloco das questões entra com "⚠️ plantão longo — escolha sua", o 🚑 diz "etapa deixada aqui por escolha sua" e a linha 🗓️ também', d10.blocks.some(x => x.tm === 19 && x.ts === 'quest' && /⚠️ plantão longo — escolha sua/.test(x.text)) && d10.blocks.some(x => /^🚑 Plantão 06h–19h — etapa deixada aqui por escolha sua/.test(x.text)) && /etapa deixada aqui por escolha sua/.test(d10.dayType) && !d10.blocks.some(x => /^Anki/.test(x.text)), JSON.stringify([d10.dayType, d10.blocks.map(x => x.text.slice(0, 90))]));
     });
 
-    // TR18f · fim do acesso: nada depois de 01/01 — deslocamento parcial; deixar uma apostila em 01/01 avisa que as seguintes ficam sem dia
+    // TR18f · 01/01 é dia comum (regra de 01/01, S3b — reescrito): com o simulado religado em 01/01, a pergunta vem por "sexta de simulado"; "Pular +1 dia" leva a apostila
+    //          para SÁB 02/01 e a selagem para janeiro — nada fica sem dia; "Deixar neste dia" guarda a escolha (keep). Premissa: "ela fez tudo no dia" até a T9 (walkT);
+    //          o PED2 · Aleitamento Materno (26) da T9 tem aula DOM 27/12, questões SEG 28/12, apostila QUA 30/12 e selagem SÁB 02/01 (teto por etapa + decisão 7)
     await scenario(browser, 'TR18f-fio-01-01', '2026-10-26', {}, async (S) => {
-        let page = await prepT(S, '2026-12-22', () => {}); // módulo 21: aula DOM 27/12, questões SEG 28/12, apostila QUA 30/12, selagem SEX 01/01
+        await walkT(S, '2026-12-22'); let page = await prepT(S, '2026-12-22', (c) => { c.simOverrides = { ...(c.simOverrides || {}), '2027-01-01': true }; }); // ela religa o simulado de 01/01
         const nav = mkNav(page, '2026-12-22'); const c0 = await getLS(page, CFG);
-        check('TR18f · premissa: módulo 21 com aula 27/12, questões 28/12, apostila 30/12, selagem 01/01', ['aula', 'quest', 'apost', 'seal'].map(x => c0.trilhaPlan[21][x]).join() === '2026-12-27,2026-12-28,2026-12-30,2027-01-01', JSON.stringify(c0.trilhaPlan[21]));
-        await moveStageT(page, nav, 21, 'aula', '2026-12-27', '2026-12-29'); await clickAsk(page, 'Mover o fio todo (+2 dias)'); let sh = await readShift(page); logSh(sh);
-        check('TR18f · apostila iria para SEX 01/01: "⛔ A apostila iria para SEX 01/01, que é último dia de acesso — só selagem." (os avisos de 01/01 só depois da resposta)', !!sh && sh.qs.length === 1 && sh.qs[0].ts === 'apost' && sh.qs[0].text.startsWith('⛔ A apostila iria para SEX 01/01, que é último dia de acesso — só selagem.') && !sh.end && !sh.nofit, sh && JSON.stringify(sh.qs));
+        check('TR18f · premissa: módulo 26 com aula 27/12, questões 28/12, apostila 30/12, selagem 02/01; simulado religado em 01/01', ['aula', 'quest', 'apost', 'seal'].map(x => (c0.trilhaPlan[26] || {})[x]).join() === '2026-12-27,2026-12-28,2026-12-30,2027-01-02' && c0.simOverrides['2027-01-01'] === true, JSON.stringify(c0.trilhaPlan[26]));
+        await moveStageT(page, nav, 26, 'aula', '2026-12-27', '2026-12-29'); await clickAsk(page, 'Mover o fio todo (+2 dias)'); let sh = await readShift(page); logSh(sh);
+        check('TR18f · apostila iria para SEX 01/01: "⛔ A apostila iria para SEX 01/01, que é sexta de simulado." com Deixar neste dia / Pular +1 dia; a aula no dia leve (29/12) só informa (X14)', !!sh && sh.qs.length === 1 && sh.qs[0].ts === 'apost' && sh.qs[0].text.startsWith('⛔ A apostila iria para SEX 01/01, que é sexta de simulado.') && JSON.stringify(sh.qs[0].btns) === JSON.stringify(['Deixar neste dia', 'Pular +1 dia']) && !sh.nofit && /🌿 A aula iria para o dia leve da semana \(TER 29\/12\) — o app não põe aula nova nele; se você aplicar, fica assim \(só informa\)\./.test(sh.text), sh && JSON.stringify(sh.qs) + ' | ' + sh.text);
         await answerQ(page, 'apost', 'Pular +1 dia'); sh = await readShift(page); logSh(sh);
-        check('TR18f · "Pular" = não cabe antes do fim do acesso: apostila e selagem sem dia; aviso "Estas etapas não cabem antes do fim do acesso (01/01)" com deslocamento parcial ou cancelar', !!sh && /sem dia — não cabe antes do fim do acesso \(01\/01\)/.test(rowT(sh, 'apost')) && /sem dia/.test(rowT(sh, 'seal')) && /^⚠️ Estas etapas não cabem antes do fim do acesso \(01\/01\): apostila, selagem\. Você pode aplicar o deslocamento parcial/.test(sh.nofit || '') && JSON.stringify(sh.btns) === JSON.stringify(['Aplicar o deslocamento parcial', 'Voltar às outras opções', 'Cancelar']), sh && JSON.stringify([sh.rows, sh.nofit, sh.btns]));
+        check('TR18f · "Pular +1 dia": apostila SÁB 02/01 e selagem empurrada em janeiro (02/01 → 05/01); nada sem dia, sem aviso de "não cabe"; "Aplicar" liberado', !!sh && /^· Apostila: QUA 30\/12 → .*SÁB 02\/01 .*pulou 1 dia/.test(rowT(sh, 'apost')) && /^· Selagem: SÁB 02\/01 → .*TER 05\/01/.test(rowT(sh, 'seal')) && !/sem dia/.test(sh.text) && !sh.nofit && JSON.stringify(sh.btns) === JSON.stringify(['Aplicar', 'Voltar às outras opções', 'Cancelar']), sh && JSON.stringify([sh.rows, sh.nofit, sh.btns]));
         await clickAsk(page, 'Voltar às outras opções'); await clickAsk(page, 'Mover o fio todo (+2 dias)'); await answerQ(page, 'apost', 'Deixar neste dia'); sh = await readShift(page); logSh(sh);
-        check('TR18f · "Deixar neste dia" com a apostila em 01/01: aviso explícito "⚠️ Deixando a apostila em 01/01 (último dia de acesso), a etapa seguinte (selagem) fica sem dia." e a selagem sem dia', !!sh && sh.end === '⚠️ Deixando a apostila em 01/01 (último dia de acesso), a etapa seguinte (selagem) fica sem dia.' && /sem dia/.test(rowT(sh, 'seal')) && /SEX 01\/01 .*⚠️ último dia de acesso — só selagem — escolha sua/.test(rowT(sh, 'apost')), sh && JSON.stringify([sh.rows, sh.end]));
-        await clickAsk(page, 'Voltar às outras opções'); await clickAsk(page, 'Mover o fio todo (+2 dias)'); await answerQ(page, 'apost', 'Pular +1 dia'); await clickAsk(page, 'Aplicar o deslocamento parcial'); await pronto(page);
-        const p = (await getLS(page, CFG)).trilhaPlan[21];
-        check('TR18f · deslocamento parcial: aula 29/12, questões 30/12; apostila e selagem sem dia (null), registradas no hist "fio"; orig intacto', p.aula === '2026-12-29' && p.quest === '2026-12-30' && p.apost === null && p.seal === null && p.hist.filter(x => x.why === 'fio').map(x => x.ts + '>' + x.to).join() === 'aula>2026-12-29,quest>2026-12-30,apost>null,seal>null' && JSON.stringify(p.orig) === JSON.stringify(c0.trilhaPlan[21].orig), JSON.stringify(p));
+        check('TR18f · "Deixar neste dia": a apostila fica em SEX 01/01 com "⚠️ sexta de simulado — escolha sua" e a selagem anda para SEG 04/01; nada sem dia', !!sh && /SEX 01\/01 .*⚠️ sexta de simulado — escolha sua/.test(rowT(sh, 'apost')) && /^· Selagem: SÁB 02\/01 → .*SEG 04\/01/.test(rowT(sh, 'seal')) && !/sem dia/.test(sh.text) && sh.btns.includes('Aplicar'), sh && JSON.stringify(sh.rows));
+        await clickAsk(page, 'Voltar às outras opções'); await clickAsk(page, 'Mover o fio todo (+2 dias)'); await answerQ(page, 'apost', 'Pular +1 dia'); await clickAsk(page, 'Aplicar'); await pronto(page);
+        const p = (await getLS(page, CFG)).trilhaPlan[26];
+        check('TR18f · Aplicar ("Pular"): aula 29/12, questões 30/12, apostila 02/01, selagem 05/01, registradas no hist "fio"; orig intacto; nada nulo', p.aula === '2026-12-29' && p.quest === '2026-12-30' && p.apost === '2027-01-02' && p.seal === '2027-01-05' && p.hist.filter(x => x.why === 'fio').map(x => x.ts + '>' + x.to).join() === 'aula>2026-12-29,quest>2026-12-30,apost>2027-01-02,seal>2027-01-05' && JSON.stringify(p.orig) === JSON.stringify(c0.trilhaPlan[26].orig) && !p.keep, JSON.stringify(p));
     });
 
     // TR18g · a selagem (nada depois dela) segue movendo direto, sem diálogo
     await scenario(browser, 'TR18g-fio-selagem-direto', '2026-10-26', {}, async (S) => {
-        let page = await prepT(S, '2026-11-17', () => {}); const nav = mkNav(page, '2026-11-17'); const c0 = await getLS(page, CFG);
+        await walkT(S, '2026-11-17'); let page = await prepT(S, '2026-11-17', () => {}); const nav = mkNav(page, '2026-11-17'); const c0 = await getLS(page, CFG); // premissa (S3b): walkT — o NEF1 congela na T4
         await moveStageT(page, nav, 1, 'seal', '2026-11-22', '2026-11-23'); const ask = await readAsk(page); await pronto(page);
         const p = (await getLS(page, CFG)).trilhaPlan[1];
         check('TR18g · selagem de DOM 22/11 para SEG 23/11 (apostila → selagem 4d, na faixa): move direto, sem diálogo; hist "mover"', !ask && p.seal === '2026-11-23' && p.hist.slice(-1)[0].why === 'mover' && p.aula === c0.trilhaPlan[1].aula && p.apost === c0.trilhaPlan[1].apost, JSON.stringify({ ask, p }));
@@ -626,14 +668,14 @@ const DEFAULT12 = [5, 6, 14, 19, 24, 32, 34, 85, 86, 1, 2, 3];
         check('TR18g · questões para hoje (TER 17/11): a aula teria de ir para SEG 16/11 — "⚠️ A ordem não pode ser preservada: a aula iria para antes de amanhã — não pode voltar. As outras opções continuam." (sem "Aplicar"); apostila e selagem andam a partir de amanhã', !!sh && /^· Aula: TER 17\/11 → .*SEG 16\/11/.test(rowT(sh, 'aula')) && /TER 17\/11 .*\(seu movimento\)/.test(rowT(sh, 'quest')) && /^· Apostila: QUI 19\/11 → .*QUA 18\/11/.test(rowT(sh, 'apost')) && sh.order === '⚠️ A ordem não pode ser preservada: a aula iria para antes de amanhã — não pode voltar. As outras opções continuam.' && !sh.btns.includes('Aplicar'), sh && JSON.stringify([sh.rows, sh.order]));
         await clickAsk(page, 'Cancelar');
         check('TR18g · Cancelar: nada gravado', JSON.stringify(await getLS(page, CFG)) === JSON.stringify(c1));
-        // um par fora de ordem que o fio não toca (questões no dia da aula, por "Mover assim mesmo") não bloqueia o fio da apostila
-        await moveStageT(page, nav, 2, 'quest', '2026-11-22', '2026-11-20'); await clickAsk(page, 'Mover assim mesmo'); await pronto(page);
+        // um par fora de ordem que o fio não toca (questões no dia da aula, por "Mover assim mesmo") não bloqueia o fio da apostila — premissa (S3b): o NEF1 II da T4 tem aula QUA 18/11, questões 19/11, apostila 20/11, selagem 23/11 (antes 20, 22, 23 e 26/11)
+        await moveStageT(page, nav, 2, 'quest', '2026-11-19', '2026-11-18'); await clickAsk(page, 'Mover assim mesmo'); await pronto(page);
         const p2a = (await getLS(page, CFG)).trilhaPlan[2];
-        check('TR18g · premissa: módulo 2 com aula e questões no mesmo dia (SEX 20/11), apostila 23/11, selagem 26/11', p2a.aula === '2026-11-20' && p2a.quest === '2026-11-20' && p2a.apost === '2026-11-23' && p2a.seal === '2026-11-26', JSON.stringify(p2a));
-        await moveStageT(page, nav, 2, 'apost', '2026-11-23', '2026-11-22'); const ask2 = await readAsk(page); const fio2 = ask2 && ask2.btns.find(b => /^Mover o fio todo/.test(b)); if (fio2) await clickAsk(page, fio2); const sh2 = await readShift(page); logSh(sh2);
+        check('TR18g · premissa: módulo 2 com aula e questões no mesmo dia (QUA 18/11), apostila 20/11, selagem 23/11', p2a.aula === '2026-11-18' && p2a.quest === '2026-11-18' && p2a.apost === '2026-11-20' && p2a.seal === '2026-11-23', JSON.stringify(p2a));
+        await moveStageT(page, nav, 2, 'apost', '2026-11-20', '2026-11-19'); const ask2 = await readAsk(page); const fio2 = ask2 && ask2.btns.find(b => /^Mover o fio todo/.test(b)); if (fio2) await clickAsk(page, fio2); const sh2 = await readShift(page); logSh(sh2);
         check('TR18g · fio da apostila (−1 dia) com o par antigo aula/questões no mesmo dia: a prévia não culpa o movimento ("A ordem não pode ser preservada" não aparece) e "Aplicar" está lá', !!sh2 && !sh2.order && sh2.btns.includes('Aplicar') && sh2.rows.map(r => r.ts).join() === 'apost,seal', sh2 && JSON.stringify([sh2.rows, sh2.order, sh2.btns]));
         if (sh2 && sh2.btns.includes('Aplicar')) await clickAsk(page, 'Aplicar'); await pronto(page); const p2b = (await getLS(page, CFG)).trilhaPlan[2];
-        check('TR18g · Aplicar: apostila 22/11, selagem 25/11; aula e questões como estavam', p2b.apost === '2026-11-22' && p2b.seal === '2026-11-25' && p2b.aula === '2026-11-20' && p2b.quest === '2026-11-20', JSON.stringify(p2b));
+        check('TR18g · Aplicar: apostila 19/11, selagem 22/11; aula e questões como estavam (18/11)', p2b.apost === '2026-11-19' && p2b.seal === '2026-11-22' && p2b.aula === '2026-11-18' && p2b.quest === '2026-11-18', JSON.stringify(p2b));
     });
 
     // TR18h · a selagem para um dia passado: sem etapa depois dela, não há "fio"; o diálogo abre só para a linha do dia passado (Mover assim mesmo / Cancelar)
@@ -648,51 +690,170 @@ const DEFAULT12 = [5, 6, 14, 19, 24, 32, 34, 85, 86, 1, 2, 3];
 
     // TR18k · aval de 08/11 (escolha 6): a etapa que ela deixou em 01/01 com "Deixar neste dia" não sai de lá com a recolocação automática da semana final
     const markExcept = (c, t, iso, skip) => Object.entries(c.trilhaPlan).forEach(([id, pl]) => { if (skip.includes(Number(id))) return; STG.forEach(x => { if (pl[x] && pl[x] < iso) { t[id] = t[id] || {}; t[id][FIELD[x]] = true; t[id][STAMP[x]] = pl[x]; } }); });
-    const chainOk = (p) => { const ds = STG.map(x => p[x]).filter(Boolean); return ds.every((d, k) => k === 0 || d > ds[k - 1]) && ds.every(d => d <= '2027-01-01') && !['aula', 'quest', 'apost'].some(x => p[x] === '2027-01-01' && (p.keep || {})[x] !== '2027-01-01'); }; // em 01/01 só selagem — ou a etapa que ela deixou lá
+    const chainOk = (p) => { const ds = STG.map(x => p[x]).filter(Boolean); return ds.every((d, k) => k === 0 || d > ds[k - 1]) && (!p.aula || p.aula <= '2027-01-01'); }; // datas crescentes; só a aula até 01/01 (regra de 01/01, S3b: questões, apostila e selagem podem ir para janeiro)
+    // (S3b — reescrito) a escolha de 01/01 passa a ser feita num 01/01 com o simulado religado (01/01 é dia comum); a selagem vai para janeiro e a recolocação diária não a tira de lá
     await scenario(browser, 'TR18k-deixar-0101-recolocacao-diaria', '2026-10-26', {}, async (S) => {
-        let page = await prepT(S, '2026-12-22', (c, t) => markExcept(c, t, '2026-12-29', [21])); // tudo antes de 29/12 feito, menos o módulo 21 (aula DOM 27/12, questões SEG 28/12, apostila QUA 30/12, selagem SEX 01/01)
+        await walkT(S, '2026-12-22'); let page = await prepT(S, '2026-12-22', (c, t) => { c.simOverrides = { ...(c.simOverrides || {}), '2027-01-01': true }; markExcept(c, t, '2026-12-29', [26]); }); // tudo antes de 29/12 feito, menos o módulo 26 (aula DOM 27/12, questões SEG 28/12, apostila QUA 30/12, selagem SÁB 02/01); simulado religado em 01/01
         const nav = mkNav(page, '2026-12-22');
-        await moveStageT(page, nav, 21, 'aula', '2026-12-27', '2026-12-29'); await clickAsk(page, 'Mover o fio todo (+2 dias)'); await answerQ(page, 'apost', 'Deixar neste dia'); await clickAsk(page, 'Aplicar o deslocamento parcial'); await pronto(page);
-        let p = (await getLS(page, CFG)).trilhaPlan[21];
-        check('TR18k · 22/12: "Deixar neste dia" com a apostila em 01/01 — aula 29/12, questões 30/12, apostila 01/01 (escolha guardada: keep), selagem sem dia', p.aula === '2026-12-29' && p.quest === '2026-12-30' && p.apost === '2027-01-01' && p.seal === null && JSON.stringify(p.keep) === JSON.stringify({ apost: '2027-01-01' }), JSON.stringify(p));
+        await moveStageT(page, nav, 26, 'aula', '2026-12-27', '2026-12-29'); await clickAsk(page, 'Mover o fio todo (+2 dias)'); await answerQ(page, 'apost', 'Deixar neste dia'); await clickAsk(page, 'Aplicar'); await pronto(page);
+        let p = (await getLS(page, CFG)).trilhaPlan[26];
+        check('TR18k · 22/12: "Deixar neste dia" com a apostila em 01/01 (sexta de simulado) — aula 29/12, questões 30/12, apostila 01/01 (escolha guardada: keep), selagem 04/01 (janeiro; nada sem dia)', p.aula === '2026-12-29' && p.quest === '2026-12-30' && p.apost === '2027-01-01' && p.seal === '2027-01-04' && JSON.stringify(p.keep) === JSON.stringify({ apost: '2027-01-01' }), JSON.stringify(p));
         for (const day of ['2026-12-29', '2026-12-31']) {
-            if (day === '2026-12-31') { const c0 = await getLS(page, CFG), t0 = (await getLS(page, TRL)) || {}; const q = c0.trilhaPlan[21]; t0[21] = { ...(t0[21] || {}), aula: true, aulaAt: q.aula, questoesD2: true, questoesD2At: q.quest }; await setLS(page, TRL, t0); } // ela fez a aula e as questões nos dias delas (30 e 31/12)
-            page = await S.reopen(day); const c = await getLS(page, CFG); p = c.trilhaPlan[21]; console.log('   📦', day, JSON.stringify({ aula: p.aula, quest: p.quest, apost: p.apost, seal: p.seal, hist: p.hist.filter(h => h.why === 'final') }));
-            check('TR18k · ' + br(day) + ': a recolocação automática da semana final rodou (' + c.trilhaFinalAutoAt + ') e a apostila continua em 01/01, com a escolha guardada; nada depois de 01/01, ordem mantida', new RegExp('^' + day + '\\|').test(c.trilhaFinalAutoAt || '') && p.apost === '2027-01-01' && JSON.stringify(p.keep) === JSON.stringify({ apost: '2027-01-01' }) && !p.hist.some(h => h.why === 'final' && h.ts === 'apost') && chainOk(p), JSON.stringify(p));
+            if (day === '2026-12-31') { const c0 = await getLS(page, CFG), t0 = (await getLS(page, TRL)) || {}; const q = c0.trilhaPlan[26]; t0[26] = { ...(t0[26] || {}), aula: true, aulaAt: q.aula, questoesD2: true, questoesD2At: q.quest }; await setLS(page, TRL, t0); } // ela fez a aula e as questões nos dias delas
+            page = await S.reopen(day); const c = await getLS(page, CFG); p = c.trilhaPlan[26]; console.log('   📦', day, JSON.stringify({ aula: p.aula, quest: p.quest, apost: p.apost, seal: p.seal, hist: p.hist.filter(h => h.why === 'final') }));
+            check('TR18k · ' + br(day) + ': a recolocação automática da semana final rodou (' + c.trilhaFinalAutoAt + ') e a apostila continua em 01/01, com a escolha guardada; a selagem em janeiro, nas faixas; aula até 01/01 e ordem mantida', new RegExp('^' + day + '\\|1$').test(c.trilhaFinalAutoAt || '') && p.apost === '2027-01-01' && JSON.stringify(p.keep) === JSON.stringify({ apost: '2027-01-01' }) && !p.hist.some(h => h.why === 'final' && h.ts === 'apost') && chainOk(p) && p.seal > '2027-01-01' && dd(p.apost, p.seal) >= 2 && dd(p.apost, p.seal) <= 5, JSON.stringify(p));
         }
         await mkNav(page, '2026-12-31')('2027-01-01'); const d1 = await readDay(page);
-        check('TR18k · SEX 01/01 mostra a apostila deixada por ela, com "⚠️ último dia de acesso — só selagem — escolha sua"', d1.blocks.some(x => x.tm === 21 && x.ts === 'apost' && /⚠️ último dia de acesso — só selagem — escolha sua/.test(x.text)), JSON.stringify(d1.blocks.map(x => x.text.slice(0, 80))));
+        check('TR18k · SEX 01/01 mostra a apostila deixada por ela, com "⚠️ sexta de simulado — escolha sua"', d1.blocks.some(x => x.tm === 26 && x.ts === 'apost' && /⚠️ sexta de simulado — escolha sua/.test(x.text)), JSON.stringify(d1.blocks.map(x => x.text.slice(0, 80))));
     });
 
-    // TR18j · fio aplicado dentro da semana final (29/12): módulo 18 com a apostila deixada em 01/01, módulo 20 com a apostila pulando +1 dia (de 01/01: sem dia).
-    //          Depois, a recolocação automática de 30/12 e a restauração do plano
+    // TR18j · fio aplicado dentro da semana final (29/12), com o simulado religado em 01/01 (S3b — reescrito: 01/01 é dia comum): módulo 18 com a apostila deixada
+    //          em 01/01, módulo 20 com a apostila pulando +1 dia (para SÁB 02/01; nada sem dia). Depois, a recolocação automática de 30/12 e a restauração do plano.
+    //          Premissa gravada no seed (trilhaPlan explícito, orig igual), porque o motor novo pode pôr a selagem em 02/01: "ela fez tudo no dia" até a T9 (walkT)
     await scenario(browser, 'TR18j-fio-semana-final', '2026-10-26', {}, async (S) => {
-        await S.reopen('2026-12-22'); let page = await S.reopen('2026-12-28');
-        { const c = await getLS(page, CFG), t = (await getLS(page, TRL)) || {}; const d = ['2026-12-28', '2026-12-29', '2026-12-30', '2027-01-01'];
-          [18, 20].forEach(id => { const x = { aula: d[0], quest: d[1], apost: d[2], seal: d[3] }; c.trilhaPlan[id] = { ...c.trilhaPlan[id], ...x, orig: { ...x }, hist: [] }; }); // como o motor teria planejado (orig igual)
-          markExcept(c, t, '2026-12-29', []); await setLS(page, CFG, c); await setLS(page, TRL, t); }
+        await walkT(S, '2026-12-22'); let page = await S.reopen('2026-12-28');
+        { const c = await getLS(page, CFG), t = (await getLS(page, TRL)) || {}; const d = ['2026-12-28', '2026-12-29', '2026-12-30', '2027-01-02'];
+          [18, 20].forEach(id => { const x = { aula: d[0], quest: d[1], apost: d[2], seal: d[3] }; c.trilhaPlan[id] = { ...c.trilhaPlan[id], ...x, orig: { ...x }, hist: [] }; }); // seed explícito (orig igual)
+          delete t[18]; delete t[20]; // premissa: as cadeias de 18 e 20 são as do seed (registro limpo) — com o walkT elas já tinham sido feitas em dezembro
+          c.simOverrides = { ...(c.simOverrides || {}), '2027-01-01': true }; markExcept(c, t, '2026-12-29', []); await setLS(page, CFG, c); await setLS(page, TRL, t); }
         page = await S.reopen('2026-12-29'); const nav = mkNav(page, '2026-12-29');
         let c = await getLS(page, CFG);
-        check('TR18j · premissa: em 29/12 a recolocação automática rodou e não mexeu nos módulos 18 e 20 (aula 28/12 feita, questões 29/12, apostila 30/12, selagem 01/01)', /^2026-12-29\|/.test(c.trilhaFinalAutoAt || '') && [18, 20].every(id => ['quest', 'apost', 'seal'].map(x => c.trilhaPlan[id][x]).join() === '2026-12-29,2026-12-30,2027-01-01' && !c.trilhaPlan[id].hist.length), JSON.stringify([c.trilhaPlan[18], c.trilhaPlan[20]]));
+        check('TR18j · premissa: em 29/12 a recolocação automática rodou (simulado religado em 01/01: "…|1") e não mexeu nos módulos 18 e 20 (aula 28/12 feita, questões 29/12, apostila 30/12, selagem 02/01)', /^2026-12-29\|1$/.test(c.trilhaFinalAutoAt || '') && [18, 20].every(id => ['quest', 'apost', 'seal'].map(x => c.trilhaPlan[id][x]).join() === '2026-12-29,2026-12-30,2027-01-02' && !c.trilhaPlan[id].hist.length), JSON.stringify([c.trilhaPlan[18], c.trilhaPlan[20]]));
         await moveStageT(page, nav, 18, 'quest', '2026-12-29', '2026-12-31'); await clickAsk(page, 'Mover o fio todo (+2 dias)'); let sh = await readShift(page); logSh(sh);
-        check('TR18j · módulo 18: questões para QUI 31/12 (+2): a apostila iria para SEX 01/01 — o app pergunta', !!sh && sh.qs.length === 1 && sh.qs[0].ts === 'apost' && /⛔ A apostila iria para SEX 01\/01, que é último dia de acesso — só selagem\./.test(sh.qs[0].text), sh && JSON.stringify(sh.qs));
-        await answerQ(page, 'apost', 'Deixar neste dia'); await clickAsk(page, 'Aplicar o deslocamento parcial'); await pronto(page);
+        check('TR18j · módulo 18: questões para QUI 31/12 (+2): a apostila iria para SEX 01/01 (sexta de simulado) — o app pergunta', !!sh && sh.qs.length === 1 && sh.qs[0].ts === 'apost' && /⛔ A apostila iria para SEX 01\/01, que é sexta de simulado\./.test(sh.qs[0].text), sh && JSON.stringify(sh.qs));
+        await answerQ(page, 'apost', 'Deixar neste dia'); await clickAsk(page, 'Aplicar'); await pronto(page);
         await moveStageT(page, nav, 20, 'quest', '2026-12-29', '2026-12-31'); await clickAsk(page, 'Mover o fio todo (+2 dias)'); await answerQ(page, 'apost', 'Pular +1 dia'); sh = await readShift(page); logSh(sh);
-        check('TR18j · módulo 20: "Pular +1 dia" a partir de 01/01 = não cabe: apostila e selagem sem dia, deslocamento parcial', !!sh && /sem dia/.test(rowT(sh, 'apost')) && /sem dia/.test(rowT(sh, 'seal')) && sh.btns.includes('Aplicar o deslocamento parcial'), sh && JSON.stringify(sh.rows));
-        await clickAsk(page, 'Aplicar o deslocamento parcial'); await pronto(page);
+        check('TR18j · módulo 20: "Pular +1 dia" a partir de 01/01 leva a apostila para SÁB 02/01 e a selagem para TER 05/01 — nada sem dia; "Aplicar"', !!sh && /SÁB 02\/01/.test(rowT(sh, 'apost')) && /TER 05\/01/.test(rowT(sh, 'seal')) && !/sem dia/.test(sh.text) && sh.btns.includes('Aplicar'), sh && JSON.stringify(sh.rows));
+        await clickAsk(page, 'Aplicar'); await pronto(page);
         c = await getLS(page, CFG); const a18 = c.trilhaPlan[18], a20 = c.trilhaPlan[20];
-        check('TR18j · aplicado em 29/12: 18 = questões 31/12, apostila 01/01 (keep), selagem sem dia; 20 = questões 31/12, apostila e selagem sem dia', a18.quest === '2026-12-31' && a18.apost === '2027-01-01' && a18.seal === null && JSON.stringify(a18.keep) === JSON.stringify({ apost: '2027-01-01' }) && a20.quest === '2026-12-31' && a20.apost === null && a20.seal === null && !a20.keep, JSON.stringify([a18, a20]));
+        check('TR18j · aplicado em 29/12: 18 = questões 31/12, apostila 01/01 (keep), selagem 04/01; 20 = questões 31/12, apostila 02/01, selagem 05/01 (sem keep)', a18.quest === '2026-12-31' && a18.apost === '2027-01-01' && a18.seal === '2027-01-04' && JSON.stringify(a18.keep) === JSON.stringify({ apost: '2027-01-01' }) && a20.quest === '2026-12-31' && a20.apost === '2027-01-02' && a20.seal === '2027-01-05' && !a20.keep, JSON.stringify([a18, a20]));
         page = await S.reopen('2026-12-30'); c = await getLS(page, CFG); const b18 = c.trilhaPlan[18], b20 = c.trilhaPlan[20];
         const show = (p) => ['aula', 'quest', 'apost', 'seal'].map(x => x + ' ' + (p[x] ? br(p[x]) : 'sem dia')).join(', ');
         console.log('   📦 30/12, depois da recolocação automática · 18:', show(b18), '· 20:', show(b20), '· log:', JSON.stringify(c.trilhaFinalLog && { moved: c.trilhaFinalLog.moved.filter(m => [18, 20].includes(m.id)), nocabe: c.trilhaFinalLog.nocabe.filter(m => [18, 20].includes(m.id)) }));
-        check('TR18j · 30/12, recolocação automática: a apostila do módulo 18 continua em 01/01 (escolha dela); as etapas dele seguem em ordem e nada passa de 01/01', /^2026-12-30\|/.test(c.trilhaFinalAutoAt || '') && b18.apost === '2027-01-01' && JSON.stringify(b18.keep) === JSON.stringify({ apost: '2027-01-01' }) && !b18.hist.some(h => h.why === 'final' && h.ts === 'apost') && chainOk(b18) && b18.seal === null, JSON.stringify(b18));
-        check('TR18j · 30/12, recolocação automática: o módulo 20 (sem dia depois do "Pular") é recolocado pela regra da semana final — em ordem, nada depois de 01/01, só a selagem em 01/01', chainOk(b20) && b20.hist.some(h => h.why === 'final'), JSON.stringify(b20));
+        check('TR18j · 30/12, recolocação automática: a apostila do módulo 18 continua em 01/01 (escolha dela); as etapas dele seguem em ordem (questões ficam até 31/12, aula até 01/01) e a selagem segue em janeiro, nas faixas', /^2026-12-30\|1$/.test(c.trilhaFinalAutoAt || '') && b18.apost === '2027-01-01' && JSON.stringify(b18.keep) === JSON.stringify({ apost: '2027-01-01' }) && !b18.hist.some(h => h.why === 'final' && h.ts === 'apost') && chainOk(b18) && b18.quest < '2027-01-01' && b18.seal > '2027-01-01' && dd(b18.apost, b18.seal) >= 2 && dd(b18.apost, b18.seal) <= 5, JSON.stringify(b18));
+        check('TR18j · 30/12, recolocação automática: o módulo 20 (questões a 3 dias da aula depois do fio) é recolocado pela regra da semana final — as questões do 18 voltam para 30/12 (📚 8h cheio), 31/12 é 🎄 (📚 3h) e 01/01 é simulado: sem dia nas faixas, vai pelo guloso (uma etapa por dia livre, em ordem, em janeiro) e o 📦 o lista entre os comprimidos; em ordem, sem etapa em 01/01, com hist "final"', chainOk(b20) && b20.hist.some(h => h.why === 'final') && !STG.some(x => b20[x] === '2027-01-01') && b20.quest > '2027-01-01' && ((c.trilhaFinalLog || {}).compressed || []).includes(20), JSON.stringify(b20) + ' · 📦 ' + JSON.stringify(c.trilhaFinalLog));
         const btnRe = async (re) => { const ok = await page.evaluate((src) => { const b = [...document.querySelectorAll('button')].find(x => new RegExp(src).test(x.innerText.trim())); if (!b) return false; b.click(); return true; }, re.source); if (!ok) throw new Error('botão não encontrado: ' + re); await page.waitForTimeout(450); };
         await clickTab(page, 'TRILHA'); await btnRe(/^Ver o que mudou desde a atualização$/); await btnRe(/^Aplicar a restauração$/); if (await page.evaluate(() => [...document.querySelectorAll('button')].some(b => b.innerText.trim() === 'Aplicar mesmo assim'))) await btnRe(/^Aplicar mesmo assim$/);
         c = await getLS(page, CFG); const r18 = c.trilhaPlan[18], r20 = c.trilhaPlan[20]; console.log('   🧹 restaurado · 18:', show(r18), '· 20:', show(r20));
-        check('TR18j · restaurar (em 30/12): os dois módulos voltam ao plano original (28/12, 29/12, 30/12, 01/01), sem a escolha guardada e sem o histórico dela nem a recolocação que veio por causa do fio; nenhum dia com duas etapas', [r18, r20].every(p => ['aula', 'quest', 'apost', 'seal'].map(x => p[x]).join() === '2026-12-28,2026-12-29,2026-12-30,2027-01-01' && !p.keep && !(p.hist || []).length && chainOk(p)), JSON.stringify([r18, r20]));
+        check('TR18j · restaurar (em 30/12): os dois módulos voltam ao plano original (28/12, 29/12, 30/12, 02/01), sem a escolha guardada e sem o histórico dela nem a recolocação que veio por causa do fio; nenhum dia com duas etapas', [r18, r20].every(p => ['aula', 'quest', 'apost', 'seal'].map(x => p[x]).join() === '2026-12-28,2026-12-29,2026-12-30,2027-01-02' && !p.keep && !(p.hist || []).length && chainOk(p)), JSON.stringify([r18, r20]));
     });
 
+
+    // ── TR19 · regra de 01/01 (desenho final §10.2) — entram no S4: TR19l (0b adaptado) e TR19d (cadeia que não fecha). As asserções que dependem do S5
+    //    (texto X39 do balanço, partição = fila, "Aulas até 01/01" sobe 1) aparecem como "⏸ PENDENTE S5" na saída e viram check no S5 ──
+    const WT = { aula: 'aula', quest: 'questões', apost: 'apostila', seal: 'selagem' };
+    const semDiaT = (c, t, day) => Object.entries((c && c.trilhaPlan) || {}).map(([id, p]) => { const x = (t || {})[id] || {}; if (STG.every(s => x[FIELD[s]]) || (day > '2027-01-01' && !STG.some(s => x[FIELD[s]]))) return null; const miss = STG.filter(s => !x[FIELD[s]] && !p[s]); return miss.length ? { id: Number(id), miss } : null; }).filter(Boolean); // re-derivado do config e do registro (§1.3): congelado aberto com etapa sem marca e sem dia; depois de 01/01, fora o módulo sem marca nenhuma (noAula, §4.3)
+    const goDateT = async (page, iso) => { await clickTab(page, 'CRONOGRAMA'); for (let k = 0; k < 12; k++) { const tabs = await listDayTabs(page); if (tabs.some(t => t.date === br(iso))) { await clickDate(page, br(iso)); return true; } const f = tabs[0].date, fIso = (f.slice(3) <= '06' ? '2027' : '2026') + '-' + f.slice(3) + '-' + f.slice(0, 2); const h0 = await headerWeek(page); await navWeek(page, iso < fIso ? -1 : 1); if ((await headerWeek(page)).week === h0.week) return false; } return false; }; // anda ◀▶ até a semana do dia (a semana que abre depende do horizonte visível)
+    const screenT = async (page, ids) => { await clickTab(page, 'CRONOGRAMA'); // o que a semana de hoje mostra: ⚠️, 📦, ⏳, balanço, painel; e, na aba Trilha, o cartão de cada módulo em "módulos desta semana"
+        const tx = async (k) => { const b = await banner(page, k); return b ? b.text : ''; };
+        const v = { cov: await tx('trilha-coverage'), fin: await tx('trilha-final'), pend: await tx('trilha-pending'), bal: await tx('trilha-balanco') };
+        v.panel = await page.evaluate(() => Object.fromEntries([...document.querySelectorAll('[data-t="trilha-panel"] [data-mod]')].map(e => [e.getAttribute('data-mod'), e.innerText.replace(/\n/g, ' | ')])));
+        await clickTab(page, 'TRILHA'); v.cards = await page.evaluate((is) => Object.fromEntries(is.map(i => { const el = document.querySelector('[data-id="' + i + '"]:not([data-t])'); return [i, el ? el.innerText.split('\n').map(s => s.trim()).filter(Boolean) : null]; })), ids); await clickTab(page, 'CRONOGRAMA');
+        return v; };
+    const dayT = async (S, day, skip) => { const c = await getLS(S.page, CFG), t = (await getLS(S.page, TRL)) || {}; markExcept(c, t, day, skip); await setLS(S.page, TRL, t); if (c.manualWeek != null) { c.manualWeek = null; await setLS(S.page, CFG, c); } return S.reopen(day); }; // ela fez tudo até o dia, menos `skip`; o ◀▶ do teste (manualWeek) volta ao automático, para o Cronograma abrir na semana de hoje
+    const covLine = (code, title, miss) => '⚠️ ' + code + ' (' + title + ') aberto — ' + miss.map(s => WT[s]).join(', ') + ' sem dia.';
+    const SUF_AULA = ' A aula só tem dia até 01/01: se você assistiu, marque no bloco do dia em que assistiu.';
+    // checks do TR19l em cada dia de 29/12 a 01/01 (o mesmo para A′ e B′): toda etapa sem dia aparece — ⚠️ (X22), painel e aba Trilha ("sem dia", X31), 📦 (X23), ⏳ (X25/aula atrasada)
+    const tr19lDay = async (S, tag, day, M, lbl) => { const page = S.page; const c = await getLS(page, CFG), t = (await getLS(page, TRL)) || {}; const sd = semDiaT(c, t, day), pM = c.trilhaPlan[M], sM = sd.find(x => x.id === M);
+        const v = await screenT(page, sd.map(x => x.id).concat([M]));
+        console.log('   📋 ' + tag + ' ' + br(day) + ' · plano ' + M + ': ' + STG.map(s => WT[s] + ' ' + (pM[s] ? br(pM[s]) : 'sem dia')).join(', ') + ' · sem dia (config): ' + JSON.stringify(sd) + ' · log noAula: ' + JSON.stringify(((c.trilhaFinalLog || {}).noAula) || []));
+        console.log('      ⚠️ ' + (v.cov.replace(/\n/g, ' / ') || '(nenhum)')); console.log('      📦 ' + (v.fin || '(nenhum)')); console.log('      ⏳ ' + (v.pend.split('\n')[0] || '(nenhum)')); console.log('      🗂️ painel ' + lbl + ': ' + (v.panel[lbl] || '(fora)') + ' · aba Trilha: ' + JSON.stringify(v.cards[M]));
+        if (!sd.length) return 0;
+        const bad = sd.filter(x => { const cd = v.cards[x.id]; if (!cd || cd.length < 2) return true; const line = covLine(cd[0], cd[1], x.miss); return !v.cov.includes(line) || !x.miss.every(s => cd.join(' ').includes(WT[s] + ' sem dia')); });
+        check('TR19l-' + tag + ' · ' + br(day) + ': as ' + sd.reduce((a, x) => a + x.miss.length, 0) + ' etapa(s) sem dia do plano (' + sd.map(x => x.id + ':' + x.miss.map(s => WT[s]).join('+')).join(', ') + ') estão TODAS no aviso ⚠️ ("CÓD (título) aberto — … sem dia.", X22) e no cartão da aba Trilha ("… sem dia", X31) — nenhuma some calada', !bad.length, JSON.stringify({ bad, cov: v.cov, cards: v.cards }));
+        if (sM) {
+            const stuck = !(t[M] || {}).aula && (!pM.aula || pM.aula < day);
+            check('TR19l-' + tag + ' · ' + br(day) + ': ' + lbl + ' — o ⚠️ diz "' + covLine(lbl.split(' · ')[0], lbl.split(' · ')[1], sM.miss) + (stuck ? SUF_AULA : '') + '" (sufixo do X22: a aula sem marca não tem dia novo até 01/01)', v.cov.includes(covLine(lbl.split(' · ')[0], lbl.split(' · ')[1], sM.miss) + (stuck ? SUF_AULA : '')), v.cov);
+            const pn = v.panel[lbl] || '';
+            check('TR19l-' + tag + ' · ' + br(day) + ': o painel da semana mostra ' + lbl + ' com "sem dia" (não "—") nas etapas sem dia (X31)', !!pn && sM.miss.every(s => pn.includes(WT[s] + ' sem dia')) && !/ —( ·|$)/.test(pn), pn);
+            check('TR19l-' + tag + ' · ' + br(day) + ': o ⏳ traz o módulo (a aula de ' + br(pM.aula || day) + ' sem marca)', v.pend.includes(lbl.split(' · ')[0] + ' · '), v.pend.split('\n')[0]); }
+        if (v.fin) { check('TR19l-' + tag + ' · ' + br(day) + ': o 📦 da semana final não diz "o que estava aberto já está nos dias planejados" com etapa sem dia (X23)', !/já está nos dias planejados/.test(v.fin), v.fin);
+            if ((((c.trilhaFinalLog || {}).noAula) || []).includes(M)) check('TR19l-' + tag + ' · ' + br(day) + ': o 📦 diz "Aula sem outro dia até 01/01: ' + lbl.split(' · ')[0] + '" (log noAula, C4)', new RegExp('Aula sem outro dia até 01/01: ([A-Z0-9]+, )*' + escT(lbl.split(' · ')[0]) + '[ ,]').test(v.fin), v.fin); }
+        return sM ? 1 : 0; };
+    // em 02/01 (depois de 01/01): o módulo sem nenhuma marca vira "aula não assistida até 01/01" (§4.3) — sai do ⚠️, do ⏳ e dos dias; o bloco da aula fica; vai para o balanço
+    const tr19lAfter = async (S, tag, M, lbl, aulaIso, hiddenIso) => { const page = S.page; const code = lbl.split(' · ')[0], title = lbl.split(' · ')[1]; const v = await screenT(page, [M]);
+        console.log('   📋 ' + tag + ' 02/01 · ⚠️ ' + (v.cov.replace(/\n/g, ' / ') || '(nenhum)') + ' · ⏳ ' + (v.pend.split('\n')[0] || '(nenhum)') + ' · balanço: ' + v.bal.replace(/\n/g, ' / ').slice(0, 600));
+        check('TR19l-' + tag + ' · 02/01: ' + lbl + ' (nenhuma etapa marcada) sai do aviso ⚠️ e do ⏳ — aula não assistida até 01/01 (§4.3)', !v.cov.includes(code + ' (' + title + ')') && !v.pend.includes(code + ' · '), JSON.stringify([v.cov, v.pend]));
+        check('TR19l-' + tag + ' · 02/01: ' + lbl + ' continua visível no balanço (nunca some calado)', v.bal.includes(code), v.bal.slice(0, 400));
+        console.log('   ⏸ PENDENTE S5 (TR19l-' + tag + '): balanço com "Aula não assistida até 01/01: ' + code + ' (planejada …)" (X39) e partição closed+ended+open+noAula+preAula+out = fila');
+        const okA = await goDateT(page, aulaIso); const dA = okA ? await readDay(page) : { blocks: [] };
+        check('TR19l-' + tag + ' · 02/01: o bloco da aula de ' + lbl + ' continua em ' + br(aulaIso) + ' (C4: é por ali que ela marca)', okA && dA.blocks.some(b => b.tm === M && b.ts === 'aula' && !b.au), JSON.stringify(dA.blocks.map(b => (b.tm || '') + ':' + (b.ts || '') + ' ' + b.text.slice(0, 50))));
+        for (const h of hiddenIso) { const ok = await goDateT(page, h); const d = ok ? await readDay(page) : { blocks: [] };
+            check('TR19l-' + tag + ' · 02/01: ' + br(h) + ' não mostra mais etapa nem linha ↷ de ' + lbl + ' (sem questões sem aula)', ok && !d.blocks.some(b => b.tm === M) && !d.blocks.some(b => new RegExp('^↷ Trilha · ' + escT(code) + ' — ').test(b.text)), JSON.stringify([ok, d.blocks.map(b => (b.tm || '') + ':' + (b.ts || '') + ' ' + b.text.slice(0, 60))])); }
+    };
+    // TR19l A′ · simulado religado em 01/01 + "Deixar neste dia" na apostila de PED2 (26) em 01/01; aula e questões do 26 sem marca, de 29/12 a 02/01
+    await scenario(browser, 'TR19l-a-simulado-0101-deixar-apostila', '2026-10-26', {}, async (S) => {
+        await walkT(S, '2026-12-22'); let page = await prepT(S, '2026-12-22', (c, t) => { c.simOverrides = { ...(c.simOverrides || {}), '2027-01-01': true }; markExcept(c, t, '2026-12-29', [26]); });
+        const nav = mkNav(page, '2026-12-22');
+        await moveStageT(page, nav, 26, 'aula', '2026-12-27', '2026-12-29'); await clickAsk(page, 'Mover o fio todo (+2 dias)'); await answerQ(page, 'apost', 'Deixar neste dia'); await clickAsk(page, 'Aplicar'); await pronto(page);
+        const p0 = (await getLS(page, CFG)).trilhaPlan[26];
+        check('TR19l-a · premissa (22/12): PED2 (26) com a apostila deixada em SEX 01/01 (sexta de simulado, keep) e aula/questões antes', p0.apost === '2027-01-01' && JSON.stringify(p0.keep) === JSON.stringify({ apost: '2027-01-01' }) && p0.aula < '2027-01-01' && p0.quest < '2027-01-01', JSON.stringify(p0));
+        let n = 0;
+        for (const day of ['2026-12-29', '2026-12-30', '2026-12-31', '2027-01-01']) { await dayT(S, day, [26]); n += await tr19lDay(S, 'a', day, 26, 'PED2 · Aleitamento Materno'); }
+        check('TR19l-a · PREMISSA (testes I11): em pelo menos um dia de 29/12 a 01/01 o PED2 tem etapa sem dia no plano (senão o teste não prova nada)', n > 0, n + ' dia(s)');
+        await dayT(S, '2027-01-02', [26]);
+        const p2 = (await getLS(S.page, CFG)).trilhaPlan[26]; await tr19lAfter(S, 'a', 26, 'PED2 · Aleitamento Materno', p2.aula, ['2026-12-31', p2.apost].filter(Boolean)); // 31/12: as linhas ↷ das questões (→ sem dia); 01/01: a apostila deixada por ela
+    });
+    // TR19l B′ · 30/12 e 01/01 editados à mão; a aula de HEM1 Anemias I (27) de SEG 28/12 sem marca: a recolocação não acha dia até 01/01 (29/12 dia leve, 31/12 feriado) — de 29/12 a 02/01
+    await scenario(browser, 'TR19l-b-dias-editados-aula-2812', '2026-10-26', {}, async (S) => {
+        await walkT(S, '2026-12-22'); let page = await prepT(S, '2026-12-22', (c, t) => { markExcept(c, t, '2026-12-29', [27]); });
+        { const ed = [{ id: 'e1', d: 'ANKI', color: '#0369A1', text: 'Anki + Meditação 15min', time: '35min' }, { id: 'e2', d: 'LAZER', color: '#6B7280', text: 'Noite livre', time: 'livre' }]; const sch = (await getLS(page, SCH)) || {}; sch['2026-12-30'] = ed; sch['2027-01-01'] = ed; await setLS(page, SCH, sch); }
+        const p0 = (await getLS(page, CFG)).trilhaPlan[27];
+        check('TR19l-b · premissa (22/12): HEM1 Anemias I (27) com a aula em SEG 28/12 e o resto depois; 30/12 e 01/01 editados à mão', p0.aula === '2026-12-28' && p0.quest > '2026-12-28', JSON.stringify(p0));
+        let n = 0;
+        for (const day of ['2026-12-29', '2026-12-30', '2026-12-31', '2027-01-01']) { await dayT(S, day, [27]); n += await tr19lDay(S, 'b', day, 27, 'HEM1 · Anemias I — Ferropriva, Megaloblástica, Doença Crônica');
+            if (day === '2026-12-29') { const p = (await getLS(S.page, CFG)).trilhaPlan[27]; const okA = await goDateT(S.page, '2026-12-28'); const dA = okA ? await readDay(S.page) : { blocks: [] };
+                check('TR19l-b · 29/12: a aula sem outro dia até 01/01 FICA no bloco de SEG 28/12 (C4), sem hist, e as seguintes ficam sem dia com hist "final"', p.aula === '2026-12-28' && !p.hist.some(h => h.ts === 'aula' && h.why === 'final') && ['quest', 'apost', 'seal'].every(s => p[s] === null && p.hist.some(h => h.ts === s && h.why === 'final' && h.to === null)) && dA.blocks.some(b => b.tm === 27 && b.ts === 'aula'), JSON.stringify(p));
+                const okS = await goDateT(S.page, p0.seal); const dS = okS ? await readDay(S.page) : { blocks: [] };
+                check('TR19l-b · 29/12: no dia em que a selagem estava (' + br(p0.seal) + '), a linha ↷ diz "↷ Trilha · HEM1 — selagem sem dia (veja o aviso ⚠️ e o ⏳)" (X03)', okS && dS.blocks.some(b => b.text === '↷ Trilha · HEM1 — selagem sem dia (veja o aviso ⚠️ e o ⏳)'), JSON.stringify([okS, dS.blocks.filter(b => /^↷/.test(b.text)).map(b => b.text)])); } }
+        check('TR19l-b · PREMISSA (testes I11): em pelo menos um dia de 29/12 a 01/01 o HEM1 Anemias I tem etapa sem dia no plano', n > 0, n + ' dia(s)');
+        await dayT(S, '2027-01-02', [27]);
+        await tr19lAfter(S, 'b', 27, 'HEM1 · Anemias I — Ferropriva, Megaloblástica, Doença Crônica', '2026-12-28', [p0.seal]);
+    });
+
+    // TR19d · cadeia que não fecha (§10.2). (i) aula feita em 30/12 e o resto não → abre em 02/01, 05/01 e 20/01; (ii) aula não feita até 01/01 → 02/01; depois ela marca a aula no bloco
+    const plan19d = (pl) => ({ ...baseCfg, trilhaWeeks: { '2026-12-22': { q: Object.keys(pl).length, base: 4, held: false, why: null, mods: Object.keys(pl).map(Number), adv: [], rise: [] } }, trilhaPlan: mkPlan(pl, '2026-12-22') });
+    const CH19d = ['2026-12-30', '2026-12-31', '2027-01-01', '2027-01-04'];
+    await scenario(browser, 'TR19d-i-aula-feita-3012-resto-nao', '2026-12-29', { [CFG]: plan19d({ 19: CH19d }) }, async (S) => {
+        let page = S.page; const c0 = await getLS(page, CFG);
+        check('TR19d-i · premissa (29/12): CIR2 Cicatrização (19) com aula 30/12, questões 31/12, apostila 01/01, selagem 04/01 (a recolocação de 29/12 não mexe: tudo válido)', ['aula', 'quest', 'apost', 'seal'].map(s => c0.trilhaPlan[19][s]).join() === '2026-12-30,2026-12-31,2027-01-01,2027-01-04', JSON.stringify(c0.trilhaPlan[19]));
+        { const t = (await getLS(page, TRL)) || {}; t[19] = { aula: true, aulaAt: '2026-12-30' }; await setLS(page, TRL, t); } // ela assistiu a aula em 30/12 e não fez o resto
+        for (const day of ['2027-01-02', '2027-01-05', '2027-01-20']) { page = await S.reopen(day); await clickTab(page, 'CRONOGRAMA');
+            const hw = await headerWeek(page), tabs = await listDayTabs(page); const pend = await banner(page, 'trilha-pending');
+            let pv = null; if (pend) { await clickIn(page, 'trilha-pending', 'Ver como recolocar'); pv = await banner(page, 'trilha-pending'); }
+            console.log('   ⏳ ' + br(day) + ' · Sem.' + hw.week + ' ' + hw.range + ' · ' + (pv ? pv.text.replace(/\n/g, ' / ').slice(0, 400) : '(sem ⏳)'));
+            check('TR19d-i · ' + br(day) + ': a semana de hoje está visível (garantia a: Sem. com ' + br(day) + ')', tabs.some(t => t.date === br(day)), JSON.stringify([hw, tabs.map(t => t.date)]));
+            check('TR19d-i · ' + br(day) + ': ⏳ com CIR2 · Cicatrização e "Ver como recolocar" propõe questões, apostila e selagem em janeiro, a partir de hoje', !!pv && /CIR2 · Cicatrização de Feridas e Queimaduras · questões \S+ (\d\d)\/01 .*apostila \S+ \d\d\/01 .*selagem \S+ \d\d\/0[12]/.test(pv.text) && pv.btns.includes('Aplicar'), pv && pv.text.slice(0, 500));
+            if (pv) await clickIn(page, 'trilha-pending', 'Cancelar'); }
+        const c1 = await getLS(page, CFG);
+        check('TR19d-i: sem Aplicar, o plano do 19 não muda (nada se move sozinho depois de 01/01)', JSON.stringify(['aula', 'quest', 'apost', 'seal'].map(s => c1.trilhaPlan[19][s])) === JSON.stringify(['aula', 'quest', 'apost', 'seal'].map(s => c0.trilhaPlan[19][s])), JSON.stringify(c1.trilhaPlan[19]));
+    });
+    await scenario(browser, 'TR19d-ii-aula-nao-assistida-ate-0101', '2026-12-29', { [CFG]: plan19d({ 14: CH19d, 26: ['2026-12-28', '2026-12-30', '2027-01-01', '2027-01-04'] }), [TRL]: { 26: { aula: true, aulaAt: '2026-12-28' } } }, async (S) => { // + PED2 (26) com a aula de 28/12 feita: a cauda fica viva e a semana de hoje (C1) aparece, com o ⏳ dele — assim o "CIR2 fora do ⏳" confere de verdade
+        let page = S.page; const c0 = await getLS(page, CFG); const pl = c0.trilhaPlan[14];
+        check('TR19d-ii · premissa (29/12): CIR2 Urologia (14) com aula 30/12, questões 31/12, apostila 01/01, selagem 04/01, nada marcado; PED2 (26) com a aula de 28/12 marcada e o resto planejado (30/12, 01/01, 04/01)', ['aula', 'quest', 'apost', 'seal'].map(s => pl[s]).join() === '2026-12-30,2026-12-31,2027-01-01,2027-01-04' && ['quest', 'apost', 'seal'].map(s => c0.trilhaPlan[26][s]).join() === '2026-12-30,2027-01-01,2027-01-04', JSON.stringify([pl, c0.trilhaPlan[26]]));
+        page = await S.reopen('2027-01-02'); // o app ficou fechado de 30/12 a 01/01
+        const cov = (await banner(page, 'trilha-coverage')) || { text: '' }, pend = (await banner(page, 'trilha-pending')) || { text: '' }, bal = (await banner(page, 'trilha-balanco')) || { text: '' };
+        console.log('   📋 02/01 · ⚠️ ' + (cov.text || '(nenhum)') + ' · ⏳ ' + (pend.text.split('\n')[0] || '(nenhum)') + ' · balanço: ' + bal.text.replace(/\n/g, ' / ').slice(0, 500));
+        check('TR19d-ii · 02/01: o ⏳ da semana de hoje (C1) traz o PED2 (cadeia aberta) e NÃO traz o CIR2 Urologia, que também não está no aviso ⚠️ (aula não assistida até 01/01: não é cadeia aberta)', /PED2 · /.test(pend.text) && !/CIR2/.test(pend.text) && !/CIR2/.test(cov.text), JSON.stringify([pend.text, cov.text]));
+        const seen = []; for (const d of ['2026-12-30', '2026-12-31', '2027-01-01', '2027-01-04']) { const ok = await goDateT(page, d); const dy = ok ? await readDay(page) : { blocks: [] }; seen.push([d, ok, dy.blocks.filter(b => b.tm === 14 || /^↷ Trilha · CIR2/.test(b.text)).map(b => b.ts || b.text.slice(0, 40))]); }
+        console.log('   🗓️ blocos do 14 em 30/12, 31/12, 01/01 e 04/01:', JSON.stringify(seen));
+        check('TR19d-ii · 02/01: o bloco da aula continua em QUA 30/12 (C4) e questões (31/12), apostila (01/01) e selagem (04/01) não aparecem em nenhum dia', seen.every(([, ok]) => ok) && JSON.stringify(seen[0][2]) === '["aula"]' && seen.slice(1).every(([, , b]) => !b.length), JSON.stringify(seen));
+        check('TR19d-ii · 02/01: o módulo continua visível no balanço', /CIR2/.test(bal.text), bal.text.slice(0, 300));
+        console.log('   ⏸ PENDENTE S5 (TR19d-ii): o balanço diz "Aula não assistida até 01/01: CIR2 (planejada QUA 30/12)" (X39)');
+        // ela assistiu e marca a aula no bloco de 30/12 (carimbo = dia do bloco)
+        await goDateT(page, '2026-12-30'); const dA = await readDay(page); const bA = dA.blocks.find(b => b.tm === 14 && b.ts === 'aula');
+        await clickTask(page, new RegExp('^' + escT(bA.text.slice(0, 60))), null);
+        const t1 = (await getLS(page, TRL)) || {};
+        check('TR19d-ii · ✓ no bloco de 30/12: aula marcada com carimbo 30/12 (o dia do bloco)', !!(t1[14] || {}).aula && t1[14].aulaAt === '2026-12-30', JSON.stringify(t1[14]));
+        await goDateT(page, '2027-01-02'); const pend2 = await banner(page, 'trilha-pending');
+        if (pend2) await clickIn(page, 'trilha-pending', 'Ver como recolocar'); const pv = await banner(page, 'trilha-pending');
+        console.log('   💡 depois da marca: ' + (pv ? pv.text.replace(/\n/g, ' / ').slice(0, 500) : '(sem ⏳)'));
+        check('TR19d-ii · depois da marca a cadeia volta: o ⏳ traz CIR2 · Urologia e "Ver como recolocar" propõe questões, apostila e selagem em janeiro', !!pv && /CIR2 · Urologia · questões \S+ \d\d\/01 [^|]*apostila \S+ \d\d\/01 [^|]*selagem \S+ \d\d\/0[12]/.test(pv.text) && pv.btns.includes('Aplicar'), pv && pv.text.slice(0, 500));
+        if (pv) await clickIn(page, 'trilha-pending', 'Aplicar');
+        const p2 = (await getLS(page, CFG)).trilhaPlan[14];
+        check('TR19d-ii · Aplicar grava questões, apostila e selagem a partir de 02/01, em ordem, com hist "recolocar"; a aula fica em 30/12', p2.aula === '2026-12-30' && p2.quest >= '2027-01-02' && p2.quest < p2.apost && p2.apost < p2.seal && ['quest', 'apost', 'seal'].every(s => p2.hist.some(h => h.ts === s && h.why === 'recolocar')), JSON.stringify(p2));
+        console.log('   ⏸ PENDENTE S5 (TR19d-ii): "Aulas até 01/01" sobe 1 depois da marca (carimbo 30/12)');
+    });
 
     await scenario(browser, 'TR11-mover-2610', '2026-10-26', {}, async (S) => {
         let page = S.page;
@@ -704,10 +865,10 @@ const DEFAULT12 = [5, 6, 14, 19, 24, 32, 34, 85, 86, 1, 2, 3];
         check('Cancelar não grava nada', JSON.stringify(await getLS(page, CFG)) === JSON.stringify(before) && !(await getLS(page, SCH)));
         await moveT(page, /^Trilha · CIR1 — Trauma II .*30 questões/, '2026-11-01'); await clickAsk(page, 'Ver como reorganizar o fio');
         const ask2 = await readAsk(page); console.log('   ', ask2.text.replace(/\n/g, ' | '));
-        check('"Ver como reorganizar" nunca propõe a TER 03/11 (plantão longo) nem a SEX 06/11 (simulado)', /💡 Reorganizar CIR1 Trauma II/.test(ask2.text) && !/03\/11|06\/11/.test(ask2.text.split('💡')[1] || ''), ask2.text);
-        await clickAsk(page, 'Aplicar');
+        check('"Ver como reorganizar" com 1 aula por dia: a aula de CIR1 · Trauma II teria de ir para 30/10 (já tem a aula de CIR2 · Urologia) ou 31/10 (dia leve) e a 2ª aula só entra pelo gatilho estrito (RM7) ⇒ "💡 Não consigo reacomodar sem quebrar outra regra…", sem "Aplicar" — e nada com TER 03/11 (plantão longo) nem SEX 06/11 (simulado)', /💡 Não consigo reacomodar sem quebrar outra regra/.test(ask2.text) && !ask2.btns.includes('Aplicar') && !/03\/11|06\/11/.test(ask2.text.split('💡')[1] || ''), ask2.text);
+        const p6a = (await getLS(page, CFG)).trilhaPlan[6]; await clickAsk(page, 'Mover assim mesmo');
         const p6 = (await getLS(page, CFG)).trilhaPlan[6];
-        check('Aplicar: trilhaPlan[6].quest = 01/11 + aula/apostila/selagem reorganizadas (hist "reorganizar"), sem dias novos no schedule_v1', p6.quest === '2026-11-01' && p6.aula < '2026-11-01' && p6.apost > '2026-11-01' && !['2026-11-03', '2026-11-06'].includes(p6.seal) && p6.hist.length >= 2 && p6.hist.every(h => h.why === 'reorganizar') && dd(p6.aula, p6.quest) >= 1 && dd(p6.aula, p6.quest) <= 2 && !(await getLS(page, SCH)), JSON.stringify(p6));
+        check('"Mover assim mesmo": trilhaPlan[6].quest = 01/11 (hist "mover"); aula, apostila e selagem ficam; sem dias novos no schedule_v1', p6.quest === '2026-11-01' && p6.aula === p6a.aula && p6.apost === p6a.apost && p6.seal === p6a.seal && p6.hist.slice(-1)[0].why === 'mover' && !(await getLS(page, SCH)), JSON.stringify(p6));
         await clickDate(page, '01/11'); const dm = await readDay(page);
         check('DOM 01/11 mostra as questões de CIR1 · Trauma II', dm.blocks.some(b => b.tm === 6 && b.ts === 'quest'));
         // cruzar a semana: a selagem de CIR1 · Trauma I sai da T1 (DOM 01/11) para a T2 (QUI 05/11, fora da faixa) ⇒ aviso; "Mover assim mesmo" grava só ela (hist "mover")
@@ -754,8 +915,8 @@ const DEFAULT12 = [5, 6, 14, 19, 24, 32, 34, 85, 86, 1, 2, 3];
         check('sem migração: não havia semana da trilha gravada (nenhum trilhaDescartes)', !cfg.trilhaDescartes, JSON.stringify(cfg.trilhaDescartes));
         const hdr = await page.evaluate(() => (document.querySelector('[data-t="trilha-panel"]') || {}).innerText || '');
         check('painel da semana: "ritmo 2 — 1º acesso: proporcional aos 6 de 8 dias que restavam (a rampa previa 3)"', /ritmo 2 — 1º acesso: proporcional aos 6 de 8 dias que restavam \(a rampa previa 3\)/.test(hdr), hdr.split('\n')[0]);
-        await navWeek(page, 1); const nT2 = await page.evaluate(() => [...document.querySelectorAll('[data-t="trilha-panel"] [data-mod]')].filter(e => e.getAttribute('data-kind') === 'novo').length); await navWeek(page, -1);
-        check('a semana proporcional não segura a seguinte: prévia da T2 com 4 novos (a subida usa a cota cheia, 3 → 4)', nT2 === 4, 'T2 novos=' + nT2);
+        await navWeek(page, 1); const nT2 = await page.evaluate(() => [...document.querySelectorAll('[data-t="trilha-panel"] [data-mod]')].filter(e => e.getAttribute('data-kind') === 'novo').length); const hT2 = await page.evaluate(() => ((document.querySelector('[data-t="trilha-panel"]') || {}).innerText || '').split('\n')[0]); await navWeek(page, -1);
+        check('a semana proporcional não segura a seguinte: prévia da T2 com ritmo 4 (a subida usa a cota cheia, 3 → 4) — e, com 1 aula por dia, 3 novos (o 4º não coube)', nT2 === 3 && /ritmo 4/.test(hT2) && !/semana de manutenção/.test(hT2), 'T2 novos=' + nT2 + ' · ' + hT2);
         check('o histórico do curso fica: fioWeek, weekGroups, progress_v1 e schedule_v1 intactos', JSON.stringify(cfg.fioWeek) === JSON.stringify({ '2026-10-07': [75, 76], '2026-10-14': [77, 78] }) && cfg.weekGroups[38] && (await getLS(page, PRG))[77].aula === true && !!(await getLS(page, SCH))['2026-10-29']);
         await clickDate(page, '29/10'); const qi = await readDay(page); console.log(fmt(qi));
         const old = qi.blocks.find(b => /^Fio 1 · toque 3/.test(b.text));
@@ -838,14 +999,16 @@ const DEFAULT12 = [5, 6, 14, 19, 24, 32, 34, 85, 86, 1, 2, 3];
         await navWeek(page, -1); await clickDate(page, '23/10'); const sx = await readDay(page);
         check('SEX 23/10 (transição): sem bloco de revisão', !sx.blocks.some(b => b.tag === 'REV'), fmt(sx));
     });
-    // ── TR15e · depois de 01/01 a regra da Trilha para: a revisão volta ao texto de sempre (nada de "o dia está cheio") ──
+    // ── TR15e · 04/01 (cauda; regra de 01/01, S2): a decisão 73 vale até o fim do calendário — 02/01 e 03/01 tinham folga, então "2d em atraso." (mesmo resultado de antes) ──
     await scenario(browser, 'TR15e-revisao-depois-de-0101', '2027-01-04', { [TRL]: { 5: { aula: true, questoesD2: true, apostila: true, smartcard: true, aulaAt: '2026-12-15', questoesD2At: '2026-12-16', apostilaAt: '2026-12-17', smartcardAt: '2026-12-23', completedAt: '2026-12-23', accSelagem: 85 } } }, async (S) => {
         const st = await revStatus(S.page);
-        check('04/01/2027 (revisão D+7 venceu 02/01): "2d em atraso." como antes — nenhum "o dia está cheio" depois do fim da Trilha', st.length >= 1 && st.every(x => x.text === '2d em atraso.') && !/o dia está cheio/.test(await bodyText(S.page)), JSON.stringify(st));
+        check('04/01/2027 (cauda; revisão D+7 venceu 02/01): a decisão 73 vale na cauda — 02/01 e 03/01 tinham folga ⇒ "2d em atraso." (mesmo resultado); nenhum "o dia está cheio"', st.length >= 1 && st.every(x => x.text === '2d em atraso.') && !/o dia está cheio/.test(await bodyText(S.page)), JSON.stringify(st));
     });
     // ── TR15b · decisão 73 no limiar reduzido: dia de 04h30 (📚 a 5h) — a revisão que passaria de 5h de estudo vira opcional ──
     const tr15b = { ...mkTrail(plan3, '2026-11-24'), 60: { aula: true, questoesD2: true, apostila: true, smartcard: true, aulaAt: '2026-11-05', questoesD2At: '2026-11-06', apostilaAt: '2026-11-07', smartcardAt: '2026-11-15', completedAt: '2026-11-15', accSelagem: 85 } };
-    await scenario(browser, 'TR15b-revisao-limiar-reduzido-2511', '2026-11-25', { [CFG]: cfg3, [TRL]: tr15b }, async (S) => {
+    const plan15b = { 24: ['2026-11-25', '2026-11-26', '2026-11-27', '2026-11-30'], 32: ['2026-11-27', '2026-11-29', '2026-11-30', '2026-12-03'], 34: ['2026-11-29', '2026-11-30', '2026-12-01', '2026-12-04'], 85: ['2026-11-25', '2026-11-26', '2026-11-27', '2026-11-30'] }; // premissa (S3b): a T5 exatamente como o motor anterior a congelava em 25/11 (medido no vm com o planner do S2: 24 e 85 com aula em 25/11 → 4,40h de estudo). O cenário testa a decisão 73 no limiar de 5h, não a colocação: com 1 aula por dia o congelamento de 25/11 deixa o dia com 3,45h e a revisão cabe
+    const cfg15b = { ...cfg3, trilhaWeeks: { ...cfg3.trilhaWeeks, '2026-11-24': { q: 4, base: 5, held: true, why: 'madrugada', mods: [24, 32, 34, 85], adv: [], rise: [], short: 0, light: '2026-11-28', at: '2026-11-25' } }, trilhaPlan: { ...cfg3.trilhaPlan, ...mkPlan(plan15b, '2026-11-24') } };
+    await scenario(browser, 'TR15b-revisao-limiar-reduzido-2511', '2026-11-25', { [CFG]: cfg15b, [TRL]: tr15b }, async (S) => {
         const page = S.page; const qua = await readDay(page); const rv = qua.blocks.find(b => /^Revisão adaptativa/.test(b.text));
         const st = H.hoursOf(qua);
         check('QUA 25/11 (04h30): com a revisão o estudo passaria de 5h ⇒ "Revisão adaptativa — opcional hoje…" (opcional), estudo do dia ' + st.toFixed(2).replace('.', ',') + 'h ≤ 5h', !!rv && /^Revisão adaptativa — opcional hoje: o dia já está cheio; se não fizer, ela passa para (SÁB|DOM) \d\d\/11$/.test(rv.text) && rv.time === 'opcional' && st <= 5 + 1e-9, (rv && rv.text) + ' · estudo ' + st.toFixed(2));
@@ -875,15 +1038,23 @@ const DEFAULT12 = [5, 6, 14, 19, 24, 32, 34, 85, 86, 1, 2, 3];
         check('caminho inverso: apostila marcada no card aparece ✓ no bloco de QUI 29/10', qi.blocks.some(b => b.tm === 5 && b.ts === 'apost' && b.done));
     });
 
-    // ── dia leve previsto: aula nunca no dia leve; etapa ali só de menor demanda e sinalizada (10 semanas da Trilha; a transição não tem 🌿) ──
+    // ── dia leve previsto: aula nunca no dia leve; etapa ali só de menor demanda e sinalizada (10 semanas da Trilha; a transição não tem 🌿) ·
+    //    semanas da cauda (regra de 01/01, S2 — 🧠 DELA 6): nenhum dia leve previsto, seletor "Auto · —" com o aviso X27; reaberto em 10/12 para a cauda existir ──
+    const X27 = '🌿 Nas semanas de janeiro nenhum dia leve é previsto — se quiser, escolha um dia no seletor.';
     await scenario(browser, 'TRleve-dia-leve-previsto', '2026-10-19', {}, async (S) => {
-        const page = S.page; await navWeek(page, 2); const bad = [], flagged = [], lights = [];
+        let page = S.page; await navWeek(page, 2); const bad = [], flagged = [], lights = [], tail = [];
         for (let k = 0; k < 10; k++) { const w = await readWeekT(page); const any = Object.values(w)[0]; const L = any.light && any.light.note ? any.light.note.slice(0, 9) : null; lights.push(L);
-            Object.entries(w).forEach(([d, x]) => { if (x.lightBadge || x.breatherBadge || (L && L.slice(4) === d)) { x.blocks.forEach(b => { if (b.ts === 'aula' && !b.au) bad.push(d); if (b.tm != null && !b.au) { if (/🌿 dia leve — etapa de menor demanda/.test(b.text)) flagged.push(d + ' ' + b.ts); else bad.push(d + ' sem sinal'); } }); } });
+            Object.entries(w).forEach(([d, x]) => { if (x.lightBadge || x.breatherBadge || (L && L.slice(4) === d)) { x.blocks.forEach(b => { if (b.ts === 'aula' && !b.au) bad.push(d); if (b.tm != null && !b.au) { if ((b.ts === 'quest' ? /🌿 dia leve — questões no dia leve só como última saída: se der, mova para outro dia/ : /🌿 dia leve — etapa de menor demanda/).test(b.text)) flagged.push(d + ' ' + b.ts); else bad.push(d + ' sem sinal'); } }); } }); // X02 (S3a/S3b; testes I4): questões no dia leve só com o aviso da última saída
             if (k < 9) await navWeek(page, 1); }
         console.log('   dias leves previstos:', lights.join(' · '));
         check('um dia leve previsto em cada uma das 10 semanas (a 1ª, de 8 dias: SÁB 31/10)', lights.length === 10 && lights.every(Boolean) && lights[0] === 'SÁB 31/10', lights.join(' · '));
-        check('nenhuma aula no dia leve previsto; etapa no dia leve só sinalizada "🌿 dia leve — etapa de menor demanda"', !bad.length, bad.join(', ') + ' | sinalizadas: ' + flagged.join(', '));
+        check('nenhuma aula no dia leve previsto; etapa no dia leve só sinalizada ("🌿 dia leve — etapa de menor demanda"; questões: "🌿 dia leve — questões no dia leve só como última saída…", X02)', !bad.length, bad.join(', ') + ' | sinalizadas: ' + flagged.join(', '));
+        // cauda: em 10/12 (1º acesso; a T7 congela e as selagens dela + 30 levam o calendário a janeiro), ▶ até a última semana visível
+        page = await S.reopen('2026-12-10');
+        for (let g = 0; g < 30; g++) { const h0 = await headerWeek(page); await navWeek(page, 1); const h1 = await headerWeek(page); if (h1.week === h0.week) break; if (h1.week <= 52) continue;
+            const w = await readWeekT(page); const any = Object.values(w)[0]; tail.push({ week: h1.week, range: h1.range, auto: any.light && any.light.auto, value: any.light && any.light.value, note: any.light && any.light.note, selo: Object.values(w).some(x => x.lightBadge || x.breatherBadge) }); }
+        console.log('   semanas da cauda (em 10/12):', tail.map(t => 'Sem.' + t.week + ' ' + t.range + ' · ' + t.auto).join(' · '));
+        check('semanas da cauda até a última visível (em 10/12: ' + tail.length + ', a 1ª = C1 02/01–04/01): nenhum dia leve previsto — seletor "Auto · —" com o aviso "' + X27 + '", sem selo de dia leve', tail.length >= 1 && tail[0].range === '02/01–04/01' && tail.every(t => t.auto === 'Auto · —' && t.value === 'auto' && t.note === X27 && !t.selo), JSON.stringify(tail));
     });
 
     // ── startDate 14/01: a numeração do curso muda, a Trilha não ──
@@ -894,7 +1065,7 @@ const DEFAULT12 = [5, 6, 14, 19, 24, 32, 34, 85, 86, 1, 2, 3];
         await navWeek(page, -1); const h0 = await headerWeek(page);
         check('◀ Sem.41 = transição 20/10–25/10', h0.week === 41 && h0.range === '20/10–25/10' && /(^|\n)Transição(\n|$)/.test(await bodyText(page)), JSON.stringify(h0));
         await navWeek(page, 12); const h2 = await headerWeek(page);
-        check('▶ para na Sem.51 = 29/12–01/01', h2.week === 51 && h2.range === '29/12–01/01', JSON.stringify(h2));
+        check('▶ para na última semana visível: Sem.52 = C1, 02/01–04/01 (a prévia tem selagem em janeiro — teto por etapa e decisão 7)', h2.week === 52 && h2.range === '02/01–04/01', JSON.stringify(h2));
     });
 
     // ── TR16 · início em 26/10 (paciente, 26/10): o app chega com a semana de 20/10 congelada pela versão anterior (nada executado) ──
@@ -1049,13 +1220,13 @@ const DEFAULT12 = [5, 6, 14, 19, 24, 32, 34, 85, 86, 1, 2, 3];
         const cfgB = await getLS(page, CFG);
         const T2 = (cfgB.trilhaWeeks['2026-11-03'] || {}).mods || [];
         check('03/11: a T2 congela segurada em 3 (a T1 não fechou) com a fila que valia na hora — o 📌 de 30/10 (85) entra: 85, 19, 24', cfgB.trilhaWeeks['2026-11-03'] && cfgB.trilhaWeeks['2026-11-03'].q === 3 && cfgB.trilhaWeeks['2026-11-03'].held && JSON.stringify(T2) === '[85,19,24]', JSON.stringify(cfgB.trilhaWeeks['2026-11-03']));
-        await clickDate(page, '09/11'); await moveAny(/^Trilha · CIR2 — Cicatrização .*aula online/, '2026-11-08');
+        await clickDate(page, '08/11'); await moveAny(/^Trilha · CIR2 — Cicatrização .*aula online/, '2026-11-07'); // premissa (S3b): na T2 congelada pela regra nova a aula está em 08/11 (antes 09/11); move −1 dia, como antes
         await page.evaluate(() => { const c = JSON.parse(localStorage.getItem('medplanner_config_v1')); c.trilhaDismiss = { '2026-11-03|rise': '2026-11-03' }; c.simResults = { ...(c.simResults || {}), '2026-11-06': 62 }; c.simOverrides = { ...(c.simOverrides || {}), '2026-11-20': true }; c.manualWeek = null; localStorage.setItem('medplanner_config_v1', JSON.stringify(c));
             const t = JSON.parse(localStorage.getItem('medplanner_trail_v1') || '{}'); t[5] = { ...(t[5] || {}), accD2: 70 }; t[14] = { aulaAudio: true, aulaAudioAt: '2026-11-02', aula: true, aulaAt: '2026-11-02' }; localStorage.setItem('medplanner_trail_v1', JSON.stringify(t)); });
         page = await S.reopen('2026-11-07');
         const pre = { cfg: await getLS(page, CFG), sch: (await getLS(page, SCH)) || {}, tr: (await getLS(page, TRL)) || {} };
         const movedPre = Object.values(pre.cfg.trilhaPlan).filter(p => STG.some(ts => p[ts] !== p.orig[ts])).length;
-        check('a bagunça está gravada: etapas fora da data original (questões de CIR1 · Trauma I em 31/10, aula de CIR2 · Cicatrização em 08/11), dias da Trilha editados, ✓ e % no registro, 📌, ↑, rampa, dia sem remédio, "Agora não", % e religar do simulado', movedPre === 2 && pre.cfg.trilhaPlan[5].quest === '2026-10-31' && pre.cfg.trilhaPlan[19].aula === '2026-11-08' && Object.keys(pre.sch).some(d => d >= '2026-10-26') && pre.tr[5] && pre.tr[5].aula && pre.tr[5].questoesD2 && pre.tr[6] && pre.tr[6].aula && (pre.cfg.trilhaPins || []).includes(85) && Array.isArray(pre.cfg.trilhaOrder) && pre.cfg.trilhaRamp && pre.cfg.trilhaRamp['2026-11-17'] === 3 && pre.cfg.lightDayOverrides && pre.cfg.lightDayOverrides['2026-10-26'] !== undefined, JSON.stringify([movedPre, Object.keys(pre.sch), pre.tr, pre.cfg.trilhaPins, pre.cfg.trilhaRamp, pre.cfg.lightDayOverrides]));
+        check('a bagunça está gravada: etapas fora da data original (questões de CIR1 · Trauma I em 31/10, aula de CIR2 · Cicatrização em 07/11), dias da Trilha editados, ✓ e % no registro, 📌, ↑, rampa, dia sem remédio, "Agora não", % e religar do simulado', movedPre === 2 && pre.cfg.trilhaPlan[5].quest === '2026-10-31' && pre.cfg.trilhaPlan[19].aula === '2026-11-07' && Object.keys(pre.sch).some(d => d >= '2026-10-26') && pre.tr[5] && pre.tr[5].aula && pre.tr[5].questoesD2 && pre.tr[6] && pre.tr[6].aula && (pre.cfg.trilhaPins || []).includes(85) && Array.isArray(pre.cfg.trilhaOrder) && pre.cfg.trilhaRamp && pre.cfg.trilhaRamp['2026-11-17'] === 3 && pre.cfg.lightDayOverrides && pre.cfg.lightDayOverrides['2026-10-26'] !== undefined, JSON.stringify([movedPre, Object.keys(pre.sch), pre.tr, pre.cfg.trilhaPins, pre.cfg.trilhaRamp, pre.cfg.lightDayOverrides]));
         // ── diagnóstico (nada gravado) ──
         await clickTab(page, 'TRILHA');
         const c0 = await restoreCard(); check('aba Trilha: cartão "🧹 RESTAURAR O PLANO AO ESTADO DA ÚLTIMA ATUALIZAÇÃO" com "Ver o que mudou desde a atualização"', !!c0 && /RESTAURAR O PLANO AO ESTADO DA ÚLTIMA ATUALIZAÇÃO/.test(c0.text) && c0.btns.includes('Ver o que mudou desde a atualização'), c0 && c0.text.slice(0, 120));
@@ -1212,7 +1383,7 @@ const DEFAULT12 = [5, 6, 14, 19, 24, 32, 34, 85, 86, 1, 2, 3];
         const W0 = (await getLS(page, CFG)).trilhaWeeks['2026-11-03'];
         check('T2 congela segurada em 3 (a selagem de CIR1 · Trauma I ficou aberta)', W0.q === 3 && W0.held === true && W0.why === 'fechamento', JSON.stringify(W0));
         await clickCardBtn(page, /Trauma I — Avaliação Inicial/, /^Selagem/); await clickTab(page, 'CRONOGRAMA');
-        await clickIn(page, 'trilha-rise', 'Ver proposta'); await clickIn(page, 'trilha-rise', 'Aplicar');
+        await page.evaluate(() => { const c = JSON.parse(localStorage.getItem('medplanner_config_v1')); const r = { aula: '2026-11-04', quest: '2026-11-05', apost: '2026-11-07', seal: '2026-11-09' }; c.trilhaPlan[34] = { wk: '2026-11-03', via: 'rise', ...r, orig: { ...r }, hist: [] }; const W = c.trilhaWeeks['2026-11-03']; c.trilhaWeeks['2026-11-03'] = { ...W, rise: [34], q: W.q + 1, held: W.q + 1 < W.base, why: W.q + 1 < W.base ? W.why : null }; localStorage.setItem('medplanner_config_v1', JSON.stringify(c)); }); // premissa (S3b): como o applyTProp grava o 🔓 — com 1 aula por dia o 🔓 da T2 não tem proposta (TR8)
         await page.evaluate(() => { const c = JSON.parse(localStorage.getItem('medplanner_config_v1')); const d = { aula: '2026-11-05', quest: '2026-11-07', apost: '2026-11-08', seal: '2026-11-11' }; c.trilhaPlan[85] = { wk: '2026-11-03', via: 'adv', ...d, orig: { ...d }, hist: [] }; c.trilhaWeeks['2026-11-03'] = { ...c.trilhaWeeks['2026-11-03'], adv: [85] }; localStorage.setItem('medplanner_config_v1', JSON.stringify(c)); });
         page = await S.reopen('2026-11-07');
         const pre = { cfg: await getLS(page, CFG), tr: (await getLS(page, TRL)) || {} }, W1 = pre.cfg.trilhaWeeks['2026-11-03'];
@@ -1363,7 +1534,7 @@ const DEFAULT12 = [5, 6, 14, 19, 24, 32, 34, 85, 86, 1, 2, 3];
         let page = S.page; const shot = async (name, sel) => { if (!process.env.SHOTS) return; const f = require('path').join(process.env.SHOTS, name + '.png'); const h = await page.evaluate(() => { const hid = []; document.querySelectorAll('body *').forEach(e => { const p = getComputedStyle(e).position; if (p === 'fixed' || p === 'sticky') { hid.push(e); e.dataset.shotHide = e.style.visibility || '-'; e.style.visibility = 'hidden'; } }); return hid.length; }); const el = sel ? await page.$(sel) : null; if (el) await el.screenshot({ path: f }); else await page.screenshot({ path: f }); await page.evaluate(() => document.querySelectorAll('[data-shot-hide]').forEach(e => { e.style.visibility = e.dataset.shotHide === '-' ? '' : e.dataset.shotHide; delete e.dataset.shotHide; })); }; // telas para o relatório: sem o cabeçalho e a barra fixos por cima
         const say = (txt) => console.log('   📋 ' + txt); const TS_W = (ts) => ({ aula: 'aula', quest: 'questões', apost: 'apostila', seal: 'selagem' })[ts];
         const BLOCKED = new Set(['2026-10-20', '2026-10-27', '2026-11-03', '2026-11-10', '2026-11-12', '2026-11-06', '2026-12-18']); // plantão longo (20/10, 27/10, 03/11, 10/11, 12/11) e sexta de simulado (06/11, 18/12); 20–25/10 transição
-        const isBlocked = (d, ts) => BLOCKED.has(d) || (d >= '2026-10-20' && d <= '2026-10-25') || (d === '2027-01-01' && ts !== 'seal');
+        const isBlocked = (d, ts) => BLOCKED.has(d) || (d >= '2026-10-20' && d <= '2026-10-25'); // regra de 01/01 (S3b; §10.1 a, trilha.js:1366): 01/01 é dia comum — saiu o "01/01 só selagem"
         // 1 · 1º acesso 27/10; a semana 2 congela em 03/11
         const cfg27 = await getLS(page, CFG);
         page = await S.reopen('2026-11-03'); const cfgF = await getLS(page, CFG);

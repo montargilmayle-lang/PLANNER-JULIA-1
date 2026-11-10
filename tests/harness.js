@@ -111,7 +111,7 @@ async function readDay(page) {
         const title = titleEl ? titleEl.textContent.trim() : '';
         const date = (title.match(/(\d\d\/\d\d)/) || [])[1] || '';
         const warn = [...document.querySelectorAll('div')].filter(d => d.style && (d.style.color === 'rgb(248, 113, 113)' || d.style.color === 'rgb(245, 197, 24)') && /acima d[eo]/.test(d.textContent) && d.style.fontSize === '9px').map(d => d.textContent.trim());
-        const simBtn = [...document.querySelectorAll('button')].map(b => b.innerText.trim()).find(t => /Simulado marcado|Sexta de estudo ativo|Sexta de plantão|último dia de acesso: sem simulado/.test(t)) || null;
+        const simBtn = [...document.querySelectorAll('button')].map(b => b.innerText.trim()).find(t => /Simulado marcado|Sexta de estudo ativo|Sexta de plantão|último dia de acesso: sem simulado|último dia de aula nova: sem simulado/.test(t)) || null;
         const weekBadge = ([...document.querySelectorAll('span')].map(s => s.textContent.trim()).find(t => /^Sem\.\d+$/.test(t))) || '';
         const hdr = [...document.querySelectorAll('span')].map(s => s.textContent.trim()).find(t => /% das semanas/.test(t)) || '';
         const lsel = [...document.querySelectorAll('select')].find(s => [...s.options].some(o => /^Auto · /.test(o.textContent)));
