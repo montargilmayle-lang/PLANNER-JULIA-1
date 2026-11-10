@@ -768,14 +768,13 @@ const DEFAULT12 = [5, 6, 14, 19, 24, 32, 34, 85, 86, 1, 2, 3];
             check('TR19l-' + tag + ' · ' + br(day) + ': o painel da semana mostra ' + lbl + ' com "sem dia" (não "—") nas etapas sem dia (X31)', !!pn && sM.miss.every(s => pn.includes(WT[s] + ' sem dia')) && !/ —( ·|$)/.test(pn), pn);
             check('TR19l-' + tag + ' · ' + br(day) + ': o ⏳ traz o módulo (a aula de ' + br(pM.aula || day) + ' sem marca)', v.pend.includes(lbl.split(' · ')[0] + ' · '), v.pend.split('\n')[0]); }
         if (v.fin) { check('TR19l-' + tag + ' · ' + br(day) + ': o 📦 da semana final não diz "o que estava aberto já está nos dias planejados" com etapa sem dia (X23)', !/já está nos dias planejados/.test(v.fin), v.fin);
-            if ((((c.trilhaFinalLog || {}).noAula) || []).includes(M)) check('TR19l-' + tag + ' · ' + br(day) + ': o 📦 diz "Aula sem outro dia até 01/01: ' + lbl.split(' · ')[0] + '" (log noAula, C4)', new RegExp('Aula sem outro dia até 01/01: ([A-Z0-9]+, )*' + escT(lbl.split(' · ')[0]) + '[ ,]').test(v.fin), v.fin); }
+            if ((((c.trilhaFinalLog || {}).noAula) || []).includes(M)) check('TR19l-' + tag + ' · ' + br(day) + ': o 📦 diz "Aula sem outro dia até 01/01: ' + lbl.split(' · ')[0] + '" (log noAula, C4)', new RegExp('Aula sem outro dia até 01/01: ([A-Z0-9]+(?:, | e ))*' + escT(lbl.split(' · ')[0]) + '[ ,]').test(v.fin), v.fin); }
         return sM ? 1 : 0; };
     // em 02/01 (depois de 01/01): o módulo sem nenhuma marca vira "aula não assistida até 01/01" (§4.3) — sai do ⚠️, do ⏳ e dos dias; o bloco da aula fica; vai para o balanço
     const tr19lAfter = async (S, tag, M, lbl, aulaIso, hiddenIso) => { const page = S.page; const code = lbl.split(' · ')[0], title = lbl.split(' · ')[1]; const v = await screenT(page, [M]);
         console.log('   📋 ' + tag + ' 02/01 · ⚠️ ' + (v.cov.replace(/\n/g, ' / ') || '(nenhum)') + ' · ⏳ ' + (v.pend.split('\n')[0] || '(nenhum)') + ' · balanço: ' + v.bal.replace(/\n/g, ' / ').slice(0, 600));
         check('TR19l-' + tag + ' · 02/01: ' + lbl + ' (nenhuma etapa marcada) sai do aviso ⚠️ e do ⏳ — aula não assistida até 01/01 (§4.3)', !v.cov.includes(code + ' (' + title + ')') && !v.pend.includes(code + ' · '), JSON.stringify([v.cov, v.pend]));
-        check('TR19l-' + tag + ' · 02/01: ' + lbl + ' continua visível no balanço (nunca some calado)', v.bal.includes(code), v.bal.slice(0, 400));
-        console.log('   ⏸ PENDENTE S5 (TR19l-' + tag + '): balanço com "Aula não assistida até 01/01: ' + code + ' (planejada …)" (X39) e partição closed+ended+open+noAula+preAula+out = fila');
+        console.log('   ⏸ PENDENTE S5 (TR19l-' + tag + '): ' + lbl + ' no balanço com "Aula não assistida até 01/01: ' + code + ' (planejada …)" (X39) e partição closed+ended+open+noAula+preAula+out = fila — o balanço de antes do S5 lista a fila toda em "Fora do alcance", então o código ali não prova nada (check tirado: conferência S4, menor 5)');
         const okA = await goDateT(page, aulaIso); const dA = okA ? await readDay(page) : { blocks: [] };
         check('TR19l-' + tag + ' · 02/01: o bloco da aula de ' + lbl + ' continua em ' + br(aulaIso) + ' (C4: é por ali que ela marca)', okA && dA.blocks.some(b => b.tm === M && b.ts === 'aula' && !b.au), JSON.stringify(dA.blocks.map(b => (b.tm || '') + ':' + (b.ts || '') + ' ' + b.text.slice(0, 50))));
         for (const h of hiddenIso) { const ok = await goDateT(page, h); const d = ok ? await readDay(page) : { blocks: [] };
@@ -838,8 +837,7 @@ const DEFAULT12 = [5, 6, 14, 19, 24, 32, 34, 85, 86, 1, 2, 3];
         const seen = []; for (const d of ['2026-12-30', '2026-12-31', '2027-01-01', '2027-01-04']) { const ok = await goDateT(page, d); const dy = ok ? await readDay(page) : { blocks: [] }; seen.push([d, ok, dy.blocks.filter(b => b.tm === 14 || /^↷ Trilha · CIR2/.test(b.text)).map(b => b.ts || b.text.slice(0, 40))]); }
         console.log('   🗓️ blocos do 14 em 30/12, 31/12, 01/01 e 04/01:', JSON.stringify(seen));
         check('TR19d-ii · 02/01: o bloco da aula continua em QUA 30/12 (C4) e questões (31/12), apostila (01/01) e selagem (04/01) não aparecem em nenhum dia', seen.every(([, ok]) => ok) && JSON.stringify(seen[0][2]) === '["aula"]' && seen.slice(1).every(([, , b]) => !b.length), JSON.stringify(seen));
-        check('TR19d-ii · 02/01: o módulo continua visível no balanço', /CIR2/.test(bal.text), bal.text.slice(0, 300));
-        console.log('   ⏸ PENDENTE S5 (TR19d-ii): o balanço diz "Aula não assistida até 01/01: CIR2 (planejada QUA 30/12)" (X39)');
+        console.log('   ⏸ PENDENTE S5 (TR19d-ii): o balanço diz "Aula não assistida até 01/01: CIR2 (planejada QUA 30/12)" (X39) — o balanço de antes do S5 lista a fila toda em "Fora do alcance" e "CIR2" também é a Cicatrização (check tirado: conferência S4, menor 5)');
         // ela assistiu e marca a aula no bloco de 30/12 (carimbo = dia do bloco)
         await goDateT(page, '2026-12-30'); const dA = await readDay(page); const bA = dA.blocks.find(b => b.tm === 14 && b.ts === 'aula');
         await clickTask(page, new RegExp('^' + escT(bA.text.slice(0, 60))), null);
@@ -853,6 +851,37 @@ const DEFAULT12 = [5, 6, 14, 19, 24, 32, 34, 85, 86, 1, 2, 3];
         const p2 = (await getLS(page, CFG)).trilhaPlan[14];
         check('TR19d-ii · Aplicar grava questões, apostila e selagem a partir de 02/01, em ordem, com hist "recolocar"; a aula fica em 30/12', p2.aula === '2026-12-30' && p2.quest >= '2027-01-02' && p2.quest < p2.apost && p2.apost < p2.seal && ['quest', 'apost', 'seal'].every(s => p2.hist.some(h => h.ts === s && h.why === 'recolocar')), JSON.stringify(p2));
         console.log('   ⏸ PENDENTE S5 (TR19d-ii): "Aulas até 01/01" sobe 1 depois da marca (carimbo 30/12)');
+    });
+    // TR19d-iii · semana T que NÃO congelou até 01/01 (conferência S4, bloqueante; S4_fix1): o app ficou fechado de 22/12 a 02/01, então a T9 e a T10 nunca congelam (guarda do S2_fix1)
+    //   e a prévia da T9 fica no plano com a aula no passado sem marca. Depois de 01/01 ela é "aula não assistida até 01/01" como o congelado (§4.3): só o bloco da aula fica (C4),
+    //   questões/apostila/selagem não aparecem em dia nenhum (sem questões sem aula), nada é gravado; se ela marcar a aula no bloco, a cadeia volta. PED2 (26) aberto mantém a cauda viva.
+    await scenario(browser, 'TR19d-iii-semana-T9-sem-congelar', '2027-01-02', { [CFG]: { ...baseCfg, trilhaFirstOpen: '2026-12-15', trilhaWeeks: { '2026-12-15': { q: 1, base: 5, held: false, why: null, mods: [26], adv: [], rise: [] } }, trilhaPlan: mkPlan({ 26: ['2026-12-16', '2026-12-17', '2026-12-30', '2027-01-04'] }, '2026-12-15') }, [TRL]: { 26: { aula: true, aulaAt: '2026-12-16', questoesD2: true, questoesD2At: '2026-12-17' } } }, async (S) => {
+        const page = S.page; const c0 = await getLS(page, CFG); const pk = (c) => JSON.stringify([Object.keys(c.trilhaWeeks || {}).filter(k => k <= '2027-01-01').sort(), Object.keys(c.trilhaPlan || {})]);
+        check('TR19d-iii · premissa (02/01): a T9 (22/12) e a T10 (29/12) não congelaram e o trilhaPlan só tem o PED2 (26) — app fechado de 22/12 a 02/01', pk(c0) === '[["2026-12-15"],["26"]]', pk(c0));
+        await clickTab(page, 'CRONOGRAMA'); const hw = await headerWeek(page); const jan = {};
+        for (const t of await listDayTabs(page)) { await clickDate(page, t.date); const d = await readDay(page); jan[t.date] = d.blocks.filter(b => (b.tm != null && b.tm !== 26) || (/^↷ Trilha/.test(b.text) && !/^↷ Trilha · PED2/.test(b.text))).map(b => (b.tm || '') + ':' + (b.ts || '') + ' ' + b.text.slice(0, 60)); }
+        const panel = await page.evaluate(() => [...document.querySelectorAll('[data-t="trilha-panel"] [data-mod]')].map(e => e.getAttribute('data-mod')));
+        const cov = (await banner(page, 'trilha-coverage')) || { text: '' }, pend = (await banner(page, 'trilha-pending')) || { text: '' };
+        console.log('   📋 02/01 · Sem.' + hw.week + ' ' + hw.range + ' · outros blocos: ' + JSON.stringify(jan) + ' · painel: ' + JSON.stringify(panel) + ' · ⚠️ ' + (cov.text || '(nenhum)') + ' · ⏳ ' + (pend.text.split('\n')[0] || '(nenhum)'));
+        check('TR19d-iii · 02/01: nenhum dia da semana de hoje (' + hw.range + ') mostra bloco ou linha ↷ de módulo com a aula sem marca — só o PED2 (sem "selagem sem aula")', Object.keys(jan).includes('02/01') && Object.values(jan).every(x => !x.length), JSON.stringify(jan));
+        check('TR19d-iii · 02/01: o painel da semana de hoje traz só o PED2 (nenhum módulo da prévia da T9 como "CONTINUA")', panel.length > 0 && panel.every(m => /^PED2 · /.test(m)), JSON.stringify(panel));
+        check('TR19d-iii · 02/01: o ⏳ traz o PED2 e nem o ⏳ nem o aviso ⚠️ citam módulo da prévia da T9', /PED2 · /.test(pend.text) && !/CIR\d/.test(pend.text) && !/CIR\d/.test(cov.text), JSON.stringify([pend.text, cov.text]));
+        const old = {}; for (const iso of ['2026-12-29', '2026-12-22']) { if (!(await goDateT(page, iso))) { old[iso] = null; continue; } Object.entries(await readWeekT(page)).forEach(([dm, d]) => { d.blocks.filter(b => b.tm != null && b.tm !== 26).forEach(b => { (old[b.tm] = old[b.tm] || []).push(b.ts + ' ' + dm + (b.au ? ' (au)' : '')); }); }); }
+        console.log('   🗓️ T9/T10, blocos de outros módulos: ' + JSON.stringify(old));
+        const mods = Object.keys(old).filter(k => /^\d+$/.test(k));
+        console.log('   ⏸ PARA O ORQUESTRADOR (S4_fix2, LOG — conflito antes do S5): quantos módulos da prévia da T9/T10 mostram o bloco da aula depois de 01/01 depende da decisão (i)/(ii)/(iii) — aqui ' + mods.length + ' (' + mods.join(', ') + '); não travado por check');
+        check('TR19d-iii · 02/01: na T9 e na T10, dos módulos da prévia só pode aparecer o bloco da AULA (C4: é por ali que ela marca) — nenhuma questões, apostila ou selagem', mods.every(k => old[k].every(x => /^aula /.test(x))) && !Object.values(old).some(v => v === null), JSON.stringify(old));
+        const c1 = await getLS(page, CFG);
+        check('TR19d-iii · 02/01: nada gravado — T9/T10 continuam sem congelar e o trilhaPlan só tem o PED2 (sem Aplicar)', pk(c1) === '[["2026-12-15"],["26"]]' && JSON.stringify(c1.trilhaPlan[26]) === JSON.stringify(c0.trilhaPlan[26]), pk(c1));
+        // ela assistiu a aula de um módulo da prévia e marca no bloco do dia (carimbo = dia do bloco): a cadeia volta (§4.3, 💬)
+        const M = Number(mods[0]); const dA = old[M] && old[M][0] ? old[M][0].split(' ')[1] : null; let back = null;
+        if (dA) { const iso = (dA.slice(3) <= '06' ? '2027' : '2026') + '-' + dA.slice(3) + '-' + dA.slice(0, 2); await goDateT(page, iso); const d = await readDay(page); const b = d.blocks.find(x => x.tm === M && x.ts === 'aula');
+            if (b) { await clickTask(page, new RegExp('^' + escT(b.text.slice(0, 60))), null); const t1 = (await getLS(page, TRL)) || {}; back = { stamp: (t1[M] || {}).aulaAt, seen: [] };
+                for (const w of ['2026-12-22', '2026-12-29', '2027-01-02']) { await goDateT(page, w); Object.entries(await readWeekT(page)).forEach(([dm, dd2]) => dd2.blocks.filter(x => x.tm === M).forEach(x => back.seen.push(x.ts + ' ' + dm))); } } }
+        console.log('   💡 depois de marcar a aula do ' + M + ' em ' + dA + ': ' + JSON.stringify(back) + ' · ⏳ ' + (((await banner(page, 'trilha-pending')) || { text: '(nenhum)' }).text.split('\n')[0]));
+        if (mods.length) check('TR19d-iii · ✓ da aula do módulo ' + M + ' no bloco de ' + dA + ' (carimbo = dia do bloco): a cadeia volta — questões, apostila e selagem aparecem de novo nos dias (§4.3)', !!back && back.stamp && ['quest', 'apost', 'seal'].every(s => back.seen.some(x => x.startsWith(s + ' '))), JSON.stringify(back));
+        else console.log('   ⏸ PENDENTE (S4_fix2, decisão do orquestrador): nenhum bloco de aula de prévia na T9/T10 — o ✓ da aula que traz a cadeia de volta não pôde ser conferido neste cenário');
+        console.log('   ⏸ PARA O ORQUESTRADOR (S4_fix1, LOG): a semana T9 continua prévia (não congela depois de 01/01) — as etapas da cadeia que voltou ficam nos dias da prévia, mesmo os que já passaram, e não entram no ⏳ (pending só vê módulo congelado)');
     });
 
     await scenario(browser, 'TR11-mover-2610', '2026-10-26', {}, async (S) => {
