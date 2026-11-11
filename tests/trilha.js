@@ -2890,6 +2890,33 @@ function partOkT(b) { if (!b) return false; const p = b.part, c = b.lines.counts
             M.length > 0 && !!again && M.every(m => has(again, m)) && !!mine && !M.some(m => has(mine, m)) && JSON.stringify(mine) === JSON.stringify(['nada — você não mudou nada depois de desfazer']) && JSON.stringify(c1) === JSON.stringify(c0),
             JSON.stringify({ M: M.map(m => m.id + '.' + m.ts + m.ln), again, mine, same: JSON.stringify(c1) === JSON.stringify(c0) }).slice(0, 1500));
     });
+    // ── TR19rv3 · revisão do S10, rodada 3 (S10rv3): check de regressão da correção na tela ──
+    // TR19rv3-encurtados-so-quando-encurta · S10rv3-encurtado (🧩 o 📦 não diz o contrário do que o app gravou · 📚 intervalos; X23; r3-A-fidelidade-1): semente E
+    //   (1º acesso 08/12, ela faz tudo no dia do plano, T10 = 3 escolhida em 22/12, simulado de 01/01 ligado em 30/12 — o estado até 30/12 vem do motor do próprio
+    //   planner num vm, como o U27 do simTrilha). Ela abre o app em 31/12: a recolocação automática põe a cadeia com a aula ✓ 30/12 com as questões a 3 dias da aula
+    //   (faixa 1–2): o intervalo foi ALONGADO e nenhum ficou abaixo do mínimo da faixa. O 📦 anuncia as datas novas ("recoloquei … questões → DIA …") e NÃO lista o
+    //   módulo em "Intervalos encurtados" (corte; o X23 só para o módulo com intervalo abaixo do mínimo). Antes: "Intervalos encurtados: NEF2 · Distúrbio Hidroeletrolítico."
+    const R3N = 'TR19rv3-encurtados-so-quando-encurta';
+    if (!only || only.some(o => R3N.startsWith(o))) {
+        const vmLoad = require('./simTrilha.js').load, GAPR = { quest: [1, 2], apost: [1, 2], seal: [2, 5] }; let cfgE = { ...baseCfg }, trE = {};
+        const markP = (lim) => { const tr = JSON.parse(JSON.stringify(trE)); Object.entries(cfgE.trilhaPlan || {}).forEach(([id, p]) => { for (const ts of STG) { const r0 = tr[id] || {}; if (r0[FIELD[ts]]) continue; if (!p[ts] || p[ts] > lim) break; const r = (tr[id] = tr[id] || {}); r[FIELD[ts]] = true; r[STAMP[ts]] = p[ts]; } const r = tr[id]; if (r && STG.every(ts => r[FIELD[ts]]) && !r.completedAt) { r.completedAt = r.smartcardAt; r.accSelagem = 70; } }); trE = tr; }; // marca pela data do plano, em ordem (o markP do U27)
+        for (let d = '2026-12-08'; d < '2026-12-31'; d = addDays(d, 1)) { if (d > '2026-12-08') markP(addDays(d, -1)); if (d === '2026-12-22') cfgE = { ...cfgE, trilhaRamp: { ...(cfgE.trilhaRamp || {}), '2026-12-29': 3 } };
+            const E = vmLoad(H.FILE, d), settle = () => { const P = E.buildTrilhaPlan(cfgE, trE, d), pt = E.trilhaFreezePatch(cfgE, trE, d, P, {}); if (pt) cfgE = { ...cfgE, ...pt }; }; settle();
+            if (d === '2026-12-30') { cfgE = { ...cfgE, simOverrides: { ...(cfgE.simOverrides || {}), '2027-01-01': true } }; settle(); } }
+        markP('2026-12-30'); const E31 = vmLoad(H.FILE, '2026-12-31');
+        await scenario(browser, R3N, '2026-12-31', { [CFG]: cfgE, [TRL]: trE }, async (S) => {
+            const page = S.page; await clickTab(page, 'CRONOGRAMA'); const fin = await banner(page, 'trilha-final'); const c = await getLS(page, CFG), t = (await getLS(page, TRL)) || {}, lg = c.trilhaFinalLog || {};
+            const txt = fin ? fin.text.replace(/\n/g, ' ') : '', enc = (txt.match(/Intervalos encurtados: ([^.]*)\./) || [])[1] || '';
+            const ivs = (id) => { const p = (c.trilhaPlan || {})[id] || {}, r = t[id] || {}; return STG.slice(1).map((ts, k) => { const x = STG[k]; if (r[FIELD[ts]]) return null; const a = r[FIELD[x]] ? (r[STAMP[x]] || p[x]) : p[x], b = p[ts]; return a && b ? { ts, g: dd(a, b) } : null; }).filter(Boolean); };
+            const lt = (id) => ivs(id).some(v => v.g < GAPR[v.ts][0]), gt = (id) => ivs(id).some(v => v.g > GAPR[v.ts][1]);
+            const L = [...new Set((lg.moved || []).map(m => Number(m.id)))].filter(id => { const r = t[id] || {}, p = (c.trilhaPlan || {})[id] || {}; return r.aula && r.aulaAt === '2026-12-30' && !r.questoesD2 && !!p.quest && dd(r.aulaAt, p.quest) > GAPR.quest[1]; })
+                .map(id => { const p = c.trilhaPlan[id]; return { id, code: (E31.modById(id) || {}).code || '?', q: p.quest, ap: p.apost, s: p.seal, iv: ivs(id).map(v => v.ts + ' ' + v.g + 'd').join(' '), lt: lt(id), gt: gt(id) }; });
+            console.log('   📦 31/12: ' + txt.slice(0, 700));
+            check('TR19rv3 · 31/12, semente E: a cadeia com a aula ✓ 30/12 recolocada com as questões a mais de 2 dias da aula (intervalo ALONGADO, nenhum abaixo do mínimo da faixa) tem as datas novas no "recoloquei" do 📦 e NÃO aparece em "Intervalos encurtados" (nem no log compressed); todo módulo que o 📦 lista como encurtado tem algum intervalo abaixo do mínimo',
+                !!fin && lg.at === '2026-12-31' && L.length > 0 && L.every(x => x.gt && !x.lt && !(lg.compressed || []).includes(x.id) && !enc.includes(x.code) && txt.includes(x.code) && txt.includes('questões → ' + dnT(x.q))) && (lg.compressed || []).every(lt),
+                JSON.stringify({ L, compressed: lg.compressed, enc }));
+        });
+    }
     await browser.close();
     H.summary('trilha');
 })();

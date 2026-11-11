@@ -1684,7 +1684,8 @@ function trilhaFinalPlan(P, cfg, trail, hoje, edited) { // 📦 semana final (29
         delete np.preview; patch[id] = np;
         if (aulaSem) noAula.push(id); // todo dia em que isso acontecer, não só quando a data muda (0b, causa 1)
         const a2 = g2used ? ch.aula : inf && inf.aula2 ? inf.aula2 : null; if (a2 && !aulaSem) aula2.push(a2);
-        if (how === "compress" && rem.some(ts => ch[ts] && ch[ts] !== p[ts])) compressed.push(id); // só quando alguma etapa ganhou data nova (0b, causa 6) · S10aj-greedy-log (🧩): só o comprimido encurta intervalos — o guloso fica nas faixas (S10aj-greedy-band), e "Intervalos encurtados" seria falso para ele
+        const encT = (ts) => { const i = STAGES_T.indexOf(ts), x = i > 0 ? STAGES_T[i - 1] : null, pv = x ? (ch[x] || fixed[x] || p[x]) : null; return !!(pv && ch[ts] && diffDays(pv, ch[ts]) < GAP_T[ts][0]); }; // S10rv3-encurtado (🧩 📚; r3-A-fidelidade-1): intervalo gravado ABAIXO do mínimo da faixa, contra a etapa anterior (a data nova dela, ou o carimbo da marcada / a data que ela deixou)
+        if (how === "compress" && rem.some(ts => ch[ts] && ch[ts] !== p[ts]) && rem.some(encT)) compressed.push(id); // só quando alguma etapa ganhou data nova (0b, causa 6) · S10aj-greedy-log (🧩): o guloso fica nas faixas (S10aj-greedy-band), e "Intervalos encurtados" seria falso para ele · S10rv3-encurtado (🧩 📚; r3-A-fidelidade-1): o comprimido (1 dia até 2× o máximo da faixa, RM22; compressA do S10rv2) também ALONGA — só entra em "Intervalos encurtados" (X23) o módulo com algum intervalo abaixo do mínimo da faixa; o alongado sai da frase (corte; as datas novas seguem no "recoloquei")
     }
     return { patch, log: { at: hoje, moved, compressed, nocabe, noAula, aula2 } };
 }

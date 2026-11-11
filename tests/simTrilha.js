@@ -12,7 +12,7 @@
 //       em diante; os mesmos invariantes de 17/11 em diante, menos o herdado (09/11 = 4 aulas, 15/11 = 2, picos de K antes de 17/11); imprime os dois
 //       números, os dias com 2 aulas (esperado 22/11, 29/11 e 06/12) e a carga dia a dia de 29/12 até o fim. Variante "marcas incompletas": as 3
 //       selagens da T1 sem ✓ (ela fez e não marcou; C2) — imprime a T4;
-//   (4) unidades U1–U27 das regras de colocação (§10.3, item 4; U25–U26 da revisão S10rv1; U27 da S10rv2), em estados montados à mão (o U27, numa linha do tempo curta);
+//   (4) unidades U1–U28 das regras de colocação (§10.3, item 4; U25–U26 da revisão S10rv1; U27 da S10rv2; U28 da S10rv3), em estados montados à mão (o U27 e o (c) do U28, numa linha do tempo curta);
 //   (5) medições para o relatório (imprimem, não são checks): decisão 7 nos dois ramos (CLOSE_BY_ON true × false, por patch só no vm) no realista e nos
 //       estresses S-a…S-d (I × II, confere com o measure7); C1: ofertas do ⏩ em cada dia do realista com a semana fechada (leitura adv × estrita, por
 //       patch) e o alcance com a T10 de 0 a 4 (gatilho estrito × largo, por patch; confere com o M-c).
@@ -304,8 +304,8 @@ if (ON('realista')) section('(3) realista', () => {
     }
 });
 
-// ══════════ (4) UNIDADES U1–U27 ══════════
-if (ON('unidades')) { console.log('\n══════════ (4) UNIDADES U1–U27: regras de colocação em estados montados à mão ══════════'); units(); }
+// ══════════ (4) UNIDADES U1–U28 ══════════
+if (ON('unidades')) { console.log('\n══════════ (4) UNIDADES U1–U28: regras de colocação em estados montados à mão ══════════'); units(); }
 
 // ══════════ (5) MEDIÇÕES (imprimem, não são checks) ══════════
 if (ON('medicoes')) section('(5) medições', () => {
@@ -593,17 +593,36 @@ function units() {
     // (escolhida em 22/12), simulado de 01/01 ligado em 30/12. Em 30/12 o comprimido põe em janeiro a cadeia de um módulo com a aula em 30/12; ela marca a aula de 30/12.
     // Em 31/12 a faixa da aula fixa → questões é 31/12–01/01 (feriado com 📚 3h e simulado): a recolocação não pode deixar as três sem dia — o comprimido da âncora fixa
     // (até 2× a faixa) as põe de novo em datas, em ordem. Antes: questões, apostila e selagem ficavam sem dia (nocabe ×3) e o ⏳ de 01/01 não tinha proposta.
+    let U27E = null; // S10rv3: a linha do tempo do U27 (semente E) também serve ao U28
     run('U27', () => { let cfg = { ...CFG }, trail = {}; const snap = {};
         const markP = (lim) => { const tr = clone(trail); Object.entries(cfg.trilhaPlan || {}).forEach(([id, p]) => { for (const ts of STG) { const r0 = tr[id] || {}; if (r0[TSFf[ts]]) continue; if (!p[ts] || p[ts] > lim) break; const r = (tr[id] = tr[id] || {}); r[TSFf[ts]] = true; r[STF[TSFf[ts]]] = p[ts]; } const r = tr[id]; if (r && STG.every(ts => r[TSFf[ts]]) && !r.completedAt) { r.completedAt = r.smartcardAt; r.accSelagem = 70; } }); trail = tr; }; // marca pela data do plano, em ordem
         for (let d = '2026-12-08'; d <= '2026-12-31'; d = add(d, 1)) { if (d > '2026-12-08') markP(add(d, -1)); if (d === '2026-12-22') cfg = { ...cfg, trilhaRamp: { ...(cfg.trilhaRamp || {}), '2026-12-29': 3 } };
             const E = load(FILE, d), settle = () => { const P = E.buildTrilhaPlan(cfg, trail, d), pt = E.trilhaFreezePatch(cfg, trail, d, P, {}); if (pt) cfg = { ...cfg, ...pt }; }; settle();
             if (d === '2026-12-30') { cfg = { ...cfg, simOverrides: { ...(cfg.simOverrides || {}), '2027-01-01': true } }; settle(); }
             snap[d] = { plan: clone(cfg.trilhaPlan || {}), log: clone(cfg.trilhaFinalLog || null), trail: clone(trail) }; }
-        const s30 = snap['2026-12-30'], s31 = snap['2026-12-31'];
-        const ids = ((s30.log || {}).compressed || []).filter(id => { const p = s30.plan[id]; return !!p && p.aula === '2026-12-30' && ['quest', 'apost', 'seal'].every(ts => p[ts] && p[ts] > '2027-01-01'); });
+        const s30 = snap['2026-12-30'], s31 = snap['2026-12-31']; U27E = { s30, s31 };
+        // S10rv3-encurtado (r3-A-fidelidade-1): o módulo do comprimido de 30/12 vem do "recoloquei" (moved) — o `compressed` agora só tem o módulo com algum intervalo abaixo
+        // do mínimo da faixa; aula em 30/12 com as questões depois de 01/01 só sai do comprimido (a faixa normal é 1–2 dias). A expectativa do U27 não muda.
+        const ids = [...new Set(((s30.log || {}).moved || []).map(m => Number(m.id)))].filter(id => { const p = s30.plan[id]; return !!p && p.aula === '2026-12-30' && ['quest', 'apost', 'seal'].every(ts => p[ts] && p[ts] > '2027-01-01'); });
         const r31 = ids.map(id => { const p = s31.plan[id] || {}, t = s31.trail[id] || {}, a = t.aula ? (t.aulaAt || p.aula) : null, q = p.quest || null, ap = p.apost || null, s = p.seal || null;
             return { id, a, q, ap, s, ok: a === '2026-12-30' && !!q && !!ap && !!s && q >= '2026-12-31' && dd(a, q) >= 1 && dd(a, q) <= 2 * GAP.quest[1] && dd(q, ap) >= 1 && dd(q, ap) <= 2 * GAP.apost[1] && dd(ap, s) >= 1 && dd(ap, s) <= 2 * GAP.seal[1] && !(((s31.log || {}).nocabe) || []).some(x => x.id === id) }; });
         check('U27 · semana final com o simulado de 01/01 ligado em 30/12: a cadeia que o comprimido de 30/12 pôs em janeiro (aula em 30/12, marcada no dia) não fica sem dia em 31/12 — questões, apostila e selagem continuam com data, em ordem, até 2× a faixa da etapa anterior (comprimido também da etapa fixa), sem nocabe',
             ids.length > 0 && r31.every(x => x.ok), J({ ids, d30: ids.map(id => { const p = s30.plan[id]; return [p.aula, p.quest, p.apost, p.seal]; }), d31: r31, nocabe31: (s31.log || {}).nocabe, compressed31: (s31.log || {}).compressed })); });
+    // U28 · S10rv3-encurtado (🧩 o 📦 não diz o contrário do que o app gravou · 📚 intervalos; X23; revisão r3-A-fidelidade-1): "Intervalos encurtados: CÓD" só para o
+    // módulo em que a recolocação automática gravou algum intervalo ABAIXO do mínimo da faixa. O comprimido de agora (1 dia até 2× o máximo da faixa, RM22; compressA
+    // do S10rv2) também ALONGA. (a) encurta: aula ✓ 28/12, questões ✓ 29/12, apostila e selagem a recolocar em 30/12, 01–05/01 editados (a faixa normal da selagem
+    // não tem dia) → apostila 30/12, selagem 31/12 (1 dia; faixa 2–5) → compressed [27]; (b) alonga: 31/12 também editado → selagem QUA 06/01 (7 dias) → fora de
+    // compressed, com a data nova no moved; (c) a semente E do U27: em 30/12 e em 31/12 o módulo da cadeia posta em janeiro (aula 30/12, questões a 3–4 dias) está no
+    // moved e fora de compressed. Antes (103a6715): (b) e (c) em compressed — o 📦 dizia "Intervalos encurtados" com todo intervalo na faixa ou acima dela.
+    run('U28', () => { const E = E30, hoje = '2026-12-30', ED5 = ['2027-01-01', '2027-01-02', '2027-01-03', '2027-01-04', '2027-01-05'];
+        const caseR = (edDays) => { const st = mkSt(hoje), p = { wk: '2026-12-22', via: 'ramp', aula: '2026-12-28', quest: '2026-12-29', apost: '2026-12-29', seal: '2027-01-01', orig: {}, hist: [] }, trail = { 27: { aula: true, aulaAt: '2026-12-28', questoesD2: true, questoesD2At: '2026-12-29' } };
+            ['apost', 'seal'].forEach(ts => E.stAdd(st, p[ts], ts)); const out = E.trilhaFinalPlan(mkP(st, { 27: { ...p } }, {}), { ...CFG, trilhaPlan: { 27: p } }, trail, hoje, Object.fromEntries(edDays.map(d => [d, true]))); const np = out.patch[27] || {};
+            return { apost: np.apost, seal: np.seal, g: np.apost && np.seal ? dd(np.apost, np.seal) : null, log: out.log }; };
+        const a = caseR(ED5), b = caseR(['2026-12-31'].concat(ED5)), mvd = (lg, id, ts, to) => (lg.moved || []).some(m => m.id === id && m.ts === ts && m.to === to);
+        const e = U27E, longOf = (s, day) => [...new Set(((s.log || {}).moved || []).map(m => Number(m.id)))].filter(id => { const t = s.trail[id] || {}, p = s.plan[id] || {}, A = t.aula ? (t.aulaAt || p.aula) : p.aula; return A === '2026-12-30' && !t.questoesD2 && !!p.quest && dd(A, p.quest) > GAP.quest[1] && (s.log || {}).at === day; });
+        const c30 = e ? longOf(e.s30, '2026-12-30') : [], c31 = e ? longOf(e.s31, '2026-12-31') : [], outC = (s, ids) => ids.every(id => !((s.log || {}).compressed || []).includes(id));
+        check('U28 · "Intervalos encurtados" (X23) só com intervalo abaixo do mínimo da faixa: (a) selagem 1 dia depois da apostila (faixa 2–5) → compressed [27]; (b) selagem 7 dias depois (só alongada) → fora de compressed, com a data nova no moved; (c) semente E (U27) em 30/12 e 31/12: o módulo com a aula em 30/12 e as questões a mais de 2 dias está no moved e fora de compressed',
+            a.seal === '2026-12-31' && a.g === 1 && J(a.log.compressed) === '[27]' && b.seal === '2027-01-06' && b.g === 7 && J(b.log.compressed) === '[]' && mvd(b.log, 27, 'seal', '2027-01-06') && c30.length > 0 && c31.length > 0 && outC(e.s30, c30) && outC(e.s31, c31),
+            J({ a: [a.apost, a.seal, a.g, a.log.compressed], b: [b.apost, b.seal, b.g, b.log.compressed], c30, c31, comp30: e && (e.s30.log || {}).compressed, comp31: e && (e.s31.log || {}).compressed, d31: e ? c31.map(id => { const p = e.s31.plan[id]; return [(e.s31.trail[id] || {}).aulaAt, p.quest, p.apost, p.seal]; }) : null })); });
 }
 }
