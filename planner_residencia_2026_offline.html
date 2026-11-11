@@ -1216,7 +1216,7 @@ function trilhaListFor(iso, X) {
         });
         (P.ghosts[iso] || []).forEach(g => { const m = modById(g.id); if (m) acts.push({ d: "EXTRA", color: "#475569", text: "↷ Trilha · " + m.code + " — " + (g.to ? TS_WORD[g.ts] + " recolocada para " + DOW_LBL[dowOf(g.to)] + " " + fmtBR(g.to) : g.ts === "aula" ? "aula sem dia: aula nova só até 01/01" + (hoje > AULA_END ? " (fica no balanço)" : " (veja o ⏳)") : TS_WORD[g.ts] + " sem dia (veja o aviso ⚠️ e o ⏳)"), time: "", gh: 1 }); }); // X03 (0b, §7 pedaço 1; 🧩): sem dia nunca some calado
         if (longo) { const au = trilhaAudioTarget(iso, P, trail); const m = au && modById(au.id); if (m) acts.push({ d: "D3", color: "#7E22CE", text: "🎧 Áudio (opcional, nos tempos mortos) — aula de " + m.code + " " + m.title + " (planejada " + DOW_LBL[dowOf(au.aula)] + " " + fmtBR(au.aula) + "). O conteúdo visual (imagens, ECG, dermatoscopia) precisa do vídeo depois.", time: "opcional", tm: m.id, ts: "aula", au: 1 }); }
-        if (!isSim && !X.noRev && computeReviews(trail, iso).length) { // só se vencer; no plantão longo vira opcional e, se não marcada, aparece no próximo dia aberto
+        if (!isSim && !X.noRev && (iso <= AULA_END || !P.revEnd || iso <= P.revEnd) && computeReviews(trail, iso).length) { // R-a (📚 DELA 9; §5): depois de 01/01, dia além do horizonte (P.revEnd) não recebe bloco de revisão // só se vencer; no plantão longo vira opcional e, se não marcada, aparece no próximo dia aberto
             if (longo) acts.push(AC("REV", "#15803D", "📱 revisão no tempo morto — 10 questões + smartcards", "opcional"));
             else if (!trilhaRevRoom(iso, X)) { const nx = trilhaRevNext(iso, X); acts.push(AC("REV", "#15803D", "Revisão adaptativa — opcional hoje: o dia já está cheio" + (nx ? "; se não fizer, ela passa para " + DOW_LBL[dowOf(nx)] + " " + fmtBR(nx) : "; não há dia com folga até " + fmtBR(P.endISO || AULA_END) + ": se não fizer, ela continua no card de revisões"), "opcional")); } // decisão 73 (paciente, 20/10): como no plantão longo — sem ⏳ e sem tom de atraso
             else acts.push(AC("REV", "#15803D", "Revisão adaptativa (o app avisa pelo seu %)", "45min"));
@@ -1280,6 +1280,7 @@ function mergeOrder(saved, def) { // ordem salva por ela (↑↓) + módulos que
     def.forEach((id, i) => { if (has.has(id)) return; const later = new Set(def.slice(i + 1)); const j = out.findIndex(x => later.has(x)); if (j >= 0) out.splice(j, 0, id); else out.push(id); has.add(id); });
     return out;
 }
+function trilhaOutOfOrder(t) { t = t || {}; return STAGES_T.some((ts, i) => !t[TS_FIELD[ts]] && STAGES_T.slice(i + 1).some(y => t[TS_FIELD[y]])); } // 📚 🩺 (g, DECISOES_S4; cadeia em ordem — decisões 38/40/46): no registro, alguma etapa SEM marca vem ANTES de uma MARCADA ("só selagem", "só apostila", "só questões", "aula+apostila"…). O "começado" assim (sem trilhaPlan) não ganha cadeia nova pela rampa, pelo ⏩ nem pelo 🔓 e não conta no K: fica noPlan (aviso X22b) até ela marcar as anteriores
 function trilhaQueue(cfg, trail) { // planejados (na ordem em que abriram) → começados (etapa marcada, sem plano — ex.: semana descartada no início em 26/10: o que ela fez continua logo, sem esperar a vez) → fixados 📌 → o resto na ordem dela/padrão
     const def = trilhaDefaultOrder();
     const base = Array.isArray(cfg && cfg.trilhaOrder) ? mergeOrder(cfg.trilhaOrder, def) : def;
@@ -1333,6 +1334,7 @@ function chainEnum(st, rem, fixed, from, lastFirst, end, opt, M) {
     opt = opt || {}; M = M || { maxA: 1, qLeve: 1, capH: false, k: 0 }; const cfg = st.cfg, prot = opt.prot || {}, EPS = 1e-9;
     if (!rem.length) return {};
     const days = { ...(fixed || {}) };
+    const ordHi = {}; rem.forEach(ts => { const nx = STAGES_T.slice(STAGES_T.indexOf(ts) + 1).map(y => (fixed || {})[y]).filter(Boolean).sort()[0]; if (nx) ordHi[ts] = nx; }); // 📚 guarda de ordem (g, DECISOES_S4; todos os caminhos que usam chainEnum: rampa, ⏩, 🔓, ⏳, recolocação automática): etapa sem marca nunca no dia de uma etapa fixa (marcada ou deixada por ela) que vem DEPOIS dela na cadeia, nem depois dele — se não couber, o caminho tem a sua saída (não coube / sem dia)
     const i0 = STAGES_T.indexOf(rem[0]); const prev0 = i0 > 0 ? days[STAGES_T[i0 - 1]] : null;
     let lo0 = from, hi0 = lastFirst;
     if (prev0) { const g = GAP_T[rem[0]]; const alo = addDaysISO(prev0, g[0]), ahi = addDaysISO(prev0, g[1]); if (alo > lo0) lo0 = alo; if (lo0 <= ahi) { if (ahi < hi0) hi0 = ahi; } else { const h6 = addDaysISO(lo0, 6); if (h6 < hi0) hi0 = h6; } } // âncora atrasada: o quanto antes, em até 7 dias
@@ -1341,7 +1343,7 @@ function chainEnum(st, rem, fixed, from, lastFirst, end, opt, M) {
         && !(ts === "aula" && (prot[d] || !aulaDayOk(st, d, prot, M.maxA)))             // aula: nunca em dia protegido; 1 por dia — a 2ª só com maxA 2, em dia permitido; nunca 3 (😴 DELA 2)
         && !(ts === "quest" && prot[d] === "leve" && !M.qLeve)                            // 🧠 questões no dia leve: só como última saída (P3; DELA 2)
         && (!M.capH || (st.load[d] || 0) + HRS_T[ts] <= trilhaCap(st, d).h + EPS)        // 😴 P1–P3: nenhuma etapa acima de 14,5h (tempo hábil)
-        && !(opt.before && opt.before[ts] && d >= opt.before[ts]) && (!opt.hard || fitsT(st, d, HRS_T[ts])); // before[ts]: teto (uma etapa fixa depois dela) · saiu o "01/01 só selagem" (DELA 5: dia comum; o teto é por etapa, stageCap)
+        && !(opt.before && opt.before[ts] && d >= opt.before[ts]) && !(ordHi[ts] && d >= ordHi[ts]) && (!opt.hard || fitsT(st, d, HRS_T[ts])); // ordHi: guarda de ordem (g) · before[ts]: teto (uma etapa fixa depois dela) · saiu o "01/01 só selagem" (DELA 5: dia comum; o teto é por etapa, stageCap)
     const ref = opt.kRef || (st.hoje && st.hoje < from ? st.hoje : from), kc = {}; // 📚 K (DELA 1): "atrasada" julgada no dia de referência da colocação, min(from, hoje) (§3.4; RM6)
     const kOk = () => { if (!M.k || !days.aula || !days.seal) return true; for (let d = days.aula; d <= days.seal; d = addDaysISO(d, 1)) { const n = d in kc ? kc[d] : (kc[d] = kCount(st, d, ref, opt.id)); if (n + 1 > M.k) return false; } return true; }; // as duas pontas incluídas (a selagem em d e a aula nova em d contam juntas)
     const myArea = opt.id != null && rem.indexOf("aula") >= 0 ? areaOf(opt.id) : null;
@@ -1411,13 +1413,16 @@ function buildTrilhaPlan(cfg, trail, hoje, opts) { // → semanas (congeladas e 
     // §4.3 (SPEC "Aula não marcada até 01/01"; 📚 sem questões sem aula · 🧩 · ⚙️): a partir de 02/01, módulo congelado, não fechado, com a aula sem marca e NENHUMA etapa marcada vira noAula —
     // deixa de ser cadeia aberta: sai da carga, do byDay (o bloco da AULA fica no dia planejado — C4), das linhas ↷, do ⏳, do K, de semDia e do horizonte; vai para o balanço. Nada é apagado; se ela marcar a aula, volta na hora (💬)
     const after = hoje > AULA_END;
-    const ended = new Set(), endedAt = {}; // §4.4 ("⏹ Encerrar a cauda agora", DELA 10): pela lista trilhaTailEnd no S7 — vazio até lá
+    const TE = Array.isArray(cfg.trilhaTailEnd) ? cfg.trilhaTailEnd : []; // S7 · §4.4/§1.2 ("⏹ Encerrar a cauda agora", DELA 10; 💬 ela aplicou com prévia · ⚙️ camada por cima do plano: o trilhaPlan não muda): lista de aplicações { at, ids }
+    const endedAt = {}; TE.forEach(x => ((x && x.ids) || []).forEach(id => { if (!endedAt[id]) endedAt[id] = x.at; })); // vale a 1ª aplicação em que o módulo entrou (RM12: uma 2ª aplicação não desfaz a 1ª)
+    const ended = new Set(Object.keys(endedAt).map(Number).filter(id => !moduleCompleteP(trail, id))); // §4.3: encerrado e não fechado (se ela fechar a cadeia depois, vale o fechado)
     const noAula = new Set(after ? [...frozen].filter(id => !moduleCompleteP(trail, id) && !ended.has(id) && !anyMk(id)) : []);
-    const hidden = (id, ts, d) => !mk(id, ts) && ((noAula.has(Number(id)) && ts !== "aula") || (ended.has(Number(id)) && !!d && d > endedAt[id])); // etapa que sai do calendário: as seguintes de noAula; as de encerrado depois da data
-    Object.keys(plan).forEach(id => STAGES_T.forEach(ts => { if (hidden(id, ts, plan[id][ts])) return; stAdd(st, stageLoadDay(plan[id], id, ts, trail), ts); })); // §4.3: etapa escondida (noAula) não ocupa capacidade
+    const hidden = (id, ts, d) => !mk(id, ts) && ((noAula.has(Number(id)) && ts !== "aula") || (ended.has(Number(id)) && (!d || d > endedAt[id]))); // etapa que sai do calendário: as seguintes de noAula; as de encerrado depois da data — e as de encerrado sem dia (S7, 🧩: a linha ↷ "sem dia (veja o aviso ⚠️ e o ⏳)" mentiria — encerrado não está no ⚠️ nem no ⏳)
+    const hidT = (id, ts, d) => hidden(id, ts, d) && !noAula.has(Number(id)); // S4d (e, DECISOES_S4 "a prévia que congela é calculada como antes de 01/01 (mesmo K e carga), ou seja, o que ela viu"): a rampa das semanas T vê o noAula na carga e no K, como antes de 01/01; ele sai dos dois logo antes da cauda (dropNoAula)
+    Object.keys(plan).forEach(id => STAGES_T.forEach(ts => { if (hidT(id, ts, plan[id][ts])) return; stAdd(st, stageLoadDay(plan[id], id, ts, trail), ts); })); // §4.3: etapa escondida (noAula) não ocupa capacidade — a partir da cauda (dropNoAula)
     // 📚 K (DELA 1; §3.4, RM6) e 😴 área (DELA 2): a área de cada aula do plano no dia em que ela pesa (como a carga) e as cadeias ABERTAS (aula feita ou planejada, selagem sem marca; fora noAula e as encerradas)
-    Object.keys(plan).forEach(id => { stArea(st, stageLoadDay(plan[id], id, "aula", trail), id, 1); if (moduleCompleteP(trail, id) || mk(id, "seal") || noAula.has(Number(id)) || ended.has(Number(id))) return; stOpenSet(st, id, (mk(id, "aula") && (trail[id] || {})[STAMP_OF.aula]) || plan[id].aula || null, plan[id].seal || null); }); // aula marcada conta do carimbo; sem dia, de hoje (kCount)
-    Object.keys(trail).forEach(id => { if (!modById(id) || plan[id] || !mk(id, "aula") || moduleCompleteP(trail, id)) return; const at = (trail[id] || {})[STAMP_OF.aula] || null; stKindAdd(st, at, "aula", 1); stArea(st, at, id, 1); if (!mk(id, "seal")) stOpenSet(st, id, at, null); }); // começado sem plano, com a aula marcada (código 6a): conta no dia do carimbo (só o tipo, sem carga) e no K até a rampa dar a selagem
+    Object.keys(plan).forEach(id => { stArea(st, stageLoadDay(plan[id], id, "aula", trail), id, 1); if (moduleCompleteP(trail, id) || mk(id, "seal") || ended.has(Number(id))) return; stOpenSet(st, id, (mk(id, "aula") && (trail[id] || {})[STAMP_OF.aula]) || plan[id].aula || null, plan[id].seal || null); }); // aula marcada conta do carimbo; sem dia, de hoje (kCount)
+    Object.keys(trail).forEach(id => { if (!modById(id) || plan[id] || !mk(id, "aula") || moduleCompleteP(trail, id)) return; const at = (trail[id] || {})[STAMP_OF.aula] || null; stKindAdd(st, at, "aula", 1); stArea(st, at, id, 1); if (!mk(id, "seal") && !trilhaOutOfOrder(trail[id]) && !ended.has(Number(id))) stOpenSet(st, id, at, null); }); // começado sem plano, com a aula marcada (código 6a): conta no dia do carimbo (só o tipo, sem carga) e no K até a rampa dar a selagem — o fora de ordem (g) não conta no K: a rampa não lhe dá [aula, selagem]
     const firstOpen = cfg.trilhaFirstOpen || (hoje >= TRILHA_START && hoje <= AULA_END ? hoje : null); // 1º acesso só até 01/01 (§2.7)
     const curW = hoje < TRILHA_START ? W1 : weekOfISO(hoje); // antes de 26/10 (transição): a 1ª semana da trilha é a "atual" das regras
     // dias protegidos de TODAS as semanas antes de distribuir qualquer etapa (🧠): dia leve efetivo (escolha dela ou o previsto) + 24, 25 e 31/12
@@ -1430,9 +1435,11 @@ function buildTrilhaPlan(cfg, trail, hoje, opts) { // → semanas (congeladas e 
         const light = (ov !== undefined && ov !== null && ov !== "" && Number(ov) >= 0 && Number(ov) < weekLen(w)) ? addDaysISO(tue, Number(ov)) : pred;
         lightInfo[tue] = { pred, light }; if (light && !prot[light]) prot[light] = "leve";
     }
-    const weeks = {}; let prevQ = null, prevClosed = true, started = false, stNow = null, lastProp = null;
+    const dropNoAula = () => noAula.forEach(id => { STAGES_T.forEach(ts => { if (hidden(id, ts, plan[id][ts])) stAdd(st, stageLoadDay(plan[id], id, ts, trail), ts, -1); }); if (st.open) delete st.open[id]; }); // §4.3 (S4d): depois das semanas T, o noAula sai da carga e do K — a cauda (ritmo 0) e o stNow (⏳, Mover, Reorganizar) não o veem; até 01/01 o noAula é vazio (nada muda)
+    const weeks = {}; let prevQ = null, prevClosed = true, started = false, stNow = null, lastProp = null, dropped = false;
     for (let w = W1; w <= LW; w++) {
         const tue = weekStartISO(w), wEnd = weekEndISO(w);
+        if (!dropped && tue > AULA_END) { dropNoAula(); dropped = true; }
         const snap = (cfg.trilhaWeeks || {})[tue];
         const pred = lightInfo[tue].pred, light = lightInfo[tue].light;
         const base = rampBase(cfg, tue);
@@ -1451,7 +1458,7 @@ function buildTrilhaPlan(cfg, trail, hoje, opts) { // → semanas (congeladas e 
             let from = tue; if (firstOpen && firstOpen > from) from = firstOpen; if (w === curW && hoje > from) from = hoje;
             const mods = []; let short = 0, shortWhy = null;
             for (let k = 0; k < R.q; k++) {
-                const id = Q.find(x => !plan[x] && !moduleCompleteP(trail, x));
+                const id = Q.find(x => !plan[x] && !moduleCompleteP(trail, x) && !trilhaOutOfOrder(trail[x])); // (g, DECISOES_S4): o começado fora de ordem é pulado — a exceção explícita ao "ninguém é pulado", só para ele (fica noPlan, X22b)
                 if (id == null) { short = R.q - k; break; }
                 const t = trail[id] || {}; const fixed = {}; STAGES_T.forEach(ts => { const f = TS_FIELD[ts]; if (t[f]) fixed[ts] = t[STAMP_OF[f]] || from; });
                 const rem = STAGES_T.filter(ts => !fixed[ts]);
@@ -1460,9 +1467,8 @@ function buildTrilhaPlan(cfg, trail, hoje, opts) { // → semanas (congeladas e 
                 const days = { ...fixed, ...ch };
                 const dts = { aula: days.aula || null, quest: days.quest || null, apost: days.apost || null, seal: days.seal || null };
                 plan[id] = { wk: tue, via: "ramp", ...dts, orig: { ...dts }, hist: [], preview: true };
-                if (after && !anyMk(id) && !!dts.aula && dts.aula <= AULA_END) noAula.add(id); // S4_fix1 (📚 SPEC "Aula não marcada até 01/01"; conferência S4, bloqueante): semana T que não congelou até 01/01 (app fechado) — o módulo de prévia sem marca é "aula não assistida até 01/01" como o congelado (§4.3)
-                rem.forEach(ts => { if (!hidden(id, ts, ch[ts])) stAdd(st, ch[ts], ts); });
-                if (!fixed.seal && !noAula.has(id)) stOpenSet(st, id, days.aula || null, days.seal || null); if (ch.aula) stArea(st, ch.aula, id, 1); // a cadeia colocada conta no K e na área das seguintes (noAula: só a aula, que continua no dia)
+                rem.forEach(ts => stAdd(st, ch[ts], ts)); // S4d (e, DECISOES_S4): sai o noAula na colocação da prévia (S4_fix1) — a prévia conta inteira na carga e no K, como antes de 01/01, e a semana T passada congela no 1º acesso (trilhaFreezePatch)
+                if (!fixed.seal) stOpenSet(st, id, days.aula || null, days.seal || null); if (ch.aula) stArea(st, ch.aula, id, 1); // a cadeia colocada conta no K e na área das seguintes
                 mods.push(id);
             }
             W = { q: R.q, base, held: R.held, why: R.why, mods, adv: [], rise: [], short, shortWhy, light: pred, preview: true }; if (prop) W.prop = prop;
@@ -1472,15 +1478,25 @@ function buildTrilhaPlan(cfg, trail, hoje, opts) { // → semanas (congeladas e 
         if (!W.pre) { if (lastProp) W.afterProp = lastProp; lastProp = W.prop ? { ...W.prop, q: W.q } : null; started = true; prevQ = W.prop ? W.prop.full : W.q; prevClosed = w < curW ? trilhaWeekDone(plan, trail, tue, wEnd) : true; }
         if (w === curW) stNow = cloneSt(st);
     }
+    if (!dropped) dropNoAula(); // defesa: o laço sempre chega à cauda (LW ≥ C1)
     if (!stNow) stNow = cloneSt(st);
     const byDay = {}, ghosts = {};
     Object.keys(plan).forEach(id => { const p = plan[id]; STAGES_T.forEach(ts => { const d = p[ts]; if (d && !hidden(id, ts, d)) (byDay[d] = byDay[d] || []).push({ id: Number(id), ts }); }); // §4.3: sem questões sem aula (o bloco da aula fica)
         const seen = {}; (p.hist || []).forEach(h => { if ((h.why === "recolocar" || h.why === "final") && h.from && h.from !== p[h.ts] && !hidden(id, h.ts, p[h.ts]) && !seen[h.ts + h.from]) { seen[h.ts + h.from] = 1; (ghosts[h.from] = ghosts[h.from] || []).push({ id: Number(id), ts: h.ts, to: p[h.ts] || null }); } }); });
     Object.keys(byDay).forEach(d => byDay[d].sort((a, b) => STAGES_T.indexOf(a.ts) - STAGES_T.indexOf(b.ts) || (qpos[a.id] || 0) - (qpos[b.id] || 0)));
     const isDone = (id) => moduleCompleteP(trail, id);
-    const full = (id) => { const p = plan[id]; const t = trail[id] || {}; return !!p && STAGES_T.every(ts => t[TS_FIELD[ts]] || (p[ts] && p[ts] <= TRILHA_END)); };
+    // §6 (🧩 ⚙️ SPEC "Alcance em dois números"; "Aula conta pela data do ✓ (carimbo)"; C10): N = "Aulas até 01/01" — aula marcada com carimbo até 01/01 (o card depois de 01/01 não conta;
+    // o bloco do dia em que assistiu conta) ou, até 01/01, datada até 01/01 · NC = "Cadeias completas (com janeiro)" — as 4 etapas feitas ou datadas (janeiro conta; sem etapa escondida
+    // nem encerrada). Na prévia os dois são iguais (nada limita questões, apostila e selagem). reach é um CONJUNTO (não prefixo da fila: noAula/sem dia podem estar no começo dela)
+    const aulaIn = (id) => { const t = trail[id] || {}, p = plan[id]; if (t[TS_FIELD.aula]) { const at = t[STAMP_OF[TS_FIELD.aula]]; return !at || at <= AULA_END; } return hoje <= AULA_END && !!p && !!p.aula && p.aula <= AULA_END; };
+    const fullC = (id) => aulaIn(id) && STAGES_T.every(ts => mk(id, ts) || (!!plan[id] && !!plan[id][ts] && !hidden(id, ts, plan[id][ts]) && !ended.has(Number(id))));
     const closed = Q.filter(isDone);
-    const reach = Q.filter(id => isDone(id) || full(id)); // dentro do alcance = as 4 etapas datadas até 01/01 (ou feitas)
+    const reach = new Set(Q.filter(aulaIn)), reachC = new Set(Q.filter(fullC));
+    // partição da fila SEM contagem dupla (§6; corrige o 26 + 1 + 67 = 94 numa fila de 93): closed + ended + open + noAula + preAula + out = Q.length (TR19q).
+    // open = "aula assistida, cadeia aberta": não fechado, não encerrado, com alguma etapa marcada — congelado (o caso TR9c, aula sem ✓) ou começado sem plano (noPlan, C24; DECISOES_S4 (f): continua aqui depois do fim do calendário)
+    // noAula = depois de 01/01, congelado sem nenhuma marca (§4.3) · preAula = até 01/01, o mesmo (sem condição de data: inclui a aula sem dia, código 23) · out = o resto (nunca planejado; a prévia antes de congelar)
+    const part = { closed: [], ended: [], open: [], noAula: [], preAula: [], out: [] };
+    Q.forEach(id => { const n = Number(id); part[isDone(n) ? "closed" : ended.has(n) ? "ended" : anyMk(n) ? "open" : noAula.has(n) ? "noAula" : frozen.has(n) ? "preAula" : "out"].push(n); });
     // 0b (§7; 🧩 nunca some calado): etapa sem marca e SEM DIA — de módulo congelado aberto, ou de módulo começado e sem plano (noPlan: RM27, C24 — só aviso, sem ⏳) — aparece como
     // "sem dia" no ⚠️, no painel, no 📦 e (menos noPlan) no ⏳. Sai do plano e do registro, nunca do log. Fora: fechados, noAula e encerrados (§4.3/§4.4). Substitui openNoChain (§1.3)
     const semDia = []; Q.forEach(id => { if (isDone(id) || noAula.has(id) || ended.has(id)) return;
@@ -1505,10 +1521,27 @@ function buildTrilhaPlan(cfg, trail, hoje, opts) { // → semanas (congeladas e 
     let tailLast = AULA_END; const bumpT = (d) => { if (d && d > tailLast) tailLast = d; }; // título do encerramento (S5): último dia com etapa (feita ou planejada) ou revisão prevista, a partir de 01/01
     Object.keys(trail).forEach(id => { if (!modById(id)) return; const t = trail[id] || {}; STAGES_T.forEach(ts => { if (t[TS_FIELD[ts]]) bumpT(t[STAMP_OF[TS_FIELD[ts]]] || (plan[id] && plan[id][ts])); }); });
     bumpT(lastPlan); bumpT(revEnd);
-    return { L, LW, W1, Q, qpos, plan, frozen, weeks, byDay, ghosts, pending, closed, reach, N: reach.length, semDia, hidden, prot, stNow, curW, firstOpen, hoje, W52, LWv, endISO, live, revEnd, revEndEst, tailLast };
+    return { L, LW, W1, Q, qpos, plan, frozen, weeks, byDay, ghosts, pending, closed, reach, N: reach.size, reachC, NC: reachC.size, open: part.open, noAula: part.noAula, preAula: part.preAula, ended: part.ended, endedAt, out: part.out, semDia, hidden, prot, stNow, curW, firstOpen, hoje, W52, LWv, endISO, live, revEnd, revEndEst, tailLast };
+}
+// §6 / X34–X35 (🧩 ⚙️): o estado do módulo na Trilha — a MESMA função no badge do card (aba Módulos) e no statusOf da fila (aba Trilha). opt.queue = fila (FECHADO ✓,
+// NESTA SEMANA, PLANEJADO, PRÉVIA); sem ele, o card (o alcance e os estados de cadeia). Do mais específico ao mais geral: fechado → encerrado (S7) → etapa sem dia (0b; noPlan,
+// DECISOES_S4 (f)) → aula assistida, cadeia aberta → nesta semana → aula não assistida até 01/01 → planejado → prévia → aula até 01/01 → fora do alcance
+const nAulasT = (n) => n + (n === 1 ? " aula" : " aulas"), nCadT = (n) => n + (n === 1 ? " cadeia completa" : " cadeias completas"); // S5 (⚙️): concordância dos dois números (X54, X56, X59, X60, compacto)
+function trilhaModStatus(P, trail, id, opt) {
+    const o = opt || {}, tr = trail || {}, n = Number(id), t = tr[n] || {}, p = P.plan[n];
+    const reachB = () => P.reach.has(n) ? ["AULA ATÉ 01/01", "#334155"] : ["FORA DO ALCANCE", "#1e293b"];
+    if (moduleCompleteP(tr, n)) return o.queue ? ["FECHADO ✓", "#15803d"] : reachB();
+    if ((P.ended || []).indexOf(n) >= 0) return ["ENCERRADO EM " + fmtBR((P.endedAt || {})[n]), "#475569"];
+    if ((P.semDia || []).some(x => x.id === n)) return ["ABERTO · ETAPA SEM DIA", "#9a3412"];
+    if (STAGES_T.some(ts => t[TS_FIELD[ts]])) return ["ABERTO — FALTA " + STAGES_T.filter(ts => !t[TS_FIELD[ts]]).map(ts => TS_WORD[ts].toUpperCase()).join(", "), "#854d0e"];
+    if (o.queue && P.frozen.has(n) && p && p.wk === o.curTue) return ["NESTA SEMANA", "#7E22CE"];
+    if ((P.noAula || []).indexOf(n) >= 0) return ["AULA NÃO ASSISTIDA ATÉ 01/01", "#7f1d1d"];
+    if (o.queue && P.frozen.has(n)) return ["PLANEJADO", "#4c1d95"];
+    if (o.queue && p) return ["PRÉVIA " + fmtBR(p.wk), "#475569"];
+    return reachB();
 }
 // ── Propostas (💬: só gravam com "Aplicar") ──
-function trilhaNextIds(P, trail, n, skip) { const out = []; for (const id of P.Q) { if (out.length >= n) break; if (P.frozen.has(id) || moduleCompleteP(trail, id) || (skip && skip.indexOf(id) >= 0)) continue; out.push(id); } return out; } // o próximo da FILA (módulos só na prévia das semanas futuras se deslocam)
+function trilhaNextIds(P, trail, n, skip) { const out = []; for (const id of P.Q) { if (out.length >= n) break; if (P.frozen.has(id) || moduleCompleteP(trail, id) || trilhaOutOfOrder((trail || {})[id]) || (skip && skip.indexOf(id) >= 0)) continue; out.push(id); } return out; } // o próximo da FILA (módulos só na prévia das semanas futuras se deslocam) — o ⏩ e o 🔓 pulam o começado fora de ordem (g, DECISOES_S4)
 function trilhaFixedOf(trail, id, fallback) { const t = (trail || {})[id] || {}; const fixed = {}; STAGES_T.forEach(ts => { const f = TS_FIELD[ts]; if (t[f]) fixed[ts] = t[STAMP_OF[f]] || fallback; }); return fixed; }
 function trilhaProposeAdvance(P, cfg, trail, hoje) { // ⏩ (A) cabe até o fim da semana · (B) começa agora, etapas finais na semana seguinte · (C) não cabe: "final", "fila", "k", "semdia", "cap" (ou "antes")
     if (hoje < TRILHA_START) return { kind: "C", why: "antes" }; // transição (20–25/10): nada a adiantar antes de a trilha começar
@@ -1632,7 +1665,7 @@ function trilhaFinalPlan(P, cfg, trail, hoje, edited) { // 📦 semana final (29
         let g2used = false;
         if (!ch) { // guloso em DUAS varreduras (RM8): primeiro 1 aula por dia; a 2ª aula só se o gatilho valeu na colocação normal — uma etapa por dia livre, em ordem
             const greedy = (maxA) => { const c = {}; let last = null;
-                for (const ts of rem) { let d = hoje; const fx = STAGES_T.slice(0, STAGES_T.indexOf(ts)).map(x => fixed[x]).filter(Boolean).sort().pop() || null; const pv = [last, fx].filter(Boolean).sort().pop() || prevOf(ts); if (pv && addDaysISO(pv, 1) > d) d = addDaysISO(pv, 1); let got = null; for (; d <= stageCap(ts); d = addDaysISO(d, 1)) { if (before[ts] && d >= before[ts]) break; if (dayOpenT(d, cfg) && !(edited && edited[d]) && !(ts === "aula" && (P.prot[d] || !aulaDayOk(st, d, P.prot, maxA))) && fitsT(st, d, HRS_T[ts])) { got = d; break; } } if (!got) break; c[ts] = got; last = got; stAdd(st, got, ts); } // depois de uma etapa fixa (marcada ou deixada por ela), nunca antes dela
+                for (const ts of rem) { let d = hoje; const fx = STAGES_T.slice(0, STAGES_T.indexOf(ts)).map(x => fixed[x]).filter(Boolean).sort().pop() || null, ob = STAGES_T.slice(STAGES_T.indexOf(ts) + 1).map(x => fixed[x]).filter(Boolean).sort()[0] || null; const pv = [last, fx].filter(Boolean).sort().pop() || prevOf(ts); if (pv && addDaysISO(pv, 1) > d) d = addDaysISO(pv, 1); let got = null; for (; d <= stageCap(ts); d = addDaysISO(d, 1)) { if ((before[ts] && d >= before[ts]) || (ob && d >= ob)) break; /* guarda de ordem (g): nunca no dia de uma etapa fixa que vem depois, nem depois dele */ if (dayOpenT(d, cfg) && !(edited && edited[d]) && !(ts === "aula" && (P.prot[d] || !aulaDayOk(st, d, P.prot, maxA))) && fitsT(st, d, HRS_T[ts])) { got = d; break; } } if (!got) break; c[ts] = got; last = got; stAdd(st, got, ts); } // depois de uma etapa fixa (marcada ou deixada por ela), nunca antes dela
                 Object.keys(c).forEach(ts => stAdd(st, c[ts], ts, -1)); return c; };
             ch = greedy(1); how = "greedy"; inf = null;
             if (hasA && !ch.aula && infoN.g2) { ch = greedy(2); g2used = !!ch.aula; } // 😴 DELA 2: nunca 3 aulas (aulaDayOk), e a 2ª só com o gatilho
@@ -1738,7 +1771,7 @@ function trilhaMigrateSchedule(sov, hoje, P) {
 // não é recalculada — só sai o que ela acrescentou depois, ⏩ e 🔓), o que o app grava sozinho (dias cheios para a revisão, recolocação da semana final)
 // e tudo o que é de antes da atualização (histórico do curso, transição, marcas anteriores ao 1º acesso ou sem data).
 const RESTORE_KEY = "restauracoes";
-const RESTORE_CFG_KEYS = ["trilhaOrder", "trilhaPins", "trilhaRamp", "lightDayOverrides", "trilhaDismiss", "simResults", "simOverrides"]; // voltam ao padrão (e o Desfazer as reaplica inteiras)
+const RESTORE_CFG_KEYS = ["trilhaOrder", "trilhaPins", "trilhaRamp", "lightDayOverrides", "trilhaDismiss", "simResults", "simOverrides", "trilhaTailEnd"]; // voltam ao padrão (S7, §4.5 e C8: o "Encerrar a cauda" também — 💬 decisão 75; o Desfazer o devolve) (e o Desfazer as reaplica inteiras)
 const RESTORE_UNDO_KEYS = RESTORE_CFG_KEYS.concat(["trilhaFinalAutoAt", "trilhaFinalLog", "trilhaFinalKeep"]); // o Desfazer também devolve a marca da semana final (se o dia mudou, o app refaz a recolocação sobre o estado devolvido)
 const RESTORE_CMP_KEYS = RESTORE_CFG_KEYS.concat(["trilhaPlan", "trilhaWeeks", "trilhaFirstOpen", "trilhaRevFull", "trilhaFinalAutoAt", "trilhaFinalLog"]); // o que "restaurar" ou o app logo depois podem mudar
 const RESTORE_STAMP = { aula: "aulaAt", questoesD2: "questoesD2At", apostila: "apostilaAt", smartcard: "smartcardAt" };
@@ -1847,6 +1880,7 @@ function trilhaRestore(cfg, sov, trail, opts) {
     cut("trilhaDismiss", k => k.split("|")[0] < TRILHA_START, (k) => d.dismiss.push(k));
     cut("simResults", k => k < TRILHA_START, (k, v) => d.simRes.push({ iso: k, v }));
     cut("simOverrides", k => k < TRILHA_START, (k, v) => d.simOv.push({ iso: k, v }));
+    if (Array.isArray(C.trilhaTailEnd) && C.trilhaTailEnd.length) { d.tailEnd = C.trilhaTailEnd; delete out.trilhaTailEnd; } // S7 (§4.5, C8): o "⏹ Encerrar a cauda" volta ao padrão — as cadeias voltam a aparecer; o Desfazer da restauração o devolve. trilhaTailEndHist não muda (o arquivo guarda o config inteiro: rejeição 4)
     // semana final: a recolocação de hoje já foi feita (é do app). Se o simulado de 01/01 volta à regra, a marca do dia acompanha — senão o app refaria
     // a recolocação agora, sobre o registro sem as marcas dela, e as etapas dos dias passados perderiam a data
     if (String(C.trilhaFinalAutoAt || "").split("|")[0] === hoje) { const nk = hoje + "|" + (simForCfg(out, AULA_END) ? 1 : 0); if (nk !== C.trilhaFinalAutoAt) out.trilhaFinalAutoAt = nk; }
@@ -1874,7 +1908,7 @@ function trilhaRestore(cfg, sov, trail, opts) {
                 d.weekNotes.push({ tue: k, got: got.map(nameOf), exp: exp.map(nameOf), started, back, other });
             }
             got.forEach(id => seen.add(id)); }); }
-    d.any = !!(d.moved.length || d.histN || d.adv.length || d.rise.length || d.days.length || d.trail.length || d.order || d.pins.length || d.ramp.length || d.light.length || d.dismiss.length || d.simRes.length || d.simOv.length);
+    d.any = !!(d.moved.length || d.histN || d.adv.length || d.rise.length || d.days.length || d.trail.length || d.order || d.pins.length || d.ramp.length || d.light.length || d.dismiss.length || d.simRes.length || d.simOv.length || !!d.tailEnd); // + o encerramento da cauda (S7, código 10: sem ele a prévia diria "nada seu muda")
     return { diag: d, changed: d.any, next: { cfg: out, sov: nsov, trail: nt } };
 }
 // O estado em que o app assenta depois de "Aplicar" (o congelamento roda sobre o estado restaurado) e se ele difere do de agora: restaurar duas
@@ -1935,14 +1969,15 @@ function trilhaWriteKeys(pairs) { // grava tudo ou nada: se uma chave não coube
 }
 function nowStampLocal() { const n = new Date(), p = (x) => String(x).padStart(2, "0"); return todayISO() + "T" + p(n.getHours()) + ":" + p(n.getMinutes()); }
 function trilhaFreezePatch(cfg, trail, hoje, P, scheduleOv) { // o que o App grava (um único saveConfig): 1º acesso, semanas a congelar, semana final
-    if (!P || !P.live) return null; // guarda ÚNICA de gravação (§2.2): o App, a restauração (trilhaRestoreCalc, settleU) e o simTrilha fazem a mesma conta — até 01/01 é a de antes; depois, só enquanto a cauda está viva (semanas da cauda e trilhaRevFull; a recolocação automática continua presa a 29/12–01/01)
+    const tOnly = !!P && !P.live && hoje > AULA_END && Object.keys(P.weeks || {}).some(k => k <= AULA_END && P.weeks[k] && !P.weeks[k].frozen && !P.weeks[k].pre); // S4d (e): "no 1º acesso depois de 01/01 as semanas T passadas sem snapshot congelam" — mesmo com a cauda já parada (live falso), senão a prévia delas mostraria questões/selagem sem aula; nesse caso só elas (nada da cauda, nem trilhaRevFull)
+    if (!P || (!P.live && !tOnly)) return null; // guarda ÚNICA de gravação (§2.2): o App, a restauração (trilhaRestoreCalc, settleU) e o simTrilha fazem a mesma conta — até 01/01 é a de antes; depois, só enquanto a cauda está viva (semanas da cauda e trilhaRevFull; a recolocação automática continua presa a 29/12–01/01)
     const patch = {}; let changed = false;
     if (!cfg.trilhaFirstOpen && hoje >= TRILHA_START && hoje <= AULA_END) { patch.trilhaFirstOpen = hoje; changed = true; } // 1º acesso só a partir de 26/10 (nunca num dia de transição) e só até 01/01
-    if (!(cfg.trilhaRevFull || {})[hoje] && computeReviews(trail, hoje).length && !trilhaRevRoom(hoje, { cfg, P, trail, hoje, ov: scheduleOv })) { patch.trilhaRevFull = { ...(cfg.trilhaRevFull || {}), [hoje]: true }; changed = true; } // decisão 73: o dia em que a revisão ficou opcional fica registrado como cheio
+    if (!tOnly && !(cfg.trilhaRevFull || {})[hoje] && computeReviews(trail, hoje).length && !trilhaRevRoom(hoje, { cfg, P, trail, hoje, ov: scheduleOv })) { patch.trilhaRevFull = { ...(cfg.trilhaRevFull || {}), [hoje]: true }; changed = true; } // decisão 73: o dia em que a revisão ficou opcional fica registrado como cheio
     const weeksAll = { ...(cfg.trilhaWeeks || {}) }, planAll = { ...(cfg.trilhaPlan || {}) }; let froze = false;
     for (let w = P.W1; w <= P.curW; w++) { // semana corrente + semanas sem app aberto (congelam como estavam planejadas; as etapas viram pendentes ⏳)
         const tue = weekStartISO(w); const W = P.weeks[tue];
-        if (!W || W.frozen || W.pre || (hoje > AULA_END && tue <= AULA_END)) continue; // depois de 01/01 só congelam as semanas da CAUDA (§4.2; 💬 DELA 8 · ⚙️ conferência S2): semana T que não congelou até 01/01 (app fechado) não congela sozinha depois — como no HEAD, nada de cadeia nova sem Aplicar
+        if (!W || W.frozen || W.pre || (tOnly && tue > AULA_END)) continue; // S4d (e, DECISOES_S4; regra de 19–20/10): depois de 01/01, a semana T passada sem snapshot (app fechado) congela retroativamente como estava na prévia — congelar não move data (DELA 8 fala de mover); os módulos dela sem marca viram noAula (§4.3: o bloco da aula fica, as seguintes saem) e, se ela marcar a aula, as etapas vencidas vão para o ⏳ (Aplicar) · semanas da cauda: q 0 (S2), só com a cauda viva
         weeksAll[tue] = { q: W.q, base: W.base, held: !!W.held, why: W.why || null, mods: W.mods.slice(), adv: [], rise: [], short: W.short || 0, light: W.light || null, at: hoje }; if (W.prop) weeksAll[tue].prop = { ...W.prop }; if (W.short && W.shortWhy === "k") weeksAll[tue].shortWhy = "k"; // §1.2: esperou pelo K (sem o campo = "não coube", como hoje)
         W.mods.forEach(id => { const p = P.plan[id]; const d = { aula: p.aula, quest: p.quest, apost: p.apost, seal: p.seal }; planAll[id] = { wk: tue, via: "ramp", ...d, orig: { ...d }, hist: [] }; });
         froze = true;
@@ -2021,7 +2056,7 @@ function Badge({ label, color }) {
             padding: "2px 7px", borderRadius: 4, whiteSpace: "nowrap" } }, label));
 }
 // Banner de revisões espaçadas no prazo
-function ReviewAlerts({ alerts, onDone }) {
+function ReviewAlerts({ alerts, onDone, horizon }) { // horizon (R-a, X65; 📚 DELA 9): a partir de 01/01, P.revEnd — "lembro até DD/MM (estimado)"
     if (!alerts || !alerts.length)
         return null;
     return (React.createElement("div", { style: { background: "#2a200a", border: "1px solid #f5c518", borderRadius: 12,
@@ -2031,7 +2066,8 @@ function ReviewAlerts({ alerts, onDone }) {
             React.createElement("span", { style: { color: "#f5c518", fontSize: 13, fontWeight: 700 } },
                 "Revis\u00F5es no prazo (",
                 alerts.length,
-                ")")),
+                ")",
+                horizon ? React.createElement("span", { "data-t": "rev-horizon" }, " · lembro até " + fmtBR(horizon) + " (estimado)") : null)),
         React.createElement("div", { style: { color: "#94a3b8", fontSize: 9, marginBottom: 10, lineHeight: 1.5 } },
             "Ao concluir, informe o % de acerto: \u2265" + "80% estica a pr\u00F3xima revis\u00E3o \u00B7 60\u201379% mant\u00E9m \u00B7 <60% encurta + reexposi\u00E7\u00E3o (apostila/aula antes de novas quest\u00F5es)."),
         React.createElement(ReviewRows, { alerts: alerts, onDone: onDone })));
@@ -2903,7 +2939,7 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, trail, P, onSa
         const now = tProp.rem.filter(inW), later = tProp.rem.filter(x => !inW(x));
         return "A cadeia completa de " + head + " não cabe nos dias que restam nesta semana sem quebrar os intervalos (apostila → selagem ~3 dias). Posso começar agora: " + now.map(x => TS_WORD[x] + " " + dayCostT(tProp.days[x], HRS_T[x]) + aula2Suf(tProp.info, x, tProp.days[x])).join(", ") + (later.length ? " e deixar " + later.map(x => TS_WORD[x] + " " + dayCostT(tProp.days[x], HRS_T[x])).join(" e ") + " para a semana seguinte." : ".");
     })();
-    const tPropNotes = !tProp ? [] : tProp.kind === "pend" ? [...new Set(tProp.jobs.flatMap(j => j.days ? chainNotes(j.days).concat(qLeveNote(j.info, j.days)) : []))] : tProp.kind === "rise" ? [...new Set(tProp.items.flatMap(it => chainNotes(it.days).concat(qLeveNote(it.info, it.days))))] : chainNotes(tProp.days).concat(qLeveNote(tProp.info, tProp.days)); // + nota 🌿 das questões no dia leve (X18/X21)
+    const tPropNotes = !tProp ? [] : tProp.kind === "pend" ? [...new Set(tProp.jobs.flatMap(j => j.days ? chainNotes(j.days).concat(qLeveNote(j.info, j.days), j.rem.filter(x => { const kp = trilhaKeptOf(config, j.id); return !!kp[x] && kp[x] === j.before[x] && !!j.days[x] && j.days[x] !== j.before[x]; }).map(x => "inclui a etapa que você tinha deixado em " + dayNameT(j.before[x]))) : []))] : tProp.kind === "rise" ? [...new Set(tProp.items.flatMap(it => chainNotes(it.days).concat(qLeveNote(it.info, it.days))))] : chainNotes(tProp.days).concat(qLeveNote(tProp.info, tProp.days)); // + nota 🌿 das questões no dia leve (X18/X21)
     const saveTrilha = (patch) => __CFG_SAVE && __CFG_SAVE(patch);
     const applyTProp = () => {
         if (!tProp) return;
@@ -2930,7 +2966,8 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, trail, P, onSa
             const miss = (P.byDay[iso] || []).filter(x => !((trail || {})[x.id] || {})[TS_FIELD[x.ts]] && !real.some(a => a.tm === x.id && a.ts === x.ts && !a.au));
             if (miss.length) out.push("📝 " + dayNameT(iso) + ": a lista editada deste dia não traz " + miss.map(x => { const m = modById(x.id) || {}; return TS_WORD[x.ts] + " de " + (m.code || "?") + " " + (m.title || ""); }).join(", ") + " (planejada" + (miss.length > 1 ? "s" : "") + " para ele) — ↺ Voltar ao padrão traz a Trilha (sua edição fica guardada) ou mova a etapa."); }
         (P.semDia || []).filter(x => (P.plan[x.id] && P.plan[x.id].wk === dateFor(0)) || nowWT).forEach(x => { const m = modById(x.id), lbl = m ? m.code + " (" + m.title + ")" : String(x.id), miss = x.miss.map(y => TS_WORD[y]).join(", "); // 0b (§7 pedaço 4): a lista vem do plano (P.semDia), na semana do módulo ou na de hoje — os noPlan, só na de hoje
-            if (x.noPlan) { out.push("⚠️ " + lbl + " tem etapa marcada fora do plano da Trilha — " + miss + " sem dia. Marque cada uma no card da aba Módulos quando fizer" + (hojeT > AULA_END && x.miss.includes("aula") ? " — a aula, só se você já assistiu (aula nova só até 01/01)." : ".")); return; } // X22b (RM27, C24): só aviso, sem proposta no ⏳ · depois de 01/01 a aula só se já assistida (S4_fix1; DELA 11)
+            if (x.noPlan) { const tt = (trail || {})[x.id] || {}, gS = STAGES_T.filter((y, i) => !tt[TS_FIELD[y]] && STAGES_T.slice(i + 1).some(z => tt[TS_FIELD[z]])), gM = gS.length ? STAGES_T.filter((y, j) => j > STAGES_T.indexOf(gS[0]) && tt[TS_FIELD[y]]) : [], jE = (a) => a.length > 1 ? a.slice(0, -1).join(", ") + " e " + a[a.length - 1] : (a[0] || "");
+                out.push("⚠️ " + lbl + " tem etapa marcada fora do plano da Trilha — " + miss + " sem dia." + (gS.length ? " Tem " + jE(gM.map(y => TS_WORD[y])) + (gM.length > 1 || gM[0] === "quest" ? " marcadas" : " marcada") + ", mas " + jE(gS.map(y => TS_ART[y][0])) + " não." : "") + " Marque cada uma no card da aba Módulos quando fizer" + (hojeT > AULA_END && x.miss.includes("aula") ? " — a aula, só se você já assistiu (aula nova só até 01/01)." : ".")); return; } // X22b (RM27, C24): só aviso, sem proposta no ⏳ · depois de 01/01 a aula só se já assistida (S4_fix1; DELA 11) · (g, DECISOES_S4) fora de ordem: diz qual etapa anterior está sem marca, como o X16 ("tem X marcada, mas Y não") — texto neutro, sem prometer a rampa
             const p = P.plan[x.id], tt = (trail || {})[x.id] || {}, kp = trilhaKeptOf(config, x.id), i0 = STAGES_T.indexOf(x.miss[0]), kAfter = STAGES_T.slice(i0 + 1).find(y => p[y] && kp[y] === p[y] && !tt[TS_FIELD[y]]);
             const stuck = !x.aulaDone && (!p.aula || p.aula < hojeT); // a aula sem marca não ganhou dia novo até 01/01 (C4): as seguintes ficam sem dia por causa dela
             out.push("⚠️ " + lbl + " aberto — " + miss + " sem dia." + (!stuck && kAfter ? " (não coube antes da etapa que você deixou em " + dayNameT(p[kAfter]) + ")." : x.aulaDone ? " Veja o ⏳ (Ver como recolocar)." : " A aula só tem dia até 01/01: se você assistiu, marque no bloco do dia em que assistiu.")); }); // X22: sufixo por caso (teto before · aula marcada · aula sem dia novo até 01/01)
@@ -2955,10 +2992,13 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, trail, P, onSa
         const afterT = hojeT > AULA_END, naS = [...new Set(na)].filter(id => !(tr[id] || {}).aula); // só as aulas ainda sem ✓, antes e depois de 01/01 (S4_fix3; ⚙️ 🧩 conferência rev_S4z, menor 3: com a aula marcada o 📦 não pede para marcar de novo — o módulo segue no ⚠️/⏳ com as etapas sem dia) · depois de 01/01, quem saiu do ⏳ "fica no balanço" (X03, §4.3)
         const hidF = afterT && Object.keys(P.plan).some(id => P.frozen.has(Number(id)) && STAGES_T.some(x => x !== "aula" && P.hidden && P.hidden(id, x, P.plan[id][x]))); // S4_fix1b (⚙️ 📚 §4.3): congelado que virou "aula não assistida até 01/01" — as etapas seguintes não estão em dia nenhum
         const naB = afterT ? naS.filter(id => !(P.pending || []).some(x => x.id === Number(id))) : [], naG = [[naS.filter(id => naB.indexOf(id) < 0), "⏳"], [naB, "balanço"]].filter(g => g[0].length); // S4_fix2 (⚙️ 🧩 C9; conferência S4_fix, menor 2): depois de 01/01 "fica no balanço" só para quem saiu do ⏳ (noAula de P: nenhuma marca); com outra etapa marcada (C9) a aula continua no ⏳ — até 01/01, tudo no ⏳ (X23)
-        const naL = (ids) => { const c = ids.map(code); return (c.length > 1 ? c.slice(0, -1).join(", ") + " e " + c[c.length - 1] + " (ficam no " : c[0] + " (fica no "); }; // S4_fix3 (⚙️; conferência rev_S4z, menor 4): "CIR2 e PED2 (ficam no ⏳), CIR1 (fica no balanço)" — com 1 código, o X23 do §8 letra por letra
-        return "📦 Semana final (" + fmtBR(lg.at) + "): " + (mv.length ? "recoloquei " + mv.length + (mv.length === 1 ? " etapa" : " etapas") + " — aula só até 01/01; questões, apostila e selagem podem ir para janeiro (" + mv.map(m => code(m.id) + " " + TS_WORD[m.ts] + " → " + dayNameT(m.to)).join(", ") + ")." : semDia ? "nenhuma etapa recolocada" + (sdHere ? " (as etapas sem dia estão no aviso ⚠️ acima)" : curWT != null ? " (as etapas sem dia estão no aviso ⚠️ da semana de hoje)" : "") + "." : afterT && (naS.length || hidF) ? "nenhuma etapa recolocada." : "o que estava aberto já está nos dias planejados.")
-            + (a2.length ? " 2ª aula em " + a2.map(dayNameT).join(", ") + "." : "") + (cp.length ? " Intervalos encurtados: " + [...new Set(cp)].map(code).join(", ") + "." : "")
+        const lblF = (id) => { const c = (modById(id) || {}).code; return c && P.Q.some(y => Number(y) !== Number(id) && (modById(y) || {}).code === c) ? modLbl(id) : code(id); }; // S4d (d′, DECISOES_S4): código que se repete na fila → o rótulo do ⏳ (modLbl: código · título) nas listas moved, compressed e noAula — dois módulos com o mesmo código não se confundem (rev_S4w: "HEM1 selagem" × "Aula sem outro dia: HEM1")
+        const naL = (ids) => { const c = ids.map(lblF); return (c.length > 1 ? c.slice(0, -1).join(", ") + " e " + c[c.length - 1] + " (ficam no " : c[0] + " (fica no "); };
+        const mvH = afterT ? [...new Set(mv.filter(m => P.hidden && P.hidden(m.id, m.ts, (P.plan[m.id] || {})[m.ts])).map(m => Number(m.id)))].filter(id => (P.noAula || []).indexOf(id) >= 0 && !naS.some(x => Number(x) === id)) : []; // S5 (⚙️ 🧩 conferência rev_S4y, menor 4): o "recoloquei" é o registro do que o app fez e fica; o módulo que virou "aula não assistida até 01/01" ganha a frase do balanço (X39) // S4_fix3 (⚙️; conferência rev_S4z, menor 4): "CIR2 e PED2 (ficam no ⏳), CIR1 (fica no balanço)" — com 1 código, o X23 do §8 letra por letra
+        return "📦 Semana final (" + fmtBR(lg.at) + "): " + (mv.length ? "recoloquei " + mv.length + (mv.length === 1 ? " etapa" : " etapas") + " — aula só até 01/01; questões, apostila e selagem podem ir para janeiro (" + mv.map(m => (lblF(m.id) === code(m.id) ? code(m.id) + " " : lblF(m.id) + " · ") + TS_WORD[m.ts] + " → " + dayNameT(m.to)).join(", ") + ")." : semDia ? "nenhuma etapa recolocada" + (sdHere ? " (as etapas sem dia estão no aviso ⚠️ acima)" : curWT != null ? " (as etapas sem dia estão no aviso ⚠️ da semana de hoje)" : "") + "." : afterT && (naS.length || hidF) ? "nenhuma etapa recolocada." : "o que estava aberto já está nos dias planejados.")
+            + (a2.length ? " 2ª aula em " + a2.map(dayNameT).join(", ") + "." : "") + (cp.length ? " Intervalos encurtados: " + [...new Set(cp)].map(lblF).join(", ") + "." : "")
             + (naG.length ? " Aula sem outro dia até 01/01: " + (naG.length === 1 ? naL(naG[0][0]) + naG[0][1] + "; se você assistiu, marque no bloco do dia em que assistiu)." : naG.map(g => naL(g[0]) + g[1] + ")").join(", ") + " — se você assistiu, marque no bloco do dia em que assistiu.") : "")
+            + (mvH.length ? " Aula não assistida até 01/01: " + mvH.map(id => lblF(id) + " (planejada " + dayNameT(P.plan[id].aula) + ")").join(" · ") + " — se você assistiu, marque no bloco do dia em que assistiu e a cadeia volta." : "") // X39
             + " Carga dia a dia: " + days.join(" · ") + (simForCfg(config, AULA_END) ? " · 01/01 com simulado (sua escolha): sem etapa de módulo." : "."); };
     const KIND_LBL = { novo: ["NOVO", "#7E22CE"], adiantado: ["ADIANTADO", "#0369A1"], subida: ["SUBIDA", "#15803D"], continua: ["CONTINUA", "#475569"] };
     const trailPanelEl = () => isTransW ? React.createElement("div", { "data-t": "trilha-panel", style: { background: "#0f172a", borderRadius: 8, padding: "10px 12px", marginBottom: 14 } }, // 20–25/10: transição (paciente, 26/10)
@@ -2972,18 +3012,19 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, trail, P, onSa
             onGoTrilha && React.createElement("button", { onClick: onGoTrilha, style: { background: "#1e293b", border: "1px solid #334155", borderRadius: 6, color: "#94a3b8", fontSize: 10, fontWeight: 700, padding: "3px 8px", cursor: "pointer" } }, "🛤️ Fila e rampa")),
         weekModsT.length ? React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6 } }, weekModsT.map(({ id, mod, p, kind }) => { const t = (trail || {})[id] || {};
             return React.createElement("div", { key: id, "data-mod": mod.code + " · " + mod.title, "data-kind": kind, style: { display: "flex", flexDirection: "column", gap: 2 } },
-                React.createElement("div", { style: { display: "flex", gap: 8, alignItems: "baseline" } }, React.createElement(Badge, { label: KIND_LBL[kind][0], color: KIND_LBL[kind][1] }),
-                    React.createElement("span", { style: { color: "#cbd5e1", fontSize: 12 } }, React.createElement("strong", { style: { color: "#f1f5f9" } }, mod.code), " · ", mod.title)),
-                React.createElement("div", { style: { color: "#64748b", fontSize: 10, paddingLeft: 4 } }, STAGES_T.map(x => TS_WORD[x] + " " + (p[x] ? fmtBR(p[x]) : t[TS_FIELD[x]] ? "" : "sem dia") + (t[TS_FIELD[x]] ? " ✓" : "")).join(" · ") + (t.aulaAudio ? " · 🎧 aula em áudio" : ""))); }))
-            : React.createElement("div", { style: { color: "#94a3b8", fontSize: 12 } }, Wcur && Wcur.pre ? "Semana anterior ao seu 1º acesso à Trilha." : "Nenhuma etapa de módulo nesta semana."));
+                React.createElement("div", { style: { display: "flex", gap: 8, alignItems: "baseline", flexWrap: "wrap" } }, React.createElement(Badge, { label: KIND_LBL[kind][0], color: KIND_LBL[kind][1] }),
+                    React.createElement("span", { style: { color: "#cbd5e1", fontSize: 12 } }, React.createElement("strong", { style: { color: "#f1f5f9" } }, mod.code), " · ", mod.title),
+                    (P.noAula || []).indexOf(id) >= 0 && React.createElement(Badge, { label: "AULA NÃO ASSISTIDA ATÉ 01/01", color: "#7f1d1d" })), // S5 (passagem do S4, desvio 2; X34): a semana passada (T9/T10 vista depois de 01/01) diz por que as etapas seguintes não estão nos dias
+                React.createElement("div", { style: { color: "#64748b", fontSize: 10, paddingLeft: 4 } }, STAGES_T.map(x => TS_WORD[x] + " " + (p[x] && P.hidden && P.hidden(id, x, p[x]) ? "—" : p[x] ? fmtBR(p[x]) : t[TS_FIELD[x]] ? "" : "sem dia") + (t[TS_FIELD[x]] ? " ✓" : "")).join(" · ") + (t.aulaAudio ? " · 🎧 aula em áudio" : ""))); })) // etapa escondida (§4.3: sem questões sem aula) → "—", nunca a data planejada
+            : React.createElement("div", { style: { color: "#94a3b8", fontSize: 12 } }, Wcur && Wcur.pre ? "Semana anterior ao seu 1º acesso à Trilha." : "Nenhuma etapa de módulo nesta semana." + (tailW && P.revEnd && P.revEnd >= dateFor(0) ? " Revisões: o app lembra até " + fmtBR(P.revEnd) + " (estimado)." : ""))); // X67 (R-a, 📚 🧩 DELA 9): semana da cauda só de revisão
     const dayDate = dateFor(activeIdx);
     const isTDay = dayDate >= POS_CURSO; // dia da Trilha ou de transição (registro próprio; blocos sem tm viram nota)
     const day = isTDay ? trilhaRow(dayDate, config) : schedFor(dayDate)[activeIdx];
     const list = listFor(activeIdx);
-    const dayReviews = isTransDay(dayDate) ? [] : isTDay ? (P ? trilhaReviewTone(computeReviews(trail, dayDate, "trail"), { cfg: config, P, trail, hoje: todayISO(), ov: scheduleOv }, dayDate, dayDate > todayISO()) : computeReviews(trail, dayDate, "trail")) : computeReviews(reviews.progress, dayDate, "progress"); // a partir de 20/10 as revisões vêm só do registro da Trilha (decisão 2, 19/10)
+    const dayReviews = isTransDay(dayDate) || (isTDay && P && P.revEnd && dayDate > AULA_END && dayDate > P.revEnd) ? [] : isTDay ? (P ? trilhaReviewTone(computeReviews(trail, dayDate, "trail"), { cfg: config, P, trail, hoje: todayISO(), ov: scheduleOv }, dayDate, dayDate > todayISO()) : computeReviews(trail, dayDate, "trail")) : computeReviews(reviews.progress, dayDate, "progress"); // a partir de 20/10 as revisões vêm só do registro da Trilha (decisão 2, 19/10) · R-a (📚 DELA 9; S6): dia depois do horizonte (P.revEnd, depois de 01/01) = o mesmo corte do bloco do dia
     const doneCount = list.filter(a => isBlockDoneAt(a, dayDate)).length;
     return (React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 16 } },
-        hojeT > TRILHA_END && P && React.createElement(TrilhaBalanco, { P, trail, closing: true }), // depois de 01/01: tela de encerramento com o balanço (paciente, 20/10)
+        hojeT > AULA_END && P && React.createElement(TrilhaBalanco, { P, trail, mode: P.live ? "compacto" : "fim", config, onPatch: saveTrilha }), // §6 (S5): de 02/01 ao fim da cauda, uma linha (os dois números — detalhes na aba Trilha); depois do fim, o encerramento
         React.createElement("div", { style: { background: "#1e293b", borderRadius: 12, padding: 16 } },
             React.createElement("div", { style: { color: "#94a3b8", fontSize: 11, marginBottom: 10 } }, "ESTRUTURA DOS DIAS D"),
             React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 6 } }, (dayDate >= POS_CURSO ? [
@@ -3046,6 +3087,7 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, trail, P, onSa
             coverageT.map((w, i) => React.createElement("div", { key: i, style: { color: "#fbbf24", fontSize: 11, fontWeight: 800, lineHeight: 1.4 } }, w))),
         isCurTW && pendT.length > 0 && React.createElement("div", { "data-t": "trilha-pending", style: tBanner },
             React.createElement("span", { style: tHead }, "⏳ Ficaram para trás " + pendT.length + (pendT.length === 1 ? " etapa" : " etapas") + " (" + pendT.slice(0, 4).map((x, i, a) => { const amb = pendT.some(y => y.id !== x.id && (modById(y.id) || {}).code === (modById(x.id) || {}).code); return (amb ? (i > 0 && a[i - 1].id === x.id ? "" : modLbl(x.id) + " · ") : ((modById(x.id) || {}).code || "?") + " · ") + TS_WORD[x.ts] + (x.why === "semdia" ? " sem dia" : x.why === "simulado" ? " de " + dayNameT(x.iso) + ", que virou simulado" : " de " + dayNameT(x.iso)); }).join(", ") + (pendT.length > 4 ? ", …" : "") + ") — sem culpa: posso propor novos dias."),
+            hojeT > AULA_END && React.createElement("span", { "data-t": "pending-tail", style: { color: "#94a3b8", fontSize: 10, lineHeight: 1.4 } }, "Se você não for fazer, dá para encerrar a cauda na aba Trilha (com prévia e Desfazer)."), // X25 (S7; DELA 10 · 🧩 cadeia abandonada → a saída dela é o "⏹ Encerrar a cauda agora")
             tView !== "pend" ? React.createElement("div", { style: tRow }, React.createElement("button", { onClick: () => setTView("pend"), style: tBtnMain }, "Ver como recolocar"))
                 : React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6 } },
                     tProp && tProp.jobs && tProp.jobs.some(j => !j.wait) && React.createElement("span", { style: tProp_ }, "💡 " + tPropText + (tPropNotes.length ? " " + tPropNotes.join(" · ") : "")),
@@ -3455,7 +3497,7 @@ function ModuleTracker({ progress, onUpdate, effWeek, reviews, simResults, trail
         React.createElement("input", { value: search, onChange: e => setSearch(e.target.value), placeholder: "\uD83D\uDD0D Buscar m\u00F3dulo...", style: { background: "#1e293b", border: "1px solid #334155",
                 borderRadius: 8, color: "#f1f5f9", padding: "8px 12px", fontSize: 13 } }),
         React.createElement("div", { style: { display: "flex", gap: 6, flexWrap: "wrap" } }, (trailMode ? [
-            ["all", "Todos"], ["tweek", "Nesta semana da Trilha"], ["reach", "No alcance até 01/01"], ["out", "Fora do alcance"],
+            ["all", "Todos"], ["tweek", "Nesta semana da Trilha"], ["reach", "Aula até 01/01"], ["out", "Fora do alcance"],
             ["review", "A revisar"], ["progress", "Em progresso"], ["done", "Completos"], ["todo", "Não iniciados"]
         ] : [
             ["all", "Todos"], ["current", "Semana atual+"], ["catchup", "Desatraso"],
@@ -3485,7 +3527,7 @@ function ModuleTracker({ progress, onUpdate, effWeek, reviews, simResults, trail
                                 React.createElement(Badge, { label: m.code, color: TAG_COLORS[m.code] || "#475569" }),
                                 trailMode ? React.createElement(Badge, { label: m.week ? "Curso S" + m.week : "sem semana", color: "#1e293b" }) : React.createElement(Badge, { label: `Sem.${m.week}`, color: isCurrentWeek ? "#92400e" : isCatchup ? "#7f1d1d" : "#1e293b" }),
                                 trailMode && P && React.createElement(Badge, { label: "TRILHA #" + ((P.qpos[m.id] || 0) + 1), color: thisT ? "#7E22CE" : "#4c1d95" }),
-                                trailMode && P && React.createElement(Badge, { label: reachSet.has(m.id) ? "ATÉ 01/01" : "FORA DO ALCANCE", color: reachSet.has(m.id) ? "#334155" : "#1e293b" }),
+                                trailMode && P && (() => { const [sl, sc] = trilhaModStatus(P, rec, m.id); return React.createElement(Badge, { label: sl, color: sc }); })(), // X34 (§6): a mesma função do statusOf da fila
                                 trailMode && pr.aulaAudio && React.createElement(Badge, { label: "🎧 AULA EM ÁUDIO", color: "#0369A1" }),
                                 isCurrentWeek && React.createElement(Badge, { label: "ATUAL", color: "#92400e" }),
                                 m.custom && React.createElement(Badge, { label: "ADICIONADO POR VOCÊ", color: "#475569" }),
@@ -3793,22 +3835,96 @@ function CatchUp({ progress, onUpdate, effWeek, config, onSaveConfig }) {
                     fmtBR(weekDayISO(config.startDate, g.week, 6))),
                 React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 8 } }, g.items.map(m => React.createElement(ModuleRow, { key: m.id, m: m })))))))))));
 }
-// ── BALANÇO DA TRILHA (01/01 e tela de encerramento depois de 01/01 — paciente, 20/10) ──
-function TrilhaBalanco({ P, trail, closing }) {
-    const t = trail || {};
-    const closed = P.closed, out = P.Q.filter(id => P.reach.indexOf(id) < 0);
-    const openNow = P.Q.filter(id => P.plan[id] && P.frozen.has(id) && !moduleCompleteP(t, id));
+// ── BALANÇO DAS AULAS (§6, X36–X44; S5) — 🧩 ⚙️ (SPEC "Alcance em dois números"; DELA 11: nada a exportar como se fosse perdido): a partição de P, sem contagem dupla
+//    (closed + ended + open + noAula + preAula + out = fila). Modos: "aulas" (aba Trilha, de 01/01 ao fim da cauda) · "compacto" (Cronograma, de 02/01 ao fim da cauda) ·
+//    "fim" (aba Trilha e Cronograma, depois do fim da cauda: hoje > 01/01 e !P.live). config/onPatch: para o cartão "⏹ Encerrar a cauda agora" (S7). As revisões (X41) são do S6;
+//    a linha das encerradas (X40) só aparece quando houver encerramento (S7). Nada é gravado aqui.
+function TrilhaBalanco({ P, trail, mode, config, onPatch }) {
+    const t = trail || {}, Q = P.Q, hoje = P.hoje;
+    const code = (id) => (modById(id) || {}).code || String(id), name = (id) => { const m = modById(id); return m ? m.code + " · " + m.title : String(id); };
+    const lbl = (id) => { const c = (modById(id) || {}).code; return c && Q.some(y => Number(y) !== Number(id) && (modById(y) || {}).code === c) ? name(id) : code(id); }; // (d′, DECISOES_S4) código que se repete na fila → "código · título" (CIR2 = Urologia e Cicatrização)
+    const dn = (iso) => DOW_LBL[dowOf(iso)] + " " + fmtBR(iso);
     const pc = (v) => v == null || v === "" ? "—" : v + "%";
-    const name = (id) => { const m = modById(id); return m ? m.code + " · " + m.title : String(id); };
-    return React.createElement("div", { "data-t": "trilha-balanco", style: { background: "#1a1430", border: "1px solid #7c3aed", borderRadius: 12, padding: 14, display: "flex", flexDirection: "column", gap: 8 } },
-        React.createElement("div", { style: { color: "#c4b5fd", fontSize: 13, fontWeight: 800 } }, closing ? "🏁 Encerramento da Trilha (" + fmtBR(TRILHA_START) + "/2026 → 01/01/2027)" : "🏁 Balanço da Trilha"),
-        React.createElement("div", { style: { color: "#ddd6fe", fontSize: 11, lineHeight: 1.5 } }, "Módulos fechados (as 4 etapas): " + closed.length + " · abertos sem selar: " + openNow.length + " · fora do alcance: " + out.length + (closing ? " — o acesso à plataforma terminou em 01/01; o cursinho novo começa em 04/01." : "")),
-        closed.length > 0 && React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 3 } }, closed.map(id => { const p = t[id] || {}; return React.createElement("div", { key: id, "data-id": id, style: { color: "#e9d5ff", fontSize: 11, lineHeight: 1.4 } }, "✓ " + name(id) + " — D2 " + pc(p.accD2) + " · selagem " + pc(p.accSelagem) + (p.aulaAudio ? " · 🎧 aula em áudio" : "")); })),
-        openNow.length > 0 && React.createElement("div", { style: { color: "#fbbf24", fontSize: 11, lineHeight: 1.5 } }, "Abertos sem selar: " + openNow.map(id => { const p = t[id] || {}; return ((modById(id) || {}).code || id) + " (falta " + STAGES_T.filter(x => !p[TS_FIELD[x]]).map(x => TS_WORD[x]).join(", ") + ")"; }).join(" · ")),
-        out.length > 0 && React.createElement("div", { style: { color: "#a78bfa", fontSize: 10, lineHeight: 1.5 } }, "Fora do alcance (seguem no novo cursinho a partir de 04/01): " + out.slice(0, 40).map(id => (modById(id) || {}).code || id).join(", ") + (out.length > 40 ? " … (+" + (out.length - 40) + ")" : "")),
+    const falta = (id) => STAGES_T.filter(x => !(t[id] || {})[TS_FIELD[x]]).map(x => TS_WORD[x]).join(", ");
+    const part = { closed: P.closed || [], ended: P.ended || [], open: P.open || [], noAula: P.noAula || [], preAula: P.preAula || [], out: P.out || [] };
+    const dataPart = JSON.stringify({ closed: part.closed.length, ended: part.ended.length, open: part.open.length, noAula: part.noAula.length, preAula: part.preAula.length, out: part.out.length, Q: Q.length, N: P.N, NC: P.NC });
+    const box = { background: "#1a1430", border: "1px solid #7c3aed", borderRadius: 12, padding: 14, display: "flex", flexDirection: "column", gap: 8 };
+    if (mode === "compacto") return React.createElement("div", { "data-t": "trilha-balanco", "data-mode": mode, "data-part": dataPart, style: { ...box, padding: "8px 12px" } },
+        React.createElement("span", { style: { color: "#c4b5fd", fontSize: 11, fontWeight: 800, lineHeight: 1.4 } }, "🏁 Balanço das aulas: " + nAulasT(P.N) + " até 01/01 · " + nCadT(P.NC) + " — detalhes na aba Trilha")); // §6 "compacto"
+    const fim = mode === "fim", d0101 = hoje === AULA_END;
+    const A = Q.filter(id => { const r = t[id] || {}; return !!r.aula && (!r.aulaAt || r.aulaAt <= AULA_END); }).length; // X37: pela data do ✓ (carimbo; C10) — em 01/01 só as marcadas (fidelidade M3); depois de 01/01 = P.N
+    const C = fim ? part.closed.length : P.NC; // §6 "fim": cadeias completas = as fechadas
+    const counts = "Aulas assistidas até 01/01 (pela data do ✓): " + A + " · cadeias completas (com janeiro): " + C + " · aula assistida, cadeia aberta: " + part.open.length
+        + (d0101 ? " · aula de hoje ainda sem ✓: " + part.preAula.length : " · aula não assistida até 01/01: " + part.noAula.length) + " · fora do alcance: " + part.out.length + (part.ended.length ? " · encerradas: " + part.ended.length : ""); // X37
+    const nextOf = (id) => { const p = P.plan[id], ts = STAGES_T.find(x => !(t[id] || {})[TS_FIELD[x]]); return p && ts ? p[ts] || null : null; }; // a próxima etapa da cadeia (a 1ª sem marca) e o dia dela
+    const openItem = (id) => { const noPlan = !P.plan[id], nx = nextOf(id); const semA = !(t[id] || {}).aula, fx = STAGES_T.filter(x => x !== "aula" || !semA).filter(x => !(t[id] || {})[TS_FIELD[x]]).map(x => TS_WORD[x]).join(", "); return lbl(id) + " (" + [semA ? "aula sem ✓" : null, fx ? "falta " + fx : null].filter(Boolean).join("; ") + (noPlan ? "; fora do plano — marque no card" : fim ? "" : nx ? "; próxima " + dn(nx) : "; sem dia") + ")"; }; // X38 (TR9c: "aula sem ✓"; noPlan, C24 e DECISOES_S4 (f))
+    const naItem = (id) => { const d = (P.plan[id] || {}).aula; return lbl(id) + (d ? " (planejada " + dn(d) + ")" : " (sem dia)"); }; // X39
+    const rv = P.revEnd, rvPast = !!rv && hoje > AULA_END && hoje > rv; // X41 (R-a, 📚 🧩 DELA 9; §5): o horizonte das revisões; depois dele, o card encerrou e o que sobrou fica aqui com a data
+    const sobras = rvPast ? computeReviews(t, rv, "trail").sort((a, b) => a.due < b.due ? -1 : a.due > b.due ? 1 : 0) : []; // as que ficaram, da mais antiga à mais nova
+    const revLine = !rv ? null : !rvPast ? "🔁 Revisões: o app lembra até " + fmtBR(rv) + " (estimado — muda com os seus %)." : sobras.length ? "🔁 Revisões que ficaram (o app lembrou até " + fmtBR(rv) + "): " + sobras.map(r => lbl(r.id) + " " + r.kind + " (venceu " + fmtBR(r.due) + ")").join(" · ") : null; // sem revisão a lembrar nem sobra: sem linha (CONFLITO 3 do S6)
+    const endedBy = {}; part.ended.forEach(id => { const at = (P.endedAt || {})[id] || ""; (endedBy[at] = endedBy[at] || []).push(id); }); // X40: uma linha por data de aplicação (S7)
+    const ln = (key, color, size, txt) => React.createElement("div", { key, "data-l": key, style: { color, fontSize: size, lineHeight: 1.5 } }, txt);
+    return React.createElement("div", { "data-t": "trilha-balanco", "data-mode": mode, "data-part": dataPart, style: box },
+        React.createElement("div", { style: { color: "#c4b5fd", fontSize: 13, fontWeight: 800 } }, fim ? "🏁 Encerramento da Trilha (" + fmtBR(TRILHA_START) + "/2026 → " + fmtBR(P.tailLast) + "/2027)" : "🏁 Balanço das aulas (" + fmtBR(TRILHA_START) + "/2026 → 01/01/2027)"), // X36
+        ln("counts", "#ddd6fe", 11, counts),
+        part.closed.length > 0 && React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 3 } }, part.closed.map(id => { const p = t[id] || {}; return React.createElement("div", { key: id, "data-id": id, style: { color: "#e9d5ff", fontSize: 11, lineHeight: 1.4 } }, "✓ " + name(id) + " — D2 " + pc(p.accD2) + " · selagem " + pc(p.accSelagem) + (p.aulaAudio ? " · 🎧 aula em áudio" : "")); })),
+        part.open.length > 0 && ln("open", "#fbbf24", 11, (fim ? "Aula assistida, cadeia aberta: " : "Aula assistida, cadeia aberta (as etapas seguem nos dias planejados): ") + part.open.map(openItem).join(" · ")), // X38
+        d0101 && part.preAula.length > 0 && ln("preAula", "#fca5a5", 11, "Aula ainda sem ✓: " + part.preAula.map(lbl).join(" · ") + " (hoje é o último dia de aula nova)"), // X39 (01/01)
+        part.noAula.length > 0 && ln("noAula", "#fca5a5", 11, "Aula não assistida até 01/01: " + part.noAula.map(naItem).join(" · ") + " — se você assistiu, marque no bloco do dia em que assistiu e a cadeia volta."), // X39 (depois de 01/01)
+        Object.keys(endedBy).sort().map(at => ln("ended-" + at, "#cbd5e1", 11, "Encerradas em " + fmtBR(at) + " (pelo “Encerrar a cauda agora”): " + endedBy[at].map(id => lbl(id) + " (falta " + falta(id) + ")").join(" · "))), // X40 (S7)
+        revLine && ln("rev", "#fde68a", 11, revLine), // X41
+        part.out.length > 0 && ln("out", "#a78bfa", 10, "Fora do alcance da Trilha (ficam para o cursinho novo): " + part.out.slice(0, 40).map(code).join(", ") + (part.out.length > 40 ? " … (+" + (part.out.length - 40) + ")" : "")), // X42
+        !fim && ln("disp", "#c4b5fd", 11, "📦 Depois de 01/01 continuam disponíveis: apostilas, questões, caderno de erros, banco de questões, revisões, smartcards e simulados; uma aula já assistida pode ser revista — só não dá para assistir aula nova."), // X43
         React.createElement("div", { style: { display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" } },
-            React.createElement("span", { style: { color: "#c4b5fd", fontSize: 11, lineHeight: 1.4 } }, "💾 Lembrete: o backup do app e o material exportado da plataforma são o que você leva para o cursinho de 04/01."),
-            React.createElement("button", { onClick: () => doExportBackup(), style: { background: "#2e1065", border: "1px solid #7c3aed", borderRadius: 8, color: "#ddd6fe", fontSize: 11, fontWeight: 700, padding: "5px 10px", cursor: "pointer" } }, "💾 Baixar backup do app")));
+            React.createElement("span", { style: { color: "#c4b5fd", fontSize: 11, lineHeight: 1.4 } }, "💾 Lembrete: faça o backup do app — ele guarda o registro da Trilha e as revisões que continuam."), // X44
+            React.createElement("button", { onClick: () => doExportBackup(), style: { background: "#2e1065", border: "1px solid #7c3aed", borderRadius: 8, color: "#ddd6fe", fontSize: 11, fontWeight: 700, padding: "5px 10px", cursor: "pointer" } }, "💾 Baixar backup do app")),
+        React.createElement(TrilhaTailEnd, { P, trail, config, onPatch })); // X45 (S7; RM12): o "⏹ Encerrar a cauda agora" e o Desfazer, em qualquer modo do balanço com o cartão inteiro ("aulas" e "fim")
+}
+// ── "⏹ ENCERRAR A CAUDA AGORA" (S7; DELA 10 · §4.4 · X45 · RM12) — 💬 ela decide: prévia (nada muda) → "Aplicar" ACRESCENTA { at: hoje, ids: P.open } ao fim de
+//    config.trilhaTailEnd (cada módulo fica com a data da aplicação em que entrou; uma 2ª aplicação não desfaz a 1ª) · "Desfazer" tira a ÚLTIMA aplicação e guarda o
+//    rastro em trilhaTailEndHist (como as decisões 75 e 76: dá para voltar). ⚙️ Nada é apagado: trilhaPlan, registro e dias editados não mudam — buildTrilhaPlan lê a
+//    lista (ended/endedAt): as etapas sem marca depois da data saem do calendário, da carga, do ⏳, do K e do horizonte; as dos dias até a data ficam como histórico.
+//    As revisões dos módulos fechados continuam até o horizonte R-a (C6). Cada gravação é um único saveConfig.
+function trilhaTailEndList(cfg) { return (cfg && Array.isArray(cfg.trilhaTailEnd)) ? cfg.trilhaTailEnd : []; }
+function trilhaTailEndApplyPatch(cfg, ids, hoje) { return { trilhaTailEnd: trilhaTailEndList(cfg).concat([{ at: hoje, ids: (ids || []).map(Number) }]) }; } // §4.4: acrescenta (RM12)
+function trilhaTailEndUndoPatch(cfg, hoje) { const TE = trilhaTailEndList(cfg); if (!TE.length) return null; const H = Array.isArray(cfg.trilhaTailEndHist) ? cfg.trilhaTailEndHist : []; return { trilhaTailEnd: TE.slice(0, -1), trilhaTailEndHist: H.concat([{ ...TE[TE.length - 1], undoneAt: hoje }]) }; } // §1.2: tira a última; o rastro fica
+function trilhaTailEndPreview(P, trail, cfg) { // X45 (prévia): o que vai para o balanço com a data de hoje — e o horizonte das revisões DEPOIS de aplicar (as encerradas saem do revEnd, §5; S6: "encerrar pode puxar o horizonte para trás")
+    const t = trail || {}, hoje = P.hoje, ids = (P.open || []).map(Number), dn = (iso) => DOW_LBL[dowOf(iso)] + " " + fmtBR(iso);
+    const items = ids.map(id => { const m = modById(id), r = t[id] || {}, p = P.plan[id], miss = STAGES_T.filter(x => !r[TS_FIELD[x]]), nx = p && miss.length ? p[miss[0]] || null : null;
+        return (m ? m.code + " — " + m.title : String(id)) + " (falta " + miss.map(x => TS_WORD[x]).join(", ") + "; " + (!p ? "fora do plano" : nx ? "a próxima estava para " + dn(nx) : "sem dia") + ")"; }); // sem data: os fragmentos do X38 ("sem dia", "fora do plano") — CONFLITO 2 do S7
+    const P2 = buildTrilhaPlan({ ...(cfg || {}), ...trilhaTailEndApplyPatch(cfg, ids, hoje) }, t, hoje), rv = P2.revEnd && P2.revEnd >= hoje ? P2.revEnd : null; // a mesma conta do App depois de "Aplicar"; horizonte já passado ou nulo: sem a frase (CONFLITO 3 do S7)
+    return { ids, P2, text: "Encerrar a cauda agora (prévia — nada muda até Aplicar). Vão para o balanço, com a data de hoje (" + fmtBR(hoje) + "): " + items.join(" · ") + ". Elas saem do calendário e do ⏳. Nada é apagado: o plano e as suas marcas ficam, e dá para desfazer." + (rv ? " As revisões dos módulos já fechados continuam até " + fmtBR(rv) + " (estimado)." : "") };
+}
+function trilhaTailEndUndoText(P, cfg) { // X45 (prévia do Desfazer): a ÚLTIMA aplicação volta
+    const TE = trilhaTailEndList(cfg), last = TE[TE.length - 1]; if (!last) return "";
+    const Q = P.Q || [], code = (id) => (modById(id) || {}).code || String(id), lbl = (id) => { const m = modById(id), c = m && m.code; return c && Q.some(y => Number(y) !== Number(id) && (modById(y) || {}).code === c) ? c + " · " + m.title : code(id); }; // (d′): código que se repete na fila → "código · título"
+    const L = (last.ids || []).map(lbl), list = L.length > 1 ? L.slice(0, -1).join(", ") + " e " + L[L.length - 1] : (L[0] || "");
+    return "Desfazer o encerramento de " + fmtBR(last.at) + ": voltam para o calendário e para o ⏳: " + list + " (as datas que já passaram aparecem como ⏳).";
+}
+function TrilhaTailEnd({ P, trail, config, onPatch }) {
+    const [view, setView] = useState(null); // null | "prev" (Encerrar) | "undo" (Desfazer) — nada é gravado até "Aplicar" / "Desfazer"
+    const hoje = P.hoje, TE = trilhaTailEndList(config), canEnd = hoje > AULA_END && (P.open || []).length > 0; // §4.4: depois de 01/01 e com ao menos uma cadeia aberta não encerrada
+    const prev = useMemo(() => view === "prev" && canEnd ? trilhaTailEndPreview(P, trail, config) : null, [view, canEnd, P, trail, config]);
+    if (!onPatch || (!canEnd && !TE.length)) return null;
+    const last = TE.length ? TE[TE.length - 1] : null;
+    const bS = (main) => ({ background: main ? "#334155" : "#0f172a", border: "1px solid " + (main ? "#94a3b8" : "#334155"), borderRadius: 8, color: main ? "#f1f5f9" : "#94a3b8", fontSize: 11, fontWeight: 700, padding: "5px 10px", cursor: "pointer" });
+    const txt = { color: "#cbd5e1", fontSize: 11, lineHeight: 1.5 }, rowS = { display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" };
+    const done = TE.map((x, i) => { const n = ((x && x.ids) || []).length; return React.createElement("div", { key: "d" + i, "data-t": "tailend-done", style: { ...txt, fontWeight: 700 } }, "⏹ Cauda encerrada em " + fmtBR(x.at) + ": " + (n === 1 ? "1 cadeia foi para o balanço." : n + " cadeias foram para o balanço.")); }); // uma linha por aplicação ativa (RM12)
+    let body;
+    if (view === "prev" && prev) body = React.createElement("div", { "data-t": "tailend-prev", style: { display: "flex", flexDirection: "column", gap: 6 } },
+        React.createElement("div", { style: txt }, prev.text),
+        React.createElement("div", { style: rowS },
+            React.createElement("button", { onClick: () => { onPatch(trilhaTailEndApplyPatch(config, prev.ids, hoje)); setView(null); }, style: bS(true) }, "Aplicar"),
+            React.createElement("button", { onClick: () => setView(null), style: bS(false) }, "Cancelar")));
+    else if (view === "undo" && last) body = React.createElement("div", { "data-t": "tailend-undo-prev", style: { display: "flex", flexDirection: "column", gap: 6 } },
+        React.createElement("div", { style: txt }, trilhaTailEndUndoText(P, config)),
+        React.createElement("div", { style: rowS },
+            React.createElement("button", { onClick: () => { const pt = trilhaTailEndUndoPatch(config, hoje); if (pt) onPatch(pt); setView(null); }, style: bS(true) }, "Desfazer"),
+            React.createElement("button", { onClick: () => setView(null), style: bS(false) }, "Cancelar")));
+    else body = React.createElement("div", { style: rowS },
+        canEnd && React.createElement("button", { onClick: () => setView("prev"), style: bS(false) }, "⏹ Encerrar a cauda agora"),
+        last && React.createElement("button", { "data-t": "tailend-undo", onClick: () => setView("undo"), style: bS(false) }, "Desfazer"));
+    return React.createElement("div", { "data-t": "trilha-tailend", style: { background: "#0f172a", border: "1px solid #475569", borderRadius: 10, padding: "8px 12px", display: "flex", flexDirection: "column", gap: 6 } }, done, body);
 }
 // ── ABA TRILHA (antiga Desatraso; id "catchup" mantido) — 🩺 fila e método · 🧩 linha de alcance e contagem à vista · 💬 ela reordena e decide ──
 function TrilhaTab({ config, trail, progress, P, scheduleOv, onRestore, onSaveConfig, onUpdateTrail, onGoSchedule }) {
@@ -3827,7 +3943,7 @@ function TrilhaTab({ config, trail, progress, P, scheduleOv, onRestore, onSaveCo
     const curTue = curW ? weekStartISO(curW) : null, curEnd = curW ? weekEndISO(curW) : null;
     const curTail = curW ? tailWeekOf(curW) : null; // semana da cauda: sem módulo novo (X57), sem ⏩ (X66)
     const W = curTue ? P.weeks[curTue] : null;
-    const Q = P.Q, N = P.N;
+    const Q = P.Q, N = P.N, NC = P.NC; // §6: aulas até 01/01 e cadeias completas (com janeiro)
     const saveCfg = (patch) => onSaveConfig({ ...config, ...patch });
     const card = { background: "#1e293b", borderRadius: 12, padding: 16 };
     const small = { color: "#64748b", fontSize: 10, lineHeight: 1.5 };
@@ -3844,8 +3960,8 @@ function TrilhaTab({ config, trail, progress, P, scheduleOv, onRestore, onSaveCo
     const movable = (id) => !P.frozen.has(id) && !moduleCompleteP(t, id) && pins.indexOf(id) < 0;
     const moveQ = (id, dir) => { const i = Q.indexOf(id); let j = i + dir; while (j >= 0 && j < Q.length && !movable(Q[j])) j += dir; if (j < 0 || j >= Q.length) return; const nb = Q[j]; const b = baseOrder.slice(); const a1 = b.indexOf(id), a2 = b.indexOf(nb); if (a1 < 0 || a2 < 0) return; b[a1] = nb; b[a2] = id; saveCfg({ trilhaOrder: b }); }; // troca com o vizinho do mesmo tipo (não planejado, não fixado)
     const togglePin = (id) => saveCfg({ trilhaPins: pins.indexOf(id) >= 0 ? pins.filter(x => x !== id) : pins.concat([id]) });
-    const reachSet = new Set(P.reach);
-    const statusOf = (id) => moduleCompleteP(t, id) ? ["FECHADO ✓", "#15803d"] : P.frozen.has(id) ? (P.plan[id].wk === curTue ? ["NESTA SEMANA", "#7E22CE"] : ["PLANEJADO", "#4c1d95"]) : P.plan[id] ? ["PRÉVIA " + fmtBR(P.plan[id].wk), "#475569"] : reachSet.has(id) ? ["ATÉ 01/01", "#334155"] : ["FORA DO ALCANCE", "#1e293b"];
+    const statusOf = (id) => trilhaModStatus(P, t, id, { queue: true, curTue }); // X35 (§6): a mesma função do badge do card
+    const lastIn = Q.reduce((m, id, k) => P.reach.has(id) ? k : m, -1); // X59 (código 22): a linha vai depois do ÚLTIMO módulo da fila que pertence ao conjunto (não é mais prefixo)
     // editor de blocos (adicionar/corrigir) — antes no Cronograma; o módulo adicionado entra na fila pela ordem do curso (ou no fim, sem semana)
     const editMod = (m, patch) => { if (m.custom) saveCfg({ customModules: (config.customModules || []).map(x => Number(x.id) === m.id ? { ...x, ...patch } : x) }); else saveCfg({ moduleEdits: { ...(config.moduleEdits || {}), [m.id]: { ...((config.moduleEdits || {})[m.id] || {}), ...patch } } }); };
     const addMod = () => { const code = newMod.code.trim().toUpperCase(), title = newMod.title.trim(); if (!code || !title) return; const cm = config.customModules || []; const id = Math.max(999, ...cm.map(x => Number(x.id) || 0), ...MODULES.map(x => x.id)) + 1; const wk = Number(newMod.week) || null; saveCfg({ customModules: cm.concat([{ id, week: wk, code, title }]) }); setNewMod({ code: "", title: "", week: "" }); };
@@ -3882,6 +3998,7 @@ function TrilhaTab({ config, trail, progress, P, scheduleOv, onRestore, onSaveCo
         const diffMarks = (now, was) => { const out = []; Object.keys(now || {}).forEach(id => { const w = marksOf((was || {})[id]).map(canonJ); const fs = marksOf(now[id]).filter(it => w.indexOf(canonJ(it)) < 0); if (fs.length) out.push({ id: Number(id), name: nm(id), items: fs }); }); return out; };
         const nMarks = (L) => L.reduce((s, x) => s + x.items.length, 0);
         const KN = { trilhaOrder: "ordem da fila", trilhaPins: "📌", trilhaRamp: "rampa", lightDayOverrides: "dia sem remédio", trilhaDismiss: "“Agora não”", simResults: "% de simulado", simOverrides: "simulado ligado/desligado" };
+        KN.trilhaTailEnd = "encerramento da cauda"; // S7 (§4.5): rótulo da chave nova (linha própria: a linha do KN, que já existia no HEAD, fica igual)
         const leaveLines = (base, U, when) => { // o que mudou desde "base" (o estado logo depois da última ação) e sai da tela com Desfazer/Refazer (fica no arquivo)
             const L = [], bc = base.cfg || {}, bp = bc.trilhaPlan || {}, cp = config.trilhaPlan || {}, up = U.cfg.trilhaPlan || {}, bw = bc.trilhaWeeks || {}, cw = config.trilhaWeeks || {}, bs = base.sov || {}, cs = scheduleOv || {};
             const am = diffMarks(t, base.trail); if (am.length) L.push("marcas feitas depois " + when + " (" + nMarks(am) + "): " + am.map(x => x.name.split(" · ")[0] + " — " + x.items.map(itemTxt).join(", ")).join("; "));
@@ -3929,6 +4046,7 @@ function TrilhaTab({ config, trail, progress, P, scheduleOv, onRestore, onSaveCo
             if (D.dismiss.length) cfgL.push("“Agora não”: " + D.dismiss.length + " → sai");
             D.simRes.forEach(x => cfgL.push("% do simulado de " + fmtBR(x.iso) + " (" + x.v + "%) → sai"));
             D.simOv.forEach(x => cfgL.push("simulado de " + fmtBR(x.iso) + (x.v ? " religado" : " desligado") + " → volta à regra"));
+            (D.tailEnd || []).forEach(x => cfgL.push("encerramento da cauda de " + fmtBR(x.at) + " → sai (as cadeias voltam a aparecer)")); // X51 (S7)
             body.push(sec("5 · Fila, 📌, rampa, dia sem remédio, “Agora não” e simulados", cfgL.length ? cfgL : ["tudo no padrão"], "s5"));
             const stW = { quest: ["As", "ficam", "as", "elas contam"] }, stw = (ts) => stW[ts] || ["A", "fica", "a", "ela conta"];
             const notes = D.weekNotes.map(x => "a semana de " + fmtBR(x.tue) + " congelou com " + x.got.join(", ") + " — pela fila padrão seriam " + x.exp.join(", ") + "; fica como congelou" + (x.back.length ? " (" + x.back.join(", ") + " tinha(m) entrado pelo ⏩/🔓 e volta(m) para a frente da fila)" : "") + (x.other ? " (com a fila e os 📌 que valiam na hora)" : "")
@@ -3938,7 +4056,7 @@ function TrilhaTab({ config, trail, progress, P, scheduleOv, onRestore, onSaveCo
             D.unticked.forEach(x => notes.push("a " + TS_WORD[x.ts] + " de " + x.name.split(" · ")[0] + " estava marcada (" + fmtBR(x.iso) + ") quando a semana congelou e foi desmarcada depois — fica desmarcada"));
             body.push(sec("Fica como está", ["1º acesso: " + (D.firstOpen ? fmtBR(D.firstOpen) : "—"), "semanas congeladas (a cota não é recalculada): " + (D.weeks.map(w => fmtBR(w.tue) + " (" + w.q + (w.n < w.q ? ", entraram " + w.n : "") + (w.held ? ", segurada" : "") + ")").join(" · ") || "—")].concat(notes).concat((D.appRec.revFull || D.appRec.final) ? ["o que o app registra sozinho: " + [D.appRec.revFull ? D.appRec.revFull + " dia(s) cheio(s) para a revisão" : "", D.appRec.final ? "a recolocação da semana final" : ""].filter(Boolean).join(" e ")] : []).concat(["tudo o que é de antes da atualização (histórico do curso e transição)"]), "s6"));
             const LWs = FINAL_START; // semana final por data (⚙️ crítica §0.1)
-            body.push(React.createElement("div", { key: "reach", "data-t": "restore-reach" }, sec("Alcance até 01/01", ["alcance estimado: " + P.N + " módulos agora → " + P2.N + " depois de restaurar (supondo que as próximas semanas fechem)", "o ritmo da semana seguinte fica segurado até a semana anterior fechar — e no bloco 04h30 (16/11 a 11/12) o ritmo não sobe. Isso só informa: a decisão é sua."], "s7r")));
+            body.push(React.createElement("div", { key: "reach", "data-t": "restore-reach" }, sec("Alcance: aulas até 01/01 e cadeias completas", ["aulas até 01/01: " + P.N + " agora → " + P2.N + " depois de restaurar · cadeias completas (com janeiro): " + P.NC + " → " + P2.NC + " (supondo que as próximas semanas fechem)", "o ritmo da semana seguinte fica segurado até a semana anterior fechar — e no bloco 04h30 (16/11 a 11/12) o ritmo não sobe. Isso só informa: a decisão é sua."], "s7r")));
             body.push(sec("Depois de aplicar", [P2.pending.length + " etapa(s) aparecem como ⏳ pendentes" + (pendS.length ? " (" + pendA + " de dias que já passaram + " + pendS.length + " em " + [...new Set(pendS.map(x => dn(x.iso)))].join(", ") + ", que volta a ser simulado)" : "") + " — é esperado: depois de restaurar nada está marcado; você marca no bloco de cada dia o que fez."]
                 .concat(hoje >= addDaysISO(LWs, -7) && hoje < LWs ? ["📦 a partir de " + fmtBR(LWs) + " (semana final): as etapas dos dias que já passaram ficam no bloco de cada dia, para você marcar o que fez — a recolocação automática diária só leva as de cada dia em diante."] : [])
                 .concat(hoje >= LWs && hoje < TRILHA_END ? ["📦 semana final: as etapas dos dias que já passaram ficam no bloco de cada dia, para você marcar o que fez — o que não foi feito aparece no ⏳ (“Ver como recolocar”). A recolocação automática de cada dia continua para as etapas de hoje em diante."] : hoje === TRILHA_END ? ["📦 hoje é o último dia de acesso: marque no bloco de cada dia o que você fez — o que ficar sem marca não é mais recolocado (fica no registro para o cursinho de 04/01)."] : [])
@@ -4017,18 +4135,18 @@ function TrilhaTab({ config, trail, progress, P, scheduleOv, onRestore, onSaveCo
         restoreEl,
         isTransDay(hoje) && React.createElement("div", { "data-t": "trilha-transition", style: { background: "#0b1f33", border: "1px solid #1d4ed8", borderRadius: 10, padding: "8px 12px", color: "#93c5fd", fontSize: 11, fontWeight: 700, lineHeight: 1.45 } }, "🗓️ Dias de transição (" + fmtBR(POS_CURSO) + "–" + fmtBR(addDaysISO(TRILHA_START, -1)) + "): a trilha começa na " + DOW_FULL[dowOf(TRILHA_START)].toLowerCase() + " " + fmtBR(TRILHA_START) + " — a fila, a rampa e o alcance abaixo são a prévia."),
         React.createElement("div", { "data-t": "trilha-counts", style: card },
-            React.createElement("div", { style: { color: "#c4b5fd", fontSize: 13, fontWeight: 800, marginBottom: 8 } }, "🛤️ TRILHA AUTÔNOMA — " + fmtBR(TRILHA_START) + "/2026 → 01/01/2027"),
-            React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 10, marginBottom: 10 } },
-                [["Fechados na Trilha", P.closed.length, "#22c55e"], ["Dentro do alcance até 01/01", N, "#f5c518"], ["Fora", Q.length - N, "#94a3b8"]].map(([l, v, c]) => React.createElement("div", { key: l, style: { background: "#0f172a", borderRadius: 10, padding: "12px 8px", textAlign: "center" } }, React.createElement("div", { style: { color: c, fontSize: 22, fontWeight: 700 } }, v), React.createElement("div", { style: { color: "#64748b", fontSize: 10 } }, l)))),
-            React.createElement("div", { style: { color: "#f1f5f9", fontSize: 12, fontWeight: 700 } }, "No ritmo atual cabem " + N + " módulos até 01/01/2027."),
-            React.createElement("div", { style: small }, "Conta = módulos com as 4 etapas datadas até 01/01 (ou já feitas). A prévia supõe que as próximas semanas fecham; não é promessa — muda quando você marca, recoloca ou adianta."),
+            React.createElement("div", { style: { color: "#c4b5fd", fontSize: 13, fontWeight: 800, marginBottom: 8 } }, "🛤️ TRILHA AUTÔNOMA — aulas de " + fmtBR(TRILHA_START) + "/2026 a 01/01/2027 · as cadeias abertas seguem em janeiro"), // X52
+            React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 6, marginBottom: 10 } }, // X53: 4 colunas (cabem em 360px com rótulo de 10px)
+                [["Fechados na Trilha", P.closed.length, "#22c55e"], ["Aulas até 01/01", N, "#f5c518"], ["Cadeias completas (com janeiro)", NC, "#38bdf8"], ["Fora", Q.length - N, "#94a3b8"]].map(([l, v, c]) => React.createElement("div", { key: l, style: { background: "#0f172a", borderRadius: 10, padding: "10px 4px", textAlign: "center" } }, React.createElement("div", { style: { color: c, fontSize: 22, fontWeight: 700 } }, v), React.createElement("div", { style: { color: "#64748b", fontSize: 10, lineHeight: 1.3 } }, l)))),
+            React.createElement("div", { style: { color: "#f1f5f9", fontSize: 12, fontWeight: 700 } }, "No ritmo atual: " + nAulasT(N) + " até 01/01/2027 e " + nCadT(NC) + " (as selagens que passam de 01/01 ficam em janeiro)."), // X54
+            React.createElement("div", { style: small }, "Aulas = módulos com a aula feita (pela data do ✓ — marque no bloco do dia em que assistiu) ou datada até 01/01. Cadeias = as 4 etapas feitas ou datadas (janeiro conta). A prévia supõe que as próximas semanas fecham; não é promessa — muda quando você marca, recoloca ou adianta."), // X55
             curW && curW < finalWeek() && React.createElement("div", { style: { display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginTop: 6 } },
                 React.createElement("button", { onClick: () => setAltN(buildTrilhaPlan(config, trail, hoje, { alt: true }).N), style: btnS(false) }, "E se esta semana virar manutenção?"),
-                altN != null && React.createElement("span", { "data-t": "trilha-alt", style: { color: "#94a3b8", fontSize: 11, lineHeight: 1.4 } }, "Se esta semana não fechar, a próxima fica no mesmo ritmo" + (W && W.prop ? " da sua cota cheia (" + W.prop.full + ")" : "") + ": cabem " + altN + " até 01/01. É só uma conta — muda quando as etapas forem marcadas."))),
+                altN != null && React.createElement("span", { "data-t": "trilha-alt", style: { color: "#94a3b8", fontSize: 11, lineHeight: 1.4 } }, "Se esta semana não fechar, a próxima fica no mesmo ritmo" + (W && W.prop ? " da sua cota cheia (" + W.prop.full + ")" : "") + ": " + nAulasT(altN) + " até 01/01. É só uma conta — muda quando as etapas forem marcadas."))),
         showExport && React.createElement("div", { "data-t": "trilha-export", style: { background: "#1a1430", border: "1px solid #7c3aed", borderRadius: 10, padding: "8px 12px", display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" } },
             React.createElement("span", { style: { color: "#c4b5fd", fontSize: 11, fontWeight: 800, lineHeight: 1.4 } }, "📦 O acesso à plataforma termina em 01/01/2027: exporte o que é seu (apostilas, resumos, cadernos de erros) e faça o 💾 backup do app."),
             React.createElement("button", { onClick: () => doExportBackup(), style: { background: "#2e1065", border: "1px solid #7c3aed", borderRadius: 8, color: "#ddd6fe", fontSize: 11, fontWeight: 700, padding: "5px 10px", cursor: "pointer" } }, "💾 Baixar backup do app")),
-        hoje >= TRILHA_END && React.createElement(TrilhaBalanco, { P, trail, closing: hoje > TRILHA_END }),
+        hoje >= AULA_END && React.createElement(TrilhaBalanco, { P, trail, mode: hoje > AULA_END && !P.live ? "fim" : "aulas", config, onPatch: saveCfg }), // §6 (S5): "aulas" de 01/01 ao fim da cauda; "fim" depois
         React.createElement("div", { "data-t": "trilha-ramp", style: card },
             React.createElement("div", { style: { color: "#94a3b8", fontSize: 11, marginBottom: 8 } }, "RITMO DA SEMANA E RAMPA"),
             W && !W.pre && React.createElement("div", { style: { color: "#f1f5f9", fontSize: 12, marginBottom: 8, lineHeight: 1.5 } }, curTail ? "Semana de " + curTail.mes + " (" + fmtBR(curTue) + "–" + fmtBR(curEnd) + "): sem módulo novo — só as etapas das cadeias abertas e as revisões." : "Esta semana (" + fmtBR(curTue) + "–" + fmtBR(curEnd) + "): " + W.q + (W.q === 1 ? " módulo novo" : " módulos novos") + (W.prop ? " — semana do seu 1º acesso: cota proporcional " + trilhaPropTxt(W.prop) + " (a rampa previa " + W.prop.full + ")" : "") + (W.afterProp ? " · " + trilhaAfterPropTxt(W.afterProp) : "") + (W.held ? " — semana de manutenção do ritmo (" + (W.why === "madrugada" ? "travado: bloco 04h30" : "segura: semana passada aberta") + "; a rampa previa " + W.base + ")" : "") + ((W.adv || []).length ? " · +" + W.adv.length + " adiantado(s)" : "") + ((W.rise || []).length ? " · +" + W.rise.length + " pela subida" : "") + (W.short && W.shortWhy === "k" ? " · " + W.short + " espera: " + K_TXT : "")),
@@ -4068,7 +4186,7 @@ function TrilhaTab({ config, trail, progress, P, scheduleOv, onRestore, onSaveCo
                         can && !pinned && React.createElement("button", { onClick: () => moveQ(id, -1), title: "Subir na fila", style: btnS(false) }, "↑"),
                         can && !pinned && React.createElement("button", { onClick: () => moveQ(id, 1), title: "Descer na fila", style: btnS(false) }, "↓"),
                         can && React.createElement("button", { onClick: () => togglePin(id), title: "Fixar: entra na próxima semana (ou pelo ⏩ Adiantar)", style: btnS(pinned) }, "📌")),
-                    k === N - 1 && React.createElement("div", { "data-t": "trilha-line", style: { color: "#f5c518", fontSize: 10, fontWeight: 800, textAlign: "center", padding: "4px 0", borderTop: "1px dashed #f5c518", borderBottom: "1px dashed #f5c518" } }, "— LINHA DE ALCANCE — até 01/01: " + N + " módulos")); }))),
+                    k === lastIn && React.createElement("div", { "data-t": "trilha-line", style: { color: "#f5c518", fontSize: 10, fontWeight: 800, textAlign: "center", padding: "4px 0", borderTop: "1px dashed #f5c518", borderBottom: "1px dashed #f5c518" } }, "— LINHA DE ALCANCE — aula até 01/01: " + N + (N === 1 ? " módulo" : " módulos"))); }))), // X59
         pomoIds.length > 0 && React.createElement("div", { "data-t": "trilha-pomo", style: { background: "#101c33", border: "1px solid #1e3a5f", borderRadius: 12, padding: 14 } },
             React.createElement("div", { style: { color: "#7dd3fc", fontSize: 13, fontWeight: 800, marginBottom: 4 } }, "⏱️ Planejador da semana — pomodoros das aulas da Trilha"),
             React.createElement("div", { style: small }, "Anote a duração da aula e receba a divisão em pomodoros. Só sugestão — nada muda no cronograma. 60min de foco · 10min de pausa · 35min a cada 2 focos; na execução, siga o Flowtime se estiver rendendo."),
@@ -4080,7 +4198,7 @@ function TrilhaTab({ config, trail, progress, P, scheduleOv, onRestore, onSaveCo
                     React.createElement("div", { style: { display: "flex", gap: 8, alignItems: "center" } }, React.createElement("span", { style: { color: "#94a3b8", fontSize: 10 } }, "Duração da aula (min):"),
                         React.createElement("input", { type: "number", min: 0, max: 600, inputMode: "numeric", placeholder: "min", value: pr.aulaMin == null ? "" : pr.aulaMin, onChange: e => { const v = e.target.value; const upd = { ...pr }; if (v === "") delete upd.aulaMin; else upd.aulaMin = Math.max(0, Math.min(600, Number(v))); onUpdateTrail({ ...t, [id]: upd }); }, style: { width: 70, background: "#1e293b", border: "1px solid #334155", borderRadius: 6, color: "#f1f5f9", padding: "4px 8px", fontSize: 12 } })),
                     sug && React.createElement("div", { style: { color: "#7dd3fc", fontSize: 10, marginTop: 6 } }, sug)); })),
-            React.createElement("div", { style: { color: "#f5c518", fontSize: 10, marginTop: 10 } }, "📅 No ritmo atual cabem " + N + " módulos até 01/01/2027.")),
+            React.createElement("div", { style: { color: "#f5c518", fontSize: 10, marginTop: 10 } }, "📅 No ritmo atual: " + nAulasT(N) + " até 01/01/2027 e " + nCadT(NC) + ".")), // X60
         React.createElement("div", { style: card },
             React.createElement("div", { style: { color: "#f5c518", fontSize: 13, fontWeight: 700, marginBottom: 10 } }, "COMO A TRILHA FUNCIONA"),
             React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 8 } }, [
@@ -4090,7 +4208,7 @@ function TrilhaTab({ config, trail, progress, P, scheduleOv, onRestore, onSaveCo
                 ["4", "Plantões e dia leve", "Plantão longo (06h–19h): só Anki + áudio. Curto e 04h30: etapas antes ou depois. O dia leve (sem Venvanse) é previsto antes de distribuir e nunca recebe aula nova; 24, 25 e 31/12 são mais leves (📚 a 3h)."],
                 ["5", "Ficou para trás? Adiantou?", "⏳ o app propõe novos dias (só grava com Aplicar). Semana fechada: ⏩ Adiantar próximo módulo. Na semana final (29/12–01/01) ele recoloca sozinho para selar até 01/01."],
                 ["6", "Ferramentas de foco", "Forest/Flora ligado em TODO bloco de estudo. Body double (FocusMate ou colega) nos blocos que você mais adia."],
-                ["7", "Aprender > zerar", "Cada selagem agenda as revisões D+7/D+30 pelo seu %. É memória, não lista riscada."],
+                ["7", "Aprender > zerar", "Cada selagem agenda as revisões D+7/D+30 pelo seu % (e um reforço 14 dias depois se o D+30 ficar abaixo de 60%)." + (P.revEndEst ? " Depois de 01/01 o app continua lembrando até " + fmtBR(P.revEndEst) + " (estimado — muda com os seus %); depois disso, o que sobrar vai para o balanço com a data." : "") + " É memória, não lista riscada."], // X64 (R-a, 📚 DELA 9; revEndEst: com as cadeias da prévia)
             ].map(([n, ti, d]) => React.createElement("div", { key: n, style: { display: "flex", gap: 10 } },
                 React.createElement("span", { style: { color: "#0ea5a0", fontSize: 13, fontWeight: 800, minWidth: 14 } }, n),
                 React.createElement("div", null, React.createElement("div", { style: { color: "#f1f5f9", fontSize: 12, fontWeight: 600 } }, ti), React.createElement("div", { style: { color: "#94a3b8", fontSize: 11, lineHeight: 1.5 } }, d)))))));
@@ -4324,7 +4442,8 @@ function App() {
         const lim = P ? P.LWv : finalWeek(config.startDate); // os DOIS ramos presos na última semana VISÍVEL (RM18; §2.2): a T10 ou, enquanto houver o que mostrar, a última semana da cauda — lastWeek é só o horizonte de planejamento
         return config.manualWeek != null ? Math.min(Math.max(Number(config.manualWeek) || 1, 1), lim) : Math.min(computeWeek(config.startDate, hoje), lim);
     }, [config, hoje, P]);
-    const reviewsT = useMemo(() => tOn && P ? trilhaReviewTone(reviews, { cfg: config, P, trail, hoje, ov: scheduleOv }, hoje) : reviews, [reviews, P, config, trail, hoje, scheduleOv]); // decisão 73: revisão que deslizou (dia cheio, plantão longo, simulado) não aparece "em atraso"
+    const reviewsLive = useMemo(() => (P && P.revEnd && hoje > AULA_END && hoje > P.revEnd) ? reviews.filter(r => r.src !== "trail") : reviews, [reviews, P, hoje]); // R-a (📚 🧩 DELA 9; §5, RM14): depois do horizonte (hoje > P.revEnd, depois de 01/01) o card de revisões encerra e o "🔁 REVISAR" da aba Módulos some (C7) — o que sobrou vai para o balanço com a data (X41)
+    const reviewsT = useMemo(() => tOn && P ? trilhaReviewTone(reviewsLive, { cfg: config, P, trail, hoje, ov: scheduleOv }, hoje) : reviewsLive, [reviewsLive, P, config, trail, hoje, scheduleOv]); // decisão 73: revisão que deslizou (dia cheio, plantão longo, simulado) não aparece "em atraso"
     setPaceCfg((todayISO() >= CATCHUP_START && todayISO() < FREE_START) ? 2 : (config && config.catchupPace)); // ritmo primeiro: a projeção depende dele · P7: CATCHUP = 2
     setCatchupPins(config && config.catchupPins);
     __SIM_SAVE = (ov) => saveConfig({ ...config, simOverrides: ov });
@@ -4499,9 +4618,9 @@ function App() {
                     React.createElement("div", { style: { background: "linear-gradient(90deg,#f5c518,#e8833a)", borderRadius: 4, height: 4,
                             width: `${Math.round(Math.min(effWeek, finalWeek(config.startDate)) / finalWeek(config.startDate) * 100)}%` } })))),
         React.createElement("div", { style: { padding: "16px 16px 100px" } },
-            (tab === "schedule" || tab === "modules" || tab === "catchup") && (React.createElement(ReviewAlerts, { alerts: reviewsT, onDone: markReviewDone })),
+            (tab === "schedule" || tab === "modules" || tab === "catchup") && (React.createElement(ReviewAlerts, { alerts: reviewsT, onDone: markReviewDone, horizon: tOn && P && hoje >= AULA_END && P.revEnd ? P.revEnd : null })),
             tab === "schedule" && (React.createElement(Schedule, { config: config, effWeek: effWeek, scheduleOv: scheduleOv, events: events, reviews: { progress }, trail: trail, P: P, onSaveSchedule: saveSchedule, onSaveEvents: saveEvents, onUpdateProgress: saveProgress, onUpdateTrail: saveTrail, onReviewDone: markReviewDone, onGoTrilha: () => setTab("catchup") })),
-            tab === "modules" && (React.createElement(ModuleTracker, { progress: progress, onUpdate: saveProgress, effWeek: effWeek, reviews: reviews, simResults: config.simResults, trail: trail, onUpdateTrail: saveTrail, P: P, trailMode: tOn })),
+            tab === "modules" && (React.createElement(ModuleTracker, { progress: progress, onUpdate: saveProgress, effWeek: effWeek, reviews: reviewsLive, simResults: config.simResults, trail: trail, onUpdateTrail: saveTrail, P: P, trailMode: tOn })),
             tab === "catchup" && (tOn ? React.createElement(TrilhaTab, { config: config, trail: trail, progress: progress, P: P, scheduleOv: scheduleOv, onRestore: restorePlan, onSaveConfig: saveConfig, onUpdateTrail: saveTrail, onGoSchedule: () => setTab("schedule") })
                 : React.createElement(React.Fragment, null, React.createElement(PlanejadorSemana, { progress: progress, onUpdate: saveProgress, effWeek: effWeek, config: config, onSaveConfig: saveConfig }), React.createElement(CatchUp, { progress: progress, onUpdate: saveProgress, effWeek: effWeek, config: config, onSaveConfig: saveConfig }))),
             tab === "dopamine" && React.createElement(DopamineMenu, { data: dopeData, onSave: saveDope }),
