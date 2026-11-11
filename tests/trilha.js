@@ -1181,6 +1181,29 @@ function partOkT(b) { if (!b) return false; const p = b.part, c = b.lines.counts
         check('TR19k-fim · "Desfazer" pelo Cronograma (no modo "fim"): trilhaTailEnd = [] e trilhaTailEndHist = [{ at 06/01, ids [PED2], undoneAt 06/01 }]; a cauda volta (Cronograma "compacto", ⏳ com o PED2, aba Trilha "aulas" com o botão de encerrar)', JSON.stringify(cF.trilhaTailEnd) === '[]' && JSON.stringify(cF.trilhaTailEndHist) === JSON.stringify([{ at: '2027-01-06', ids: [26], undoneAt: '2027-01-06' }]) && modeC === 'compacto' && /PED2 · apostila de SÁB 02\/01/.test(pF) && !!bA && bA.mode === 'aulas' && (((await teK(page)) || {}).btns || []).join() === '⏹ Encerrar a cauda agora', JSON.stringify({ te: cF.trilhaTailEnd, h: cF.trilhaTailEndHist, modeC, pF: pF.split('\n')[0], mode: bA && bA.mode }));
     });
 
+    // TR19k-mover · S7_fix1 (🧩 nada some calado · 💬 o diálogo não promete dia que ela não verá; conferência do S7, problema 1 — rev_S7b/u2_today_move): PED2 com a
+    //   selagem planejada para o PRÓPRIO dia da aplicação (07/01; CONFLITO 7 do S7: fica no dia como histórico). Encerrado em 07/01, o "→ mover p/ dia" do bloco só oferece
+    //   dias até a data do encerramento (o mesmo teto da aula em 01/01 — RM10, §3.3 l. 14); mover para um dia passado deixa a etapa VISÍVEL nesse dia, sem ⏳ e sem
+    //   "Mover o fio todo", e a linha do dia passado não promete ⏳; o painel da semana tem o badge X34 "ENCERRADO EM 07/01".
+    await scenario(browser, 'TR19k-mover-encerrado-nao-some', '2027-01-07', { [CFG]: cfgKk([26]), [TRL]: { 26: { ...trKk[26], apostila: true, apostilaAt: '2027-01-02' } } }, async (S) => {
+        let page = S.page; await clickTab(page, 'TRILHA');
+        await clickIn(page, 'trilha-tailend', '⏹ Encerrar a cauda agora'); await page.waitForTimeout(300); await clickIn(page, 'trilha-tailend', 'Aplicar'); await page.waitForTimeout(400);
+        const c0 = await getLS(page, CFG); await clickTab(page, 'CRONOGRAMA'); await clickDate(page, '07/01');
+        const pn = await page.evaluate(() => [...document.querySelectorAll('[data-t="trilha-panel"] [data-mod]')].map(e => e.innerText.replace(/\n/g, ' | ')));
+        const d7 = await readDay(page), b7 = d7.blocks.find(x => x.tm === 26 && x.ts === 'seal' && !x.au);
+        await page.evaluate(() => { if (![...document.querySelectorAll('button')].some(b => b.innerText.trim() === '✓ Pronto')) { const e = [...document.querySelectorAll('button')].find(b => b.innerText.trim() === '✎ Reorganizar dia'); if (e) e.click(); } }); await page.waitForTimeout(200);
+        const opts = b7 ? await page.evaluate((bs) => { const bre = new RegExp(bs); const el = [...document.querySelectorAll('div')].filter(e => e.style && /^3px solid/.test(e.style.borderLeft)).find(b => { const body = b.children[0] && b.children[0].children[2]; const s = body && body.querySelector('span'); return s && bre.test(s.textContent.trim()); }); const sel = el && [...el.querySelectorAll('select')].find(s => [...s.options].some(o => /mover p\/ dia/.test(o.textContent))); return sel ? [...sel.options].map(o => o.value).filter(Boolean) : null; }, '^' + escT(b7.text.slice(0, 60))) : null;
+        check('TR19k-mover · 07/01, encerrado em 07/01 (trilhaTailEnd [{07/01,[PED2]}]): a selagem de hoje fica no bloco de 07/01; o "→ mover p/ dia" dele só oferece TER 05/01 e QUA 06/01 — nenhum dia depois do encerramento (antes do S7_fix1: 08/01 em diante, e a etapa sumia do calendário sem ⏳); o painel da semana diz "ENCERRADO EM 07/01" (X34)',
+            JSON.stringify(c0.trilhaTailEnd) === JSON.stringify([{ at: '2027-01-07', ids: [26] }]) && !!b7 && JSON.stringify(opts) === '["2027-01-05","2027-01-06"]' && pn.some(x => /PED2 · Aleitamento Materno \| ENCERRADO EM 07\/01 \|/.test(x)), JSON.stringify({ te: c0.trilhaTailEnd, b7: !!b7, opts, pn }));
+        await moveT(page, new RegExp('^' + escT(b7.text.slice(0, 60))), '2027-01-06'); const ask = await readAsk(page);
+        check('TR19k-mover · mover para QUA 06/01 (já passou): o diálogo diz "Esse dia já passou. Se você fez a etapa nele, marque o ✓ no bloco desse dia, assim o carimbo fica com a data certa." SEM "Mover para um dia passado só deixa a etapa como pendente (⏳)" (o encerrado fica no dia, fora do ⏳) e sem "Mover o fio todo"',
+            !!ask && ask.text.includes('Esse dia já passou. Se você fez a etapa nele, marque o ✓ no bloco desse dia, assim o carimbo fica com a data certa.') && !/pendente/.test(ask.text) && !ask.btns.some(x => /fio todo/.test(x)), ask && JSON.stringify(ask));
+        await clickMove(page); await pronto(page);
+        const c1 = await getLS(page, CFG), d7b = await readDay(page); await clickDate(page, '06/01'); const d6 = await readDay(page), pd = await banner(page, 'trilha-pending'), last = ((c1.trilhaPlan[26] || {}).hist || []).slice(-1)[0] || {};
+        check('TR19k-mover · "Mover assim mesmo": grava seal = 06/01 (hist "mover") e a selagem APARECE no bloco de QUA 06/01 (histórico até a data do encerramento) e sai de 07/01 — nada some calado; sem ⏳; trilhaTailEnd igual',
+            c1.trilhaPlan[26].seal === '2027-01-06' && last.why === 'mover' && last.to === '2027-01-06' && d6.blocks.some(x => x.tm === 26 && x.ts === 'seal') && !d7b.blocks.some(x => x.tm === 26) && !pd && JSON.stringify(c1.trilhaTailEnd) === JSON.stringify(c0.trilhaTailEnd), JSON.stringify({ seal: c1.trilhaPlan[26].seal, last, d6: d6.blocks.filter(x => x.tm === 26).map(x => x.ts), d7: d7b.blocks.filter(x => x.tm === 26).map(x => x.ts), pd: pd && pd.text.split('\n')[0] }));
+    });
+
     await scenario(browser, 'TR11-mover-2610', '2026-10-26', {}, async (S) => {
         let page = S.page;
         await clickDate(page, '29/10'); await moveT(page, /^Trilha · CIR1 — Trauma II .*30 questões/, '2026-11-01');
@@ -1788,7 +1811,8 @@ function partOkT(b) { if (!b) return false; const p = b.part, c = b.lines.counts
         await page.evaluate(() => { const c = JSON.parse(localStorage.getItem('medplanner_config_v1')); c.manualWeek = null; localStorage.setItem('medplanner_config_v1', JSON.stringify(c)); }); // volta à semana de hoje (a navegação ◀ ficou na semana anterior)
         page = await S.reopen('2026-12-31'); const c31 = await getLS(page, CFG);
         const lost = Object.entries(pastD(cR)).filter(([k, v]) => v && v < '2026-12-30' && (pastD(c31)[k] || null) !== v).map(([k]) => k);
-        check('no dia seguinte (31/12) a recolocação automática roda, mas as etapas dos dias que já passaram ficam no bloco do dia (nenhuma vai para "depois de 01/01"); o ⏳ continua', /^2026-12-31\|/.test(c31.trilhaFinalAutoAt || '') && !lost.length && !!(await banner(page, 'trilha-pending')), JSON.stringify({ key: c31.trilhaFinalAutoAt, lost: lost.slice(0, 6), n: lost.length }));
+        const aulaJ = [], janE = []; Object.entries(c31.trilhaPlan).forEach(([id, p]) => STG.forEach(ts => { if (p[ts] && p[ts] > '2027-01-01') (ts === 'aula' ? aulaJ : janE).push(id + '.' + ts + ' ' + br(p[ts])); })); // S8 (§10.1 a): só a aula tem teto (01/01)
+        check('no dia seguinte (31/12) a recolocação automática roda: nenhuma etapa de dia anterior à restauração sai do bloco do dia; nenhuma aula depois de 01/01; as outras podem ir para janeiro (' + janE.length + ' em janeiro); o ⏳ continua', /^2026-12-31\|/.test(c31.trilhaFinalAutoAt || '') && !lost.length && !aulaJ.length && !!(await banner(page, 'trilha-pending')), JSON.stringify({ key: c31.trilhaFinalAutoAt, lost: lost.slice(0, 6), n: lost.length, aulaJ, jan: janE.slice(0, 8) }));
     });
     // ── TR17f · blocos que ela criou nos dias da Trilha: por padrão saem da tela (ficam no arquivo); a prévia oferece mantê-los no dia regenerado ──
     const own12 = { id: 'c-1794200000000', d: 'EXTRA', color: '#0EA5E9', text: 'Consulta médica 14h', time: '3h', done: true }, own05 = { id: 'c-1761000000000', d: 'EXTRA', color: '#0EA5E9', text: 'Consulta (editado por ela)', time: '1h' };
@@ -1847,10 +1871,11 @@ function partOkT(b) { if (!b) return false; const p = b.part, c = b.lines.counts
         let page = S.page;
         for (let tu = '2026-11-03'; tu <= '2026-12-22'; tu = addDays(tu, 7)) { await markUntil(page, addDays(tu, -1)); page = await S.reopen(tu); }
         await markUntil(page, '2026-12-27'); page = await S.reopen('2026-12-28');
-        await clickTab(page, 'TRILHA'); await rClick(page, /^Ver o que mudou desde a atualização$/); const diag = await rDiag(page);
+        await clickTab(page, 'TRILHA'); const tailN = await page.evaluate(() => document.querySelectorAll('[data-tail-tue]').length); // linhas C da cauda na rampa (X58): o calendário passa de 01/01
+        await rClick(page, /^Ver o que mudou desde a atualização$/); const diag = await rDiag(page);
         check('28/12: a prévia avisa que, a partir de 29/12, as etapas dos dias que já passaram ficam no bloco de cada dia', /📦 a partir de 29\/12 \(semana final\): as etapas dos dias que já passaram ficam no bloco de cada dia/.test(diag), (diag.match(/📦[^\n]*/) || [''])[0]);
         await rClick(page, /^Aplicar a restauração$/); const c1 = await getLS(page, CFG);
-        check('Aplicar em 28/12 grava trilhaFinalKeep = 28/12', c1.trilhaFinalKeep === '2026-12-28', c1.trilhaFinalKeep);
+        check('Aplicar em 28/12 grava trilhaFinalKeep = 28/12 — âncora fixa por data (22/12 a 01/01; S8, §4.5): a rampa já mostra ' + tailN + ' semana(s) da cauda e o horizonte de planejamento é a Sem.78 (LW = 78), então a regra antiga "da semana antes da última" não gravaria', c1.trilhaFinalKeep === '2026-12-28' && tailN > 0, JSON.stringify({ keep: c1.trilhaFinalKeep, tailN }));
         await page.evaluate(() => { const c = JSON.parse(localStorage.getItem('medplanner_config_v1')); c.manualWeek = null; localStorage.setItem('medplanner_config_v1', JSON.stringify(c)); });
         page = await S.reopen('2026-12-29'); const c2 = await getLS(page, CFG);
         const lost = []; Object.entries(c1.trilhaPlan).forEach(([id, p]) => STG.forEach(ts => { if (p[ts] && p[ts] < '2026-12-28' && ((c2.trilhaPlan[id] || {})[ts] || null) !== p[ts]) lost.push(id + '.' + ts); }));
@@ -1913,6 +1938,8 @@ function partOkT(b) { if (!b) return false; const p = b.part, c = b.lines.counts
         await shot('aceite-2-restaurado', '[data-t="restore-card"]');
         // 5 · ela marca nos blocos de dias passados das semanas 1 e 2
         await clickTab(page, 'CRONOGRAMA'); const pend0 = await banner(page, 'trilha-pending'); const n0 = Number((pend0.text.match(/Ficaram para trás (\d+) etapas/) || [])[1]);
+        const x50 = (diag.match(/\d+ etapa\(s\) aparecem como ⏳ pendentes[^\n]*/) || [''])[0]; say('passo 4 · prévia (X50): ' + x50); // S8
+        check('passo 4d (X50): a prévia disse "' + n0 + ' etapa(s) aparecem como ⏳ pendentes — é esperado: …" (sem parênteses: nada "sem dia" nem "que volta a ser simulado" em 07/11) e o ⏳ do topo depois de aplicar mostra ' + n0, n0 > 0 && x50 === n0 + ' etapa(s) aparecem como ⏳ pendentes — é esperado: depois de restaurar nada está marcado; você marca no bloco de cada dia o que fez.', x50);
         const pastT = []; Object.entries(cfgA.trilhaPlan).forEach(([id, p]) => STG.forEach(ts => { if (p[ts] && p[ts] < '2026-11-07') pastT.push({ id: Number(id), ts, d: p[ts] }); })); pastT.sort((a, b) => a.d < b.d ? -1 : 1);
         const w2 = pastT.find(x => x.d >= '2026-11-03' && STG.indexOf(x.ts) === 1), w2a = w2 && pastT.find(x => x.id === w2.id && x.ts === 'aula'), w1 = pastT.find(x => x.d < '2026-11-03' && x.ts === 'aula' && (!w2 || x.id !== w2.id)); // na ordem: a aula antes das questões
         const marks = [w1, w2a, w2].filter(Boolean);
@@ -1943,6 +1970,154 @@ function partOkT(b) { if (!b) return false; const p = b.part, c = b.lines.counts
         const cRR = await getLS(page, CFG), tRR = await getLS(page, TRL), sRR = (await getLS(page, SCH)) || {};
         say('passo 7 · Refazer — plano: ' + Object.keys(cRR.trilhaPlan).filter(id => (cRR.trilhaPlan[id].hist || []).length).map(id => id + ' ' + STG.map(ts => br(cRR.trilhaPlan[id][ts] || '----------')).join('·')).join(' | '));
         check('passo 7b: Refazer volta ao estado de antes de desfazer (restaurado + as 3 marcas + a recolocação)', subX(cRR) === subX(beforeUndo.cfg) && canon(tRR) === canon(beforeUndo.tr) && canon(trilhaDays(sRR)) === canon(trilhaDays(beforeUndo.sch)));
+    });
+
+    // ── TR19g · RESTAURAÇÃO COM A CAUDA (S8; §4.5 e §10.2; decisão 75 ajustada; X47–X51; testes M6): 1º acesso em 22/12 (a T9 congela) e "ela fez tudo no dia";
+    //    restaurar em 23/12, 30/12 e 03/01, duas vezes seguidas (a 2ª dá "Nada a restaurar"); em 01/01 só a prévia (X47); em 03/01 ela encerra a cauda antes de
+    //    restaurar — a restauração tira trilhaTailEnd (X51) e o Desfazer o devolve (C8); depois do fim da cauda, o Desfazer da restauração continua visível e funciona ──
+    const X47g = '📦 hoje é o último dia de aula nova: marque no bloco de cada dia o que você fez. Questões, apostila e selagem sem marca seguem para janeiro; aula sem marca não tem mais dia depois de hoje.';
+    const X48g = 'Depois de 01/01, restaurar desmarca também as aulas, e aula sem marca não volta a ter dia: se você assistiu, marque no bloco do dia em que assistiu.';
+    const afterG = (diag) => (diag.split('Depois de aplicar\n')[1] || '').split('\n').filter(Boolean); // as linhas da seção "Depois de aplicar" da prévia
+    const mwG = (page) => page.evaluate(() => { const c = JSON.parse(localStorage.getItem('medplanner_config_v1')); c.manualWeek = null; localStorage.setItem('medplanner_config_v1', JSON.stringify(c)); }); // volta à semana de hoje
+    await scenario(browser, 'TR19g-restaurar-com-a-cauda', '2026-12-22', {}, async (S) => {
+        let page = S.page; const c0 = await getLS(page, CFG), T9 = (c0.trilhaWeeks || {})['2026-12-22'] || {};
+        check('TR19g · premissa (22/12, 1º acesso): trilhaFirstOpen = 22/12 e a T9 congela com ' + JSON.stringify(T9.mods), c0.trilhaFirstOpen === '2026-12-22' && (T9.mods || []).length > 0, JSON.stringify({ fo: c0.trilhaFirstOpen, T9 }));
+        await markUntil(page, '2026-12-22'); page = await S.reopen('2026-12-23');
+        // 23/12 · âncora por data
+        await clickTab(page, 'TRILHA'); const tailN = await page.evaluate(() => document.querySelectorAll('[data-tail-tue]').length);
+        await rClick(page, /^Ver o que mudou desde a atualização$/); const a23 = afterG(await rDiag(page));
+        await rClick(page, /^Aplicar a restauração$/); const c23 = await getLS(page, CFG);
+        check('TR19g · 23/12: a prévia diz "📦 a partir de 29/12 (semana final): …" (sem X47/X48) e Aplicar grava trilhaFinalKeep = 23/12 — âncora fixa por data (22/12 a 01/01), com a rampa já mostrando ' + tailN + ' semana(s) da cauda e o horizonte de planejamento na Sem.78 (LW = 78): a regra antiga "da semana antes da última" não gravaria',
+            a23.some(l => l.startsWith('📦 a partir de 29/12 (semana final): as etapas dos dias que já passaram ficam no bloco de cada dia')) && !a23.includes(X47g) && !a23.includes(X48g) && c23.trilhaFinalKeep === '2026-12-23' && tailN > 0, JSON.stringify({ keep: c23.trilhaFinalKeep, tailN, box: a23.filter(l => /^📦/.test(l)).map(l => l.slice(0, 60)) }));
+        await rClick(page, /^Ver o que mudou desde a atualização$/); const g23 = await rCard(page);
+        check('TR19g · 23/12, 2ª vez: "Nada a restaurar" e o arquivo com 1 entrada', /Nada a restaurar/.test(g23.text) && (await rArc(page)).length === 1, g23.text.slice(0, 160)); await rClick(page, /^Fechar$/);
+        // 30/12 · o TR17e de novo (com a cauda)
+        await markUntil(page, '2026-12-29'); await mwG(page); page = await S.reopen('2026-12-30'); const pre30 = await getLS(page, CFG);
+        await clickTab(page, 'TRILHA'); await rClick(page, /^Ver o que mudou desde a atualização$/); const d30 = await rDiag(page), a30 = afterG(d30), nP30 = Number((d30.match(/(\d+) etapa\(s\) aparecem como ⏳ pendentes/) || [])[1]);
+        const w30 = await page.evaluate(/* depois da restauração de 23/12 ela marcou: aviso + "Aplicar mesmo assim" */ () => !!document.querySelector('[data-t="restore-after-warn"]')); await rClick(page, /^Aplicar mesmo assim$/); const c30 = await getLS(page, CFG); await clickTab(page, 'CRONOGRAMA'); const p30 = await banner(page, 'trilha-pending');
+        check('TR19g · 30/12 (o TR17e de novo): a recolocação de hoje já tinha rodado ("2026-12-30|…"); a prévia avisa das marcas feitas depois da restauração de 23/12 e diz "📦 semana final: …"; "Aplicar mesmo assim" grava trilhaFinalKeep = 30/12, a marca do dia fica e o ⏳ do topo = o número da prévia (' + nP30 + ', X50)',
+            /^2026-12-30\|/.test(pre30.trilhaFinalAutoAt || '') && w30 && a30.some(l => l.startsWith('📦 semana final: as etapas dos dias que já passaram ficam no bloco de cada dia')) && c30.trilhaFinalKeep === '2026-12-30' && c30.trilhaFinalAutoAt === pre30.trilhaFinalAutoAt && nP30 > 0 && !!p30 && new RegExp('Ficaram para trás ' + nP30 + ' etapas').test(p30.text), JSON.stringify({ key: [pre30.trilhaFinalAutoAt, c30.trilhaFinalAutoAt], keep: c30.trilhaFinalKeep, nP30, pend: p30 && p30.text.slice(0, 90) }));
+        await clickTab(page, 'TRILHA'); await rClick(page, /^Ver o que mudou desde a atualização$/); const g30 = await rCard(page);
+        check('TR19g · 30/12, 2ª vez: "Nada a restaurar" e o arquivo com 2 entradas', /Nada a restaurar/.test(g30.text) && (await rArc(page)).length === 2, g30.text.slice(0, 160)); await rClick(page, /^Fechar$/);
+        await mwG(page); page = await S.reopen('2026-12-31'); const c31 = await getLS(page, CFG);
+        const lost = [], janE = [], aulaJ = []; Object.entries(c30.trilhaPlan).forEach(([id, p]) => STG.forEach(ts => { const v = (c31.trilhaPlan[id] || {})[ts] || null; if (p[ts] && p[ts] < '2026-12-30' && v !== p[ts]) lost.push(id + '.' + ts); if (v && v > '2027-01-01') (ts === 'aula' ? aulaJ : janE).push(id + '.' + ts + ' ' + br(v)); }));
+        console.log('   📋 TR19g 31/12 · recolocação ' + c31.trilhaFinalAutoAt + ' · em janeiro: ' + (janE.join(', ') || '—'));
+        check('TR19g · 31/12: a recolocação automática roda ("2026-12-31|…"): nenhuma etapa de dia anterior à restauração sai do bloco do dia; nenhuma aula depois de 01/01; as outras podem ir para janeiro (' + janE.length + '); o ⏳ continua', /^2026-12-31\|/.test(c31.trilhaFinalAutoAt || '') && !lost.length && !aulaJ.length && !!(await banner(page, 'trilha-pending')), JSON.stringify({ key: c31.trilhaFinalAutoAt, lost, aulaJ, jan: janE }));
+        // 01/01 · X47 (só a prévia; Cancelar não grava)
+        await markUntil(page, '2026-12-31'); page = await S.reopen('2027-01-01'); const c01 = await getLS(page, CFG);
+        await clickTab(page, 'TRILHA'); await rClick(page, /^Ver o que mudou desde a atualização$/); const a01 = afterG(await rDiag(page)); await rClick(page, /^Cancelar$/);
+        check('TR19g · 01/01: a prévia diz "' + X47g + '" (X47 — sem "último dia de acesso" nem "cursinho de 04/01"); Cancelar não grava nada', a01.includes(X47g) && !a01.includes(X48g) && !a01.some(l => /último dia de acesso|cursinho de 04\/01/.test(l)) && JSON.stringify(await getLS(page, CFG)) === JSON.stringify(c01) && (await rArc(page)).length === 2, JSON.stringify(a01.filter(l => /^📦|^Depois de 01/.test(l))));
+        // 03/01 · ela encerra a cauda; restaurar tira o encerramento (X51) e mostra o X48
+        await markUntil(page, '2027-01-02'); page = await S.reopen('2027-01-03');
+        await clickTab(page, 'TRILHA'); await clickIn(page, 'trilha-tailend', '⏹ Encerrar a cauda agora'); await page.waitForTimeout(300); await clickIn(page, 'trilha-tailend', 'Aplicar'); await page.waitForTimeout(400);
+        const pre03 = { cfg: await getLS(page, CFG), tr: (await getLS(page, TRL)) || {} }, te03 = pre03.cfg.trilhaTailEnd || [];
+        await rClick(page, /^Ver o que mudou desde a atualização$/); const d03 = await rDiag(page), a03 = afterG(d03);
+        check('TR19g · 03/01: com a cauda encerrada por ela (trilhaTailEnd ' + JSON.stringify(te03) + '), a prévia lista "encerramento da cauda de 03/01 → sai (as cadeias voltam a aparecer)" (X51) e diz "' + X48g + '" (X48)', te03.length === 1 && te03[0].at === '2027-01-03' && (te03[0].ids || []).length > 0 && d03.includes('encerramento da cauda de 03/01 → sai (as cadeias voltam a aparecer)') && a03.includes(X48g) && !a03.includes(X47g), JSON.stringify({ te03, box: a03.filter(l => /^📦|^Depois de 01/.test(l)) }));
+        await rClick(page, /^Aplicar mesmo assim$/); const cR3 = await getLS(page, CFG), tR3 = (await getLS(page, TRL)) || {}, b3 = await balT(page);
+        await rClick(page, /^Ver o que mudou desde a atualização$/); const g03 = await rCard(page);
+        check('TR19g · 03/01: "Aplicar mesmo assim" tira o encerramento (trilhaTailEnd sai; trilhaTailEndHist não muda) e as marcas desde 22/12 (aulas inclusive: a cauda acaba — aba Trilha "' + (b3 && b3.mode) + '"), sem gravar trilhaFinalKeep novo depois de 01/01 (fica 30/12); a 2ª vez dá "Nada a restaurar" (arquivo com 3 entradas)',
+            cR3.trilhaTailEnd === undefined && JSON.stringify(cR3.trilhaTailEndHist) === JSON.stringify(pre03.cfg.trilhaTailEndHist) && cR3.trilhaFinalKeep === '2026-12-30' && !Object.values(tR3).some(r => STG.some(ts => r[FIELD[ts]])) && !!b3 && b3.mode === 'fim' && /Nada a restaurar/.test(g03.text) && (await rArc(page)).length === 3, JSON.stringify({ te: cR3.trilhaTailEnd, keep: cR3.trilhaFinalKeep, tr: Object.keys(tR3), mode: b3 && b3.mode, card: g03.text.slice(0, 80) }));
+        await rClick(page, /^Fechar$/);
+        // depois do fim da cauda · o Desfazer da restauração continua visível e funciona (e devolve trilhaTailEnd: C8)
+        await mwG(page); page = await S.reopen('2027-01-10'); const b10 = await balT(page), k10 = await rCard(page);
+        check('TR19g · 10/01 (depois do fim da cauda: aba Trilha em "fim"): o cartão da restauração continua com "Desfazer a restauração" (testes M6)', !!b10 && b10.mode === 'fim' && !!k10 && k10.btns.includes('Desfazer a restauração'), JSON.stringify({ mode: b10 && b10.mode, btns: k10 && k10.btns }));
+        await rClick(page, /^Desfazer a restauração$/); await rClick(page, /^Confirmar: desfazer$/);
+        const cU = await getLS(page, CFG), tU = (await getLS(page, TRL)) || {}, bU = await balT(page);
+        check('TR19g · 10/01: Desfazer devolve o estado de antes da restauração de 03/01 — as marcas (registro igual), o plano, o encerramento da cauda (trilhaTailEnd ' + JSON.stringify(cU.trilhaTailEnd) + ', C8) e trilhaFinalKeep; a cauda volta (aba Trilha "' + (bU && bU.mode) + '", não "fim")',
+            canon(tU) === canon(pre03.tr) && canon(cU.trilhaPlan) === canon(pre03.cfg.trilhaPlan) && canon(cU.trilhaTailEnd) === canon(te03) && cU.trilhaFinalKeep === pre03.cfg.trilhaFinalKeep && JSON.stringify(cU.trilhaTailEndHist) === JSON.stringify(pre03.cfg.trilhaTailEndHist) && !!bU && bU.mode !== 'fim', JSON.stringify({ te: cU.trilhaTailEnd, keep: cU.trilhaFinalKeep, mode: bU && bU.mode }));
+    });
+    // TR19g-x50 · X50 (S8; passagem do S4): o motivo "semdia" conta à parte — "(A de dias que já passaram + D sem dia)". PED2 (26) com a aula marcada ANTES do
+    //   1º acesso (fica) e as questões sem dia pela recolocação do app (hist "final" → null: fica, é do app); CIR2 Cicatrização (19) com a aula marcada depois (sai)
+    const cfgG50 = { ...baseCfg, trilhaFirstOpen: '2026-12-10', trilhaFinalAutoAt: '2027-01-01|0', trilhaWeeks: { '2026-12-08': { q: 2, base: 4, held: false, why: null, mods: [26, 19], adv: [], rise: [] } }, trilhaPlan: mkPlan({ 26: ['2026-12-09', '2026-12-23', '2026-12-26', '2026-12-30'], 19: ['2026-12-11', '2026-12-14', '2026-12-16', '2026-12-18'] }, '2026-12-08') };
+    cfgG50.trilhaPlan[26] = { ...cfgG50.trilhaPlan[26], quest: null, hist: [{ ts: 'quest', from: '2026-12-23', to: null, at: '2026-12-29', why: 'final' }] };
+    await scenario(browser, 'TR19g-x50-sem-dia-0301', '2027-01-03', { [CFG]: cfgG50, [TRL]: { 26: { aula: true, aulaAt: '2026-12-09' }, 19: { aula: true, aulaAt: '2026-12-11' } } }, async (S) => {
+        let page = S.page; await clickTab(page, 'TRILHA'); await rClick(page, /^Ver o que mudou desde a atualização$/); const a = afterG(await rDiag(page));
+        check('TR19g-x50 · 03/01: a prévia diz "3 etapa(s) aparecem como ⏳ pendentes (2 de dias que já passaram + 1 sem dia) — …" (X50: as questões sem dia do PED2 não entram em "de dias que já passaram") e o X48', a[0] === '3 etapa(s) aparecem como ⏳ pendentes (2 de dias que já passaram + 1 sem dia) — é esperado: depois de restaurar nada está marcado; você marca no bloco de cada dia o que fez.' && a.includes(X48g), JSON.stringify(a.slice(0, 2)));
+        await rClick(page, /^Aplicar a restauração$/); await clickTab(page, 'CRONOGRAMA'); const p = await banner(page, 'trilha-pending');
+        check('TR19g-x50 · depois de aplicar: o ⏳ do topo tem as mesmas 3 etapas, com "PED2 · questões sem dia"', !!p && /Ficaram para trás 3 etapas/.test(p.text) && /PED2 · questões sem dia/.test(p.text), p && p.text.slice(0, 200));
+    });
+
+    // ── TR19o · medicação e exportação (S9; desenho final §10.2, testes I5 e I9) — 🧠 regra permanente: nenhum texto novo menciona medicação · DELA 11: nada a exportar
+    //   como se fosse perdido (X26, X05, X06, X43, X44). Varre de 29/12 ao fim da cauda: no Cronograma, cada dia de cada semana visível (blocos, dayType, notas, banners
+    //   trilha-final/-export/-coverage/-pending, seletor 🌿 e X27); na aba Trilha, o balanço nos 3 modos, o cartão de encerrar com a prévia e "Como a Trilha funciona" (X61–X64).
+    //   Tira os textos que já existiam no HEAD 409e1f9 (a lista explícita do §10.2, conferida linha a linha contra a base por git show, como no historico.js) e exige que
+    //   nada mais tenha Venvanse/remédio/estimulante/medica nem horário de medicação (VENV_TIME). Seed: PED2 (26) com a aula de 28/12 ✓ e o resto em 30/12, 01/01 e 04/01;
+    //   CIR2 Urologia (14) com a aula em 01/01 e as outras em janeiro; NEF3 (9) fechado em 24/12 (revisões); módulo 40 com questões marcadas fora do plano (X22b).
+    const MED_RE = /Venvanse|remédio|estimulante|medica/i;
+    const MED_HEAD = [ // [linha no HEAD 409e1f9, trecho literal do código da base nessa linha, padrão do texto visível que vem dele]
+        [1247, 'Janela do estimulante a validar com a psiquiatra (bloco de plantão de madrugada)', /Janela do estimulante a validar com a psiquiatra \(bloco de plantão de madrugada\)/g],
+        [2423, ' é o dia leve da semana (sem Venvanse) — só etapa de menor demanda', /🌿 (DOM|SEG|TER|QUA|QUI|SEX|SÁB) \d\d\/\d\d é o dia leve da semana \(sem Venvanse\) — só etapa de menor demanda/g],
+        [2838, 'label: "Sem remédio", desc: "Dia de menor carga da semana (selo 🌿), calculado a cada semana — sem dia padrão; empate resolvido pelos critérios do seletor"', /Sem remédio(?=\s*Dia de menor carga da semana \(selo 🌿\), calculado a cada semana — sem dia padrão; empate resolvido pelos critérios do seletor)/g],
+        [2944, '"🌿 Sem remédio:"', /🌿 Sem remédio:/g],
+        [2945, 'title: "Dia sem Venvanse desta semana — Auto = menor carga entre os dias livres', /Dia sem Venvanse desta semana — Auto = menor carga entre os dias livres[^\n]*/g],
+        [2986, '"🌬️ Dia de respiro — o mais leve da semana. COM Venvanse (semana sem pausa: nenhum dia ficou leve o bastante)"', /🌬️ Dia de respiro — o mais leve da semana\. COM Venvanse \(semana sem pausa: nenhum dia ficou leve o bastante\)/g],
+        [2987, '"🌿 Hoje sem Venvanse — faça só o leve, mova o pesado (pausa variável: validar com a psiquiatra)"', /🌿 Hoje sem Venvanse — faça só o leve, mova o pesado \(pausa variável: validar com a psiquiatra\)/g],
+        [3716, 'lightDayOverrides: "dia sem remédio"', /escolhas feitas depois [^\n(]*\([^)\n]*\) → voltam a como estavam/g], // o rótulo KN só entra na lista "(…, dia sem remédio, …) → voltam…"
+        [3729, 'return "dia sem remédio da semana de " + fmtBR(x.tue)', /dia sem remédio da semana de \d\d\/\d\d: fica /g],
+        [3760, 'cfgL.push("dia sem remédio da semana de " + fmtBR(x.tue)', /dia sem remédio da semana de \d\d\/\d\d: (?:[A-ZÁ]{3} \d\d\/\d\d \(sua escolha\)|a sua escolha) → /g],
+        [3764, '"5 · Fila, 📌, rampa, dia sem remédio, “Agora não” e simulados"', /5 · Fila, 📌, rampa, dia sem remédio, “Agora não” e simulados/g],
+        [3769, 'notes.push("dia sem remédio da semana de " + fmtBR(x.tue)', /dia sem remédio da semana de \d\d\/\d\d: fica (?:[A-ZÁ]{3} \d\d\/\d\d|a sua escolha) \(a sua escolha — esse dia, ou o previsto/g],
+        [3922, 'O dia leve (sem Venvanse) é previsto antes de distribuir e nunca recebe aula nova; 24, 25 e 31/12 são mais leves (📚 a 3h).', /O dia leve \(sem Venvanse\) é previsto antes de distribuir e nunca recebe aula nova; 24, 25 e 31\/12 são mais leves \(📚 a 3h\)\./g],
+        [4046, '"Tomei Venvanse hoje"', /Tomei Venvanse hoje/g],
+    ];
+    const X26O = '📦 Aula nova só até 01/01/2027. Depois disso continuam disponíveis as apostilas, as questões, o caderno de erros, o banco de questões, as revisões, os smartcards e os simulados — e uma aula já assistida pode ser revista; só não dá para assistir aula nova. As cadeias abertas seguem em janeiro até fechar. Faça o 💾 backup do app.';
+    const X27O = '🌿 Nas semanas de janeiro nenhum dia leve é previsto — se quiser, escolha um dia no seletor.';
+    const X61O = '3 · 4 · 4 · 4 · 4 · 4 · 4 · 5 · 4 · 0 módulos novos por semana. Sobe só se a semana passada fechou e fora do bloco 04h30.';
+    const X62O = 'nunca duas etapas do módulo no mesmo dia. No que o app planejar daqui para frente: até 5 cadeias abertas ao mesmo tempo — o próximo módulo espera uma fechar; aula nova 1 por dia, e a 2ª só quando, com uma, algum dia passaria de 14,5h (no ⏩ também quando não sobra dia sem aula na semana — com aviso, e só se você aplicar); nunca 3. Nada visto antes conta como aprendido';
+    const X63O = '⏳ o app propõe novos dias (só grava com Aplicar). Semana fechada: ⏩ Adiantar próximo módulo. De 29/12 a 01/01 ele recoloca sozinho: aula só até 01/01; questões, apostila e selagem podem ir para janeiro. Depois de 01/01 não há aula nova; o que ficar para trás aparece no ⏳ e só muda com Aplicar (a aula sem ✓ vai para o balanço). Nas semanas de janeiro nenhum dia leve é previsto (o seletor 🌿 continua).';
+    const X64O = /Cada selagem agenda as revisões D\+7\/D\+30 pelo seu % \(e um reforço 14 dias depois se o D\+30 ficar abaixo de 60%\)\. Depois de 01\/01 o app continua lembrando até \d\d\/\d\d \(estimado — muda com os seus %\); depois disso, o que sobrar vai para o balanço com a data\. É memória, não lista riscada\./;
+    const medLeftO = (txt) => { let s = txt; MED_HEAD.forEach(([, , re]) => { s = s.replace(re, '⟨HEAD⟩'); }); return s.split('\n').filter(l => MED_RE.test(l) || VENV_TIME.test(l)); };
+    const O = { seen: [], bad: [], cov: new Set() };
+    const grabO = async (page, tag) => { const g = await page.evaluate(() => ({ t: document.body.innerText, has: ['trilha-final', 'trilha-export', 'trilha-coverage', 'trilha-pending', 'tailend-prev', 'tailend-done'].filter(k => !!document.querySelector('[data-t="' + k + '"]')), mode: [...document.querySelectorAll('[data-t="trilha-balanco"]')].map(e => e.getAttribute('data-mode')) }));
+        O.seen.push(tag); medLeftO(g.t).forEach(l => O.bad.push(tag + ': ' + l.slice(0, 220)));
+        g.has.forEach(k => O.cov.add(k)); g.mode.forEach(m => O.cov.add('balanço ' + m));
+        if (g.t.includes(X26O)) O.cov.add('X26'); if (g.t.includes(X27O)) O.cov.add('X27'); if (g.t.includes(X63O)) O.cov.add('X63'); if (X64O.test(g.t)) O.cov.add('X64'); if (/tem etapa marcada fora do plano da Trilha/.test(g.t)) O.cov.add('X22b'); };
+    const sweepO = async (page, tag, all) => { await clickTab(page, 'CRONOGRAMA'); // cada dia da semana visível (e, com all, de cada semana seguinte até a última visível)
+        for (let k = 0; k < 30; k++) { const hw = await headerWeek(page); for (const t of await listDayTabs(page)) { await clickDate(page, t.date); await grabO(page, tag + ' · ' + t.date); }
+            if (!all) break; await navWeek(page, 1); if ((await headerWeek(page)).week === hw.week) break; }
+        await clickTab(page, 'TRILHA'); await grabO(page, tag + ' · aba Trilha'); };
+    const exportO = async (page, days) => { await clickTab(page, 'CRONOGRAMA'); const r = { cron: await banner(page, 'trilha-export'), fin: await banner(page, 'trilha-final'), bal: await banner(page, 'trilha-balanco'), days: {} };
+        for (const d of days) { const ok = await goDateT(page, d); r.days[d] = ok ? allText(await readDay(page)) : null; }
+        await clickTab(page, 'TRILHA'); r.aba = await banner(page, 'trilha-export'); r.abaBal = await banner(page, 'trilha-balanco'); return r; };
+    const autoO = async (page) => { const c = await getLS(page, CFG); if (c && c.manualWeek != null) { c.manualWeek = null; await setLS(page, CFG, c); } }; // o ◀▶ do teste volta ao automático antes de trocar o relógio
+    const cfgO = { ...plan19d({ 26: ['2026-12-28', '2026-12-30', '2027-01-01', '2027-01-04'], 14: ['2027-01-01', '2027-01-03', '2027-01-04', '2027-01-07'] }), trilhaFirstOpen: '2026-12-22' };
+    const trO = { 26: { aula: true, aulaAt: '2026-12-28' }, 40: { questoesD2: true, questoesD2At: '2026-12-20' }, 9: { aula: true, questoesD2: true, apostila: true, smartcard: true, aulaAt: '2026-12-18', questoesD2At: '2026-12-19', apostilaAt: '2026-12-21', smartcardAt: '2026-12-24', completedAt: '2026-12-24', accSelagem: 70 } };
+    await scenario(browser, 'TR19o-medicacao-e-exportacao', '2026-12-29', { [CFG]: cfgO, [TRL]: trO }, async (S) => {
+        let page = S.page;
+        // (0) a lista explícita do §10.2 é texto da BASE: cada trecho está na linha citada do HEAD 409e1f9 (git show, como no historico.js) e continua no planner, igual
+        const headSrc = (() => { try { return require('child_process').execSync('git -C ' + JSON.stringify(require('path').resolve(__dirname, '..')) + ' show 409e1f9:planner_residencia_2026_offline.html', { maxBuffer: 1 << 26 }).toString('utf8').split('\n'); } catch (e) { return []; } })();
+        const curSrc = require('fs').readFileSync(H.FILE, 'utf8');
+        const baseBad = MED_HEAD.filter(([ln, lit]) => !(headSrc[ln - 1] || '').includes(lit) || !curSrc.includes(lit)).map(([ln]) => ln);
+        check('TR19o · a lista dos textos com medicação que já existiam (l. 1247, 2423, 2838, 2944–2945, 2986, 2987, 3716/3729/3760/3764/3769, 3922, 4046 do HEAD 409e1f9) é texto da base: cada trecho está na linha citada do HEAD (git show) e continua igual no planner', headSrc.length > 4000 && !baseBad.length, JSON.stringify({ headLines: headSrc.length, baseBad }));
+        // (1) 29/12: 📦 X26 nos dois lugares, sem "export"; 📦 da semana final e os blocos de 29/12 e 01/01 sem "export"
+        const e29 = await exportO(page, ['2026-12-29', '2027-01-01']);
+        console.log('   📋 29/12 · 📦 Cronograma: ' + (e29.cron && e29.cron.text.replace(/\n/g, ' / ')) + ' · 📦 semana final: ' + (e29.fin && e29.fin.text.slice(0, 300)));
+        await autoO(page); page = await S.reopen('2026-12-29'); await sweepO(page, '29/12', true);
+        await autoO(page); page = await S.reopen('2027-01-01'); const e01 = await exportO(page, ['2027-01-01']); await autoO(page); page = await S.reopen('2027-01-01'); await sweepO(page, '01/01', false);
+        const xOk = (r) => !!r.cron && r.cron.text.split('\n')[0] === X26O && r.cron.btns.join() === '💾 Baixar backup do app' && !!r.aba && r.aba.text.split('\n')[0] === X26O && r.aba.btns.join() === '💾 Baixar backup do app';
+        const noExp = (r) => [r.cron, r.aba, r.fin, r.bal, r.abaBal].every(b => !b || !/export/i.test(b.text)) && Object.values(r.days).every(t => t != null && !/export/i.test(t));
+        check('TR19o · 29/12 e 01/01: o 📦 do Cronograma e o da aba Trilha dizem "' + X26O + '" (X26), com o botão "💾 Baixar backup do app" dentro; nenhum "export" no 📦 (trilha-export), no 📦 da semana final (trilha-final), no balanço e nos blocos de 29/12 e 01/01',
+            xOk(e29) && xOk(e01) && !!e29.fin && noExp(e29) && noExp(e01), JSON.stringify({ cron29: e29.cron, aba29: e29.aba && e29.aba.text, fin29: e29.fin && e29.fin.text.slice(0, 200), d29: e29.days, bal01: e01.abaBal && e01.abaBal.text.slice(0, 200), d01: e01.days }));
+        await clickTab(page, 'TRILHA'); const how = await page.evaluate(() => document.body.innerText);
+        check('TR19o · "Como a Trilha funciona": item 2 com o X62 ("… No que o app planejar daqui para frente: até 5 cadeias abertas … nunca 3."), item 3 com a rampa de verdade (X61: "' + X61O.slice(0, 38) + '…") e item 5 com o X63 (recolocação de 29/12 a 01/01, ⏳ depois de 01/01, janeiro sem dia leve previsto)',
+            how.includes(X62O) && how.includes(X61O) && how.includes(X63O) && !/3 · 4 · 4 · 4 · 4 · 4 · 4 · 4 · 5/.test(how) && !/para selar até 01\/01/.test(how), JSON.stringify((how.match(/COMO A TRILHA FUNCIONA[\s\S]*/) || [''])[0].slice(0, 1600)));
+        // (2) 02/01: ela marcou PED2 questões (30/12) e apostila (01/01) e assistiu a aula do CIR2 Urologia em ÁUDIO em 01/01 — as questões dele ficam em janeiro (03/01)
+        { const t = (await getLS(page, TRL)) || {}; t[26] = { ...t[26], questoesD2: true, questoesD2At: '2026-12-30', apostila: true, apostilaAt: '2027-01-01' }; t[14] = { aula: true, aulaAt: '2027-01-01', aulaAudio: true, aulaAudioAt: '2027-01-01' }; await setLS(page, TRL, t); }
+        await autoO(page); page = await S.reopen('2027-01-02'); const e02 = await exportO(page, []);
+        const okQ = await goDateT(page, '2027-01-03'), dQ = okQ ? await readDay(page) : { blocks: [] }, bQ = dQ.blocks.find(b => b.tm === 14 && b.ts === 'quest' && !b.au);
+        check('TR19o · 02/01: o 📦 X26 some depois de 01/01 (Cronograma e aba Trilha); as questões de janeiro (DOM 03/01) do CIR2 Urologia, cuja aula foi em áudio em 01/01, mostram "🎬 antes das questões: veja no vídeo as partes visuais (a aula foi em áudio em 01/01)" (decisão 11: aula assistida pode ser revista)',
+            !e02.cron && !e02.aba && !!bQ && (bQ.notes || []).includes('🎬 antes das questões: veja no vídeo as partes visuais (a aula foi em áudio em 01/01)'), JSON.stringify({ cron: e02.cron, aba: e02.aba, okQ, bQ, blocks: dQ.blocks.map(b => (b.tm || '') + ':' + (b.ts || '') + ' ' + b.text.slice(0, 50)) }));
+        await autoO(page); page = await S.reopen('2027-01-02'); await sweepO(page, '02/01', true);
+        await clickTab(page, 'TRILHA'); await clickIn(page, 'trilha-tailend', '⏹ Encerrar a cauda agora'); await page.waitForTimeout(300); await grabO(page, '02/01 · prévia do encerrar'); await clickIn(page, 'trilha-tailend', 'Cancelar'); await page.waitForTimeout(200);
+        // (3) 01/03: ela encerra a cauda (as duas cadeias abertas) → modo "fim" com o "Desfazer", no Cronograma e na aba Trilha
+        await autoO(page); page = await S.reopen('2027-03-01'); await sweepO(page, '01/03', false);
+        await clickTab(page, 'TRILHA'); await clickIn(page, 'trilha-tailend', '⏹ Encerrar a cauda agora'); await page.waitForTimeout(300); await grabO(page, '01/03 · prévia do encerrar');
+        await clickIn(page, 'trilha-tailend', 'Aplicar'); await page.waitForTimeout(400); await grabO(page, '01/03 · aba Trilha depois de encerrar'); await clickTab(page, 'CRONOGRAMA'); await grabO(page, '01/03 · Cronograma depois de encerrar');
+        const bF = await balT(page); const noExpF = !!bF && !/export/i.test(bF.text);
+        const need = ['X26', 'X27', 'X63', 'X64', 'X22b', 'trilha-final', 'trilha-export', 'trilha-coverage', 'trilha-pending', 'tailend-prev', 'tailend-done', 'balanço compacto', 'balanço aulas', 'balanço fim'], miss = need.filter(k => !O.cov.has(k));
+        console.log('   📋 TR19o · ' + O.seen.length + ' telas varridas (' + O.seen[0] + ' … ' + O.seen[O.seen.length - 1] + ') · cobertas: ' + [...O.cov].sort().join(', ') + ' · fim: ' + (bF && bF.text.split('\n')[0]));
+        check('TR19o · de 29/12 ao fim da cauda (' + O.seen.length + ' telas: cada dia de cada semana visível em 29/12 e 02/01, 01/01, 01/03, a aba Trilha, a prévia do encerrar e o modo "fim"), tirando os textos que já existiam no HEAD, nenhum texto tem Venvanse/remédio/estimulante/medica nem horário de medicação (VENV_TIME); a varredura passou por ' + need.join(', ') + '; o balanço "fim" não tem "export"',
+            !O.bad.length && !miss.length && O.seen.length >= 30 && noExpF && !!bF && bF.mode === 'fim', JSON.stringify({ bad: O.bad.slice(0, 12), miss, n: O.seen.length, fim: bF && bF.text.slice(0, 300) }));
     });
 
     await browser.close();

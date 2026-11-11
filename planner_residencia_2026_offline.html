@@ -754,7 +754,8 @@ function diffDays(aISO, bISO) { return Math.round((parseISO(bISO) - parseISO(aIS
 // Semanas do curso: QUA→TER a partir de config.startDate, até 19/10 — a semana que contém 19/10 termina nele (Sem.41 = 14–19/10, 6 dias). O histórico fica intacto.
 // 20–25/10: semana de TRANSIÇÃO (Sem.42, TER→DOM, 6 dias) — sem etapa da trilha e sem o motor antigo: plantão, Anki, academia e lazer (paciente, 26/10: ela não começou em 20/10).
 // A partir de 26/10: semanas da TRILHA. A 1ª vai da segunda 26/10 à segunda 02/11 (8 dias: a segunda do início + a semana TER→SEG seguinte); depois TERÇA→SEGUNDA
-// (Sem.44 = 03–09/11 … Sem.52 = 29/12–01/01, 4 dias) — 10 semanas. Nenhum dia em duas semanas (⚙️).
+// (Sem.44 = 03–09/11 … Sem.52 = 29/12–01/01, 4 dias) — 10 semanas da rampa (T1–T10). Depois, as semanas da CAUDA (regra de 01/01: C1 = SÁB 02/01–SEG 04/01, 3 dias;
+// depois TER→SEG até PLAN_HZ), com ritmo 0: só as etapas das cadeias abertas e as revisões. Nenhum dia em duas semanas (⚙️).
 const POS_CURSO = "2026-10-20"; // 1º dia depois do curso: daqui em diante o motor antigo não atua e o registro é o da trilha
 const TRILHA_START = "2026-10-26"; // 1º dia da trilha (etapas, cota, 1º acesso)
 const TRILHA_GRID = "2026-11-03"; // 1ª terça da grade TER→SEG depois da 1ª semana da trilha
@@ -767,7 +768,6 @@ const TAIL_START = "2027-01-02"; // 1ª semana da cauda (C1): SÁB 02/01 a SEG 0
 const TAIL_GRID = "2027-01-05"; // 1ª terça da grade da cauda; depois semanas TER→SEG
 const PLAN_HZ = "2027-06-28"; // horizonte técnico interno (fim da Sem.78, 22–28/06/2027): planejamento, laços e dias da trilha; nunca aparece como data para ela
 const K_OPEN = 5, CLOSE_BY = "2027-01-03", CLOSE_BY_ON = true; // DELA 1 (até 5 cadeias abertas ao abrir cadeia nova) e decisão 7 (fechar até 03/01): usadas pelas regras de colocação
-const TRILHA_END = AULA_END; // nome antigo (alias): cada uso passa a AULA_END ou PLAN_HZ
 const POST_WEEKS = (() => { const a = []; if (POS_CURSO < TRILHA_START) a.push(POS_CURSO); a.push(TRILHA_START); for (let d = TRILHA_GRID; d <= AULA_END; d = addDaysISO(d, 7)) a.push(d); a.push(TAIL_START); for (let d = TAIL_GRID; d <= PLAN_HZ; d = addDaysISO(d, 7)) a.push(d); return a; })(); // início de cada semana depois do curso: transição, 1ª da trilha, grade até a T10 (29/12) e a cauda (C1 = 02/01, 3 dias; depois TER→SEG até PLAN_HZ) — as semanas da cauda são inícios válidos (⚙️ crítica §0.3)
 function weekNumRaw(iso, s) { return Math.floor(diffDays(s || __START_ISO, iso) / 7) + 1; }
 function lcw(s) { return Math.max(1, weekNumRaw(addDaysISO(POS_CURSO, -1), s)); } // última semana do curso (41 com início em 07/01)
@@ -1003,7 +1003,8 @@ function weekFioIds(config, progress, wk, startISO, n) {
 }
 let __PACE = 2;
 function setPaceCfg(p) { __PACE = Math.max(1, Math.min(4, Number(p) || 2)); }
-// Horizonte FIXO (Trilha, 20/10): o acesso à plataforma termina em 01/01/2027 — a última semana é a que contém 01/01 (Sem.52). A decisão 8
+// Horizonte FIXO (Trilha, 20/10; regra de 01/01, 10/11): aula nova só até 01/01/2027 — a última semana da RAMPA é a que contém 01/01 (Sem.52 = finalWeek);
+// as semanas da cauda (janeiro em diante) só levam as etapas das cadeias abertas e as revisões. A decisão 8
 // (horizonte dinâmico pela projeção) fica superada neste período: a honestidade passa para a linha de alcance da Trilha ("fora do alcance").
 function dynTW() { return finalWeek(); } // a semana de 01/01 (52), o mesmo número de antes (lastWeek passou a ser o horizonte de planejamento)
 function setDynTW() { }
@@ -1124,7 +1125,8 @@ function computeReviews(progress, refISO, src) { // src: "trail" (registro da Tr
 }
 // ══ TRILHA AUTÔNOMA (paciente, 19–20/10/2026) ═════════════════════════════════
 // A partir de 20/10 o app deixa de ser cronograma de cursinho: fila única de módulos, cadeia COMPLETA por módulo (aula → questões → apostila →
-// selagem, decisões 38/40/46), rampa semanal, plantões novos, "Adiantar próximo módulo" e linha de alcance até 01/01/2027 (fim do acesso).
+// selagem, decisões 38/40/46), rampa semanal, plantões novos, "Adiantar próximo módulo" e linha de alcance (regra de 01/01, 10/11: aula nova só até 01/01/2027; as cadeias
+// abertas seguem em janeiro, nas semanas da cauda; o alcance tem dois números — aulas até 01/01 e cadeias completas).
 // O histórico até 19/10 fica intacto. Quem pede: 🩺 fila e método · 📚 cadeia e intervalos · 🧩 o app lembra por ela (pendentes, linha de alcance,
 // botão) · 😴 plantão longo sem etapa de mesa, 04h30 com 📚 a 5h · 🧠 dia leve protegido · 💬 ela decide (proposta + Aplicar) · ⚙️ registros separados.
 // Tudo aqui é determinístico (sem aleatoriedade, sem relógio nas decisões além de `hoje`) e só CALCULA — quem grava é o App (congelamento) ou o toque dela.
@@ -1590,7 +1592,8 @@ function trilhaProposeRecolocar(P, cfg, trail, hoje, opts) { // ⏳ para cada m�
 }
 // ── MOVER O FIO TODO JUNTO (paciente, 07/11): a etapa movida e as seguintes do mesmo módulo, ainda sem marca, andam o mesmo N dias — os intervalos que o fio
 // já tinha ficam. Ao adiantar, uma etapa anterior sem marca que ficaria fora de ordem anda junto. Dia bloqueado: o app pergunta ("Deixar neste dia" ou
-// "Pular +1 dia"), não decide. Nunca depois de 01/01; nunca duas etapas do módulo no mesmo dia; a ordem aula → questões → apostila → selagem sempre.
+// "Pular +1 dia"), não decide. A aula nunca depois de 01/01 (o movimento é recusado — aulaFim); questões, apostila e selagem podem ir para janeiro (teto por
+// etapa, stageCap); nunca duas etapas do módulo no mesmo dia; a ordem aula → questões → apostila → selagem sempre.
 function trilhaKeptOf(cfg, id) { return ((((cfg || {}).trilhaPlan || {})[id]) || {}).keep || {}; } // { ts: dia } — etapa que ela deixou num dia bloqueado ("Deixar neste dia"); vale enquanto a data for essa
 function trilhaBlockedWhy(iso, cfg, ts) { // por que o dia não recebe etapa (null = recebe) · 01/01 é dia comum (DELA 5; X09 saiu): aula depois de 01/01 não é "dia bloqueado", é fim de acesso (§3.8: o movimento é recusado — aulaFim)
     if (!iso) return null;
@@ -2188,7 +2191,7 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, trail, P, onSa
         if (iso >= AMB_START && iso <= AMB_END) return WEEK_SCHEDULE_AMB;
         return WEEK_SCHEDULE;
     };
-    // Sexta de simulado? override manual → sexta de plantão = não → paridade quinzenal (âncora 14/08) · 01/01 sem simulado (último dia de acesso)
+    // Sexta de simulado? override manual → sexta de plantão = não → paridade quinzenal (âncora 14/08) · 01/01 sem simulado pela regra (último dia de aula nova; o botão religa)
     const simFor = (fri) => simForCfg(config, fri);
     const trilhaGen = (iso, keepDone) => trilhaListFor(iso, { cfg: config, P, trail, hoje: hojeT, keepDone, ov: scheduleOv }).map((a, i) => ({ ...a, id: a.tm != null ? "t-" + a.tm + "-" + a.ts + (a.au ? "-au" : "") : "g-" + iso + "-" + i })); // id estável por (módulo, etapa)
     // Gerador por CONTEXTO de semana (a sugestão de redistribuição usa o da semana seguinte para avaliar a carga dos dias onde cai)
@@ -2313,7 +2316,7 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, trail, P, onSa
     const listFor = (dayIdx) => { var _a; return (_a = scheduleOv[dateFor(dayIdx)]) !== null && _a !== void 0 ? _a : genActivities(dayIdx); };
     const isCustom = (dayIdx) => !!scheduleOv[dateFor(dayIdx)];
     const isoAt = (d) => addDaysISO(dateFor(0), d); // dia absoluto d: 0–6 esta semana, 7–27 até 3 semanas à frente
-    // Lista REAL de qualquer data (editada à mão ou gerada) — resolve a semana pela data (semanas do curso de 7 dias, Sem.41 de 6, Trilha TER→SEG). Depois de 01/01: null.
+    // Lista REAL de qualquer data (editada à mão ou gerada) — resolve a semana pela data (semanas do curso de 7 dias, Sem.41 de 6, Trilha TER→SEG, cauda inclusive). Depois de PLAN_HZ: null.
     const listAtISO = (iso, keepDone) => { if (iso > PLAN_HZ) return null; if (scheduleOv[iso]) return scheduleOv[iso]; if (iso >= POS_CURSO) return trilhaGen(iso, keepDone); const w2 = weekOfISO(iso, startISO); const k = w2 - week; const di = dayIdxOf(iso, startISO); if (k === 0) return genActivities(di, null, keepDone); return genForCtx(ctxAt(k), di, null, true); };
     const listAt = (d) => { if (d < -7 || d > 27) return null; if (d >= 0 && d < WL) return listFor(d); return listAtISO(isoAt(d), true); }; // lista do dia (editada à mão ou gerada); −7…−1 = semana passada (espaçamento)
     const loadMemo = {};
@@ -2771,9 +2774,11 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, trail, P, onSa
     const tDoneT = (t) => !!(((trail || {})[t.mod.id] || {})[t.field]);
     const isBlockDoneAt = (a, iso) => { if (a.tm != null) { const tk = trailTasks(a, iso).filter(t => !t.extra); return tk.length ? tk.every(tDoneT) : !!a.done; } if (iso >= POS_CURSO) return !!a.done; return isBlockDone(a); };
     // ── mover etapa da Trilha (aviso de espaçamento, decisões 38/40/54): família = o módulo; pode cruzar semanas; grava no plano (trilhaPlan), sem materializar dias ──
+    const endedAtT = (id) => (P && (P.ended || []).indexOf(Number(id)) >= 0 && (P.endedAt || {})[id]) || null; // S7_fix1 (🧩 nada some calado · 💬; §4.3/§4.4: etapa sem marca de encerrado com data > endedAt sai do calendário): o teto dos movimentos manuais do encerrado é a data do encerramento — o mesmo mecanismo do teto da aula em 01/01 (RM10; §3.3 l. 14–15). Para voltar a planejar, o "Desfazer" do cartão
+    const hidET = (id, x, d) => !!(endedAtT(id) && P.hidden && P.hidden(id, x, d || null)); // S7_fix1: etapa do encerrado que já saiu do calendário (sem marca; depois de endedAt ou sem dia) — fora da conta dos intervalos e do "Ver como reorganizar"
     const reorganizeT = (st, fixedD, movable, D0, id) => { // passos como os de placeChain (RM7; §3.3 linha 16): R1 (aula movível só em dia sem aula; nada de questões no dia leve; toda etapa movível ≤ 14,5h) → R2 (2ª aula em dia permitido, só com o gatilho estrito) → R3a/R3b (questões no dia leve, a última saída) → R4 (o score de antes, com 1 aula por dia). Sem K: cadeia aberta (📚 😴 🧠 DELA 2)
-        const prot = (P && P.prot) || {}; const EPS = 1e-9; const lo = addDaysISO(hojeT, 1);
-        const okDay = (x, d) => d >= lo && d <= stageCap(x) && dayOpenT(d, config) && !(x === "aula" && prot[d]); // teto por etapa (aula ≤ 01/01; 01/01 é dia comum — DELA 5)
+        const prot = (P && P.prot) || {}; const EPS = 1e-9; const lo = addDaysISO(hojeT, 1); const eAtR = endedAtT(id); // S7_fix1: encerrado → teto endedAt
+        const okDay = (x, d) => d >= lo && d <= stageCap(x) && (!eAtR || d <= eAtR) && dayOpenT(d, config) && !(x === "aula" && prot[d]); // teto por etapa (aula ≤ 01/01; 01/01 é dia comum — DELA 5)
         const cands0 = movable.map(x => { const out = []; for (let k = -7; k <= 7; k++) { const d = addDaysISO(D0[x], k); if (okDay(x, d)) out.push(d); } return out; });
         const hasA = movable.indexOf("aula") >= 0, myArea = hasA && id != null ? areaOf(id) : null, memo = {};
         const run = (maxA, q, capH) => { const key = maxA + "|" + q + "|" + capH; if (key in memo) return memo[key]; // um passo: as mesmas candidatas, filtradas pelas regras do passo
@@ -2797,14 +2802,14 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, trail, P, onSa
     const analyzeMoveT = (act, fromIso, toIso) => {
         const id = act.tm, ts = act.ts; const p = (P && P.plan[id]) || {}; const t = (trail || {})[id] || {};
         const dayOfT = (x) => { const f = TS_FIELD[x]; return t[f] ? (t[STAMP_OF[f]] || p[x]) : p[x]; };
-        const D0 = {}; STAGES_T.forEach(x => { D0[x] = dayOfT(x) || null; }); D0[ts] = fromIso;
+        const D0 = {}; STAGES_T.forEach(x => { D0[x] = hidET(id, x, p[x]) ? null : (dayOfT(x) || null); }); D0[ts] = fromIso; // S7_fix1: etapa escondida do encerrado = fora do calendário (§4.4)
         const D1 = { ...D0, [ts]: toIso };
         const toMap = (D) => { const mp = {}; STAGES_T.forEach(x => { if (D[x]) mp[x] = [{ d: diffDays(TRILHA_START, D[x]) }]; }); return mp; };
         const gapOf = (D, x, y) => (D[x] && D[y]) ? diffDays(D[x], D[y]) : null;
         const issues = spacingIssues(toMap(D1), false, [ts]).map(is => ({ ...is, before: gapOf(D0, is.x, is.y) }));
         let proposal = null;
         if (issues.length && P) {
-            const movable = STAGES_T.filter(x => x !== ts && !t[TS_FIELD[x]] && p[x] && p[x] > hojeT); // só as não feitas e ainda não vividas
+            const movable = STAGES_T.filter(x => x !== ts && !t[TS_FIELD[x]] && p[x] && p[x] > hojeT && !hidET(id, x, p[x])); // só as não feitas e ainda não vividas
             const fixedD = {}; STAGES_T.forEach(x => { if (x === ts) fixedD[x] = toIso; else if (movable.indexOf(x) < 0 && D0[x]) fixedD[x] = D0[x]; });
             const st = cloneSt(P.stNow); movable.concat([ts]).forEach(x => { if (!t[TS_FIELD[x]] && p[x]) stAdd(st, p[x], x, -1); }); stAdd(st, toIso, ts);
             if ((ts === "aula" || movable.indexOf("aula") >= 0) && !t.aula && p.aula) stArea(st, p.aula, id, -1); if (ts === "aula") stArea(st, toIso, id, 1); // a área acompanha a aula, como a carga (DELA 2): a do próprio módulo não pesa contra ele
@@ -2814,7 +2819,7 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, trail, P, onSa
         return { id, ts, mod: modById(id), D0, D1, issues, proposal, fromIso, toIso, aulaN: nA >= 1 ? { d: toIso, n: nA + 1 } : null, aulaLeve: ts === "aula" && P && (P.prot || {})[toIso] === "leve" ? toIso : null };
     };
     const applyMoveT = (ask, withProposal) => { // "Mover assim mesmo" grava só a etapa movida; "Aplicar" grava também a reorganização — datas atuais mudam, originais e histórico ficam (⚙️)
-        const id = ask.id; const base = ((config && config.trilhaPlan) || {})[id]; if (!base || (ask.ts === "aula" && ask.toIso > AULA_END)) { setMoveAsk(null); return; } // RM10 (defesa; §3.3 linha 15): aula depois de 01/01 nunca é gravada (o seletor não oferece)
+        const id = ask.id; const base = ((config && config.trilhaPlan) || {})[id]; const eAtM = endedAtT(id); if (!base || (ask.ts === "aula" && ask.toIso > AULA_END) || (eAtM && (ask.toIso > eAtM || (withProposal && ask.proposal && ask.proposal.plan.some(c => c.to > eAtM))))) { setMoveAsk(null); return; } // S7_fix1 (defesa): encerrado nunca recebe dia depois de endedAt // RM10 (defesa; §3.3 linha 15): aula depois de 01/01 nunca é gravada (o seletor não oferece)
         const p = { ...base }; const hist = (p.hist || []).slice(); const ov = { ...scheduleOv }; let ovCh = false;
         const changes = [{ ts: ask.ts, from: p[ask.ts], to: ask.toIso, why: withProposal ? "reorganizar" : "mover" }].concat(withProposal && ask.proposal ? ask.proposal.plan.map(c => ({ ts: c.st, from: c.from, to: c.to, why: "reorganizar" })) : []);
         changes.forEach(c => { if (c.from === c.to) return; p[c.ts] = c.to; hist.push({ ts: c.ts, from: c.from || null, to: c.to, at: hojeT, why: c.why }); if (c.from && takeFromT(ov, c.from, id, c.ts)) ovCh = true; if (putIntoT(ov, c.to, id, c.ts)) ovCh = true; });
@@ -2824,7 +2829,7 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, trail, P, onSa
         setMoveAsk(null);
     };
     const applyShiftT = (ask, SP) => { // "Mover o fio todo": grava em trilhaPlan as datas novas (orig fica; hist com motivo próprio "fio")
-        const id = ask.id; const base = ((config && config.trilhaPlan) || {})[id]; if (!base || !SP || !SP.ready) { setMoveAsk(null); return; }
+        const id = ask.id; const base = ((config && config.trilhaPlan) || {})[id]; const eAtS = endedAtT(id); if (!base || !SP || !SP.ready || (eAtS && SP.rows.some(r => { const to = r.nofit ? null : r.to; return to !== (base[r.ts] || null) && (!to || to > eAtS); }))) { setMoveAsk(null); return; } // S7_fix1 (defesa): encerrado nunca recebe dia depois de endedAt nem "sem dia"
         const p = { ...base }; const hist = (p.hist || []).slice(); const ov = { ...scheduleOv }; let ovCh = false;
         const keep = { ...(p.keep || {}) };
         SP.rows.forEach(r => { const to = r.nofit ? null : r.to, from = p[r.ts] || null; const kept = to && r.why ? r.why : null; if (kept) keep[r.ts] = to; else delete keep[r.ts]; if (to === from) return; p[r.ts] = to; hist.push({ ts: r.ts, from, to, at: hojeT, why: "fio" }); if (from && takeFromT(ov, from, id, r.ts)) ovCh = true; if (to && putIntoT(ov, to, id, r.ts, kept)) ovCh = true; }); // kept = ela deixou num dia bloqueado ("Deixar neste dia", ou o próprio movimento): o bloco avisa e não vira ⏳
@@ -2836,6 +2841,7 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, trail, P, onSa
     };
     const nTxtT = (n) => (n > 0 ? "+" : "−") + Math.abs(n) + (Math.abs(n) === 1 ? " dia" : " dias");
     const TS_CAP = { aula: "Aula", quest: "Questões", apost: "Apostila", seal: "Selagem" }, TS_THE = { aula: "a aula", quest: "as questões", apost: "a apostila", seal: "a selagem" };
+    const PAST_LINE_E = "Esse dia já passou. Se você fez a etapa nele, marque o ✓ no bloco desse dia, assim o carimbo fica com a data certa."; // S7_fix1 (💬): o mesmo texto sem "Mover para um dia passado só deixa a etapa como pendente (⏳)" — o encerrado fica no dia como histórico, fora do ⏳ (§4.4)
     const PAST_LINE = "Esse dia já passou. Se você fez a etapa nele, marque o ✓ no bloco desse dia, assim o carimbo fica com a data certa. Mover para um dia passado só deixa a etapa como pendente (⏳).";
     const shiftViewT = (ask) => { // prévia do "Mover o fio todo": dia e carga de cada etapa, intervalos antes e depois, perguntas dos dias bloqueados
         const SP = trilhaShiftPlan(P, config, trail, ask.id, ask.ts, ask.fromIso, ask.toIso, hojeT, ask.shift.ans);
@@ -2873,7 +2879,7 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, trail, P, onSa
             const l = listAtISO(toIso) || []; const destHrs = dayLoadHours(l) + actHours(act);
             const capMsg = destHrs > DAY_CAP_H ? "⚠️ " + dayNameT(toIso) + " ficaria com ~" + destHrs.toFixed(1).replace(".", ",") + "h de atividades — acima do tempo hábil (~" + String(DAY_CAP_H).replace(".", ",") + "h). Nada será apagado nem trocado." : "";
             const tr0 = (trail || {})[act.tm] || {}, pl0 = (P && P.plan[act.tm]) || {};
-            const hasLater = !tr0[TS_FIELD[act.ts]] && STAGES_T.slice(STAGES_T.indexOf(act.ts) + 1).some(x => !tr0[TS_FIELD[x]] && pl0[x]); // etapa já marcada nunca anda: mover o bloco dela não oferece o fio // etapas sem marca depois dela: o diálogo abre sempre (só esta etapa ou o fio todo) — paciente, 07/11
+            const hasLater = !endedAtT(act.tm) && !tr0[TS_FIELD[act.ts]] && STAGES_T.slice(STAGES_T.indexOf(act.ts) + 1).some(x => !tr0[TS_FIELD[x]] && pl0[x]); // S7_fix1: encerrado — sem "Mover o fio todo" (as seguintes sumiriam depois de endedAt) // etapa já marcada nunca anda: mover o bloco dela não oferece o fio // etapas sem marca depois dela: o diálogo abre sempre (só esta etapa ou o fio todo) — paciente, 07/11
             if (!an.issues.length && !capMsg && !hasLater && !an.aulaN && !an.aulaLeve && toIso >= hojeT) { applyMoveT(an, false); return; } // linha de 2ª aula ou de dia leve (X15): o diálogo curto abre para informar // a selagem (nada depois dela) segue movendo direto
             setMoveAsk({ trail: true, fromIdx, idx, act, capMsg, ...an, missing: [], view: false, hasLater, short: !an.issues.length && hasLater, shift: null }); // curto = os intervalos ficam; a carga (capMsg) só informa
             return;
@@ -2884,7 +2890,7 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, trail, P, onSa
     };
     const moveOptsFor = (act) => { // dias de destino: bloco de etapa da Trilha = esta semana e a seguinte (a aula só até 01/01); demais = os dias desta semana
         const out = [];
-        if (act && act.tm != null && !act.au && !act.gh && !isTransDay(dayDate)) { const end0 = weekEndISO(Math.min(week + 1, P ? P.LW : finalWeek(startISO)), startISO), end = act.ts === "aula" && end0 > AULA_END ? AULA_END : end0; for (let d = dateFor(0) < TRILHA_START ? TRILHA_START : dateFor(0); d <= end; d = addDaysISO(d, 1)) if (d !== dayDate) out.push(d); return out; } // esta semana e a seguinte (a 1ª da Trilha tem 8 dias), nunca um dia de transição · aula nunca depois de 01/01 (fim de acesso; §3.3 linha 14); questões, apostila e selagem: janeiro inclusive (teto por etapa)
+        if (act && act.tm != null && !act.au && !act.gh && !isTransDay(dayDate)) { const end0 = weekEndISO(Math.min(week + 1, P ? P.LW : finalWeek(startISO)), startISO), end1 = act.ts === "aula" && end0 > AULA_END ? AULA_END : end0, eAt = endedAtT(act.tm), end = eAt && end1 > eAt ? eAt : end1; for (let d = dateFor(0) < TRILHA_START ? TRILHA_START : dateFor(0); d <= end; d = addDaysISO(d, 1)) if (d !== dayDate) out.push(d); return out; } // esta semana e a seguinte (a 1ª da Trilha tem 8 dias), nunca um dia de transição · aula nunca depois de 01/01 (fim de acesso; §3.3 linha 14); questões, apostila e selagem: janeiro inclusive (teto por etapa)
         for (let i = 0; i < WL; i++) if (i !== activeIdx) out.push(dateFor(i));
         return out;
     };
@@ -2955,7 +2961,7 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, trail, P, onSa
         setTView(null);
     };
     const dismissRise = () => { saveTrilha({ trilhaDismiss: { ...((config && config.trilhaDismiss) || {}), [dateFor(0) + "|rise"]: hojeT } }); setTView(null); };
-    const showExport = hojeT >= "2026-12-15" && hojeT <= TRILHA_END && isTW; // 📦 a partir de 15/12 (paciente, 20/10)
+    const showExport = hojeT >= "2026-12-15" && hojeT <= AULA_END && isTW; // 📦 a partir de 15/12 (paciente, 20/10) até o último dia de aula nova (X26; §2.7 l. 2779)
     const finalLog = isTW && P && week === finalWeek(startISO) ? ((config && config.trilhaFinalLog) || null) : null;
     const nowWT = isCurTW; // 0b (§7 pedaço 3): a semana de hoje — curWT não é nulo na cauda (§2.2), então o P.LW do protótipo não é preciso
     // cobertura da Trilha (⚙️ a tela não pode prometer o que não entrega): etapa planejada ausente da lista REAL do dia (dia editado) · módulo aberto com etapa SEM DIA (0b)
@@ -3014,8 +3020,8 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, trail, P, onSa
             return React.createElement("div", { key: id, "data-mod": mod.code + " · " + mod.title, "data-kind": kind, style: { display: "flex", flexDirection: "column", gap: 2 } },
                 React.createElement("div", { style: { display: "flex", gap: 8, alignItems: "baseline", flexWrap: "wrap" } }, React.createElement(Badge, { label: KIND_LBL[kind][0], color: KIND_LBL[kind][1] }),
                     React.createElement("span", { style: { color: "#cbd5e1", fontSize: 12 } }, React.createElement("strong", { style: { color: "#f1f5f9" } }, mod.code), " · ", mod.title),
-                    (P.noAula || []).indexOf(id) >= 0 && React.createElement(Badge, { label: "AULA NÃO ASSISTIDA ATÉ 01/01", color: "#7f1d1d" })), // S5 (passagem do S4, desvio 2; X34): a semana passada (T9/T10 vista depois de 01/01) diz por que as etapas seguintes não estão nos dias
-                React.createElement("div", { style: { color: "#64748b", fontSize: 10, paddingLeft: 4 } }, STAGES_T.map(x => TS_WORD[x] + " " + (p[x] && P.hidden && P.hidden(id, x, p[x]) ? "—" : p[x] ? fmtBR(p[x]) : t[TS_FIELD[x]] ? "" : "sem dia") + (t[TS_FIELD[x]] ? " ✓" : "")).join(" · ") + (t.aulaAudio ? " · 🎧 aula em áudio" : ""))); })) // etapa escondida (§4.3: sem questões sem aula) → "—", nunca a data planejada
+                    (P.noAula || []).indexOf(id) >= 0 && React.createElement(Badge, { label: "AULA NÃO ASSISTIDA ATÉ 01/01", color: "#7f1d1d" }), (P.ended || []).indexOf(Number(id)) >= 0 && React.createElement(Badge, { label: "ENCERRADO EM " + fmtBR((P.endedAt || {})[id]), color: "#475569" })), // S7_fix1 (X34, como o badge do noAula do S5): o encerrado diz por que as etapas seguintes não estão nos dias · S5 (passagem do S4, desvio 2; X34): a semana passada (T9/T10 vista depois de 01/01) diz por que as etapas seguintes não estão nos dias
+                React.createElement("div", { style: { color: "#64748b", fontSize: 10, paddingLeft: 4 } }, STAGES_T.map(x => TS_WORD[x] + " " + (!t[TS_FIELD[x]] && P.hidden && P.hidden(id, x, p[x] || null) ? "—" : p[x] ? fmtBR(p[x]) : t[TS_FIELD[x]] ? "" : "sem dia") + (t[TS_FIELD[x]] ? " ✓" : "")).join(" · ") + (t.aulaAudio ? " · 🎧 aula em áudio" : ""))); })) // etapa escondida (§4.3: sem questões sem aula) → "—", nunca a data planejada
             : React.createElement("div", { style: { color: "#94a3b8", fontSize: 12 } }, Wcur && Wcur.pre ? "Semana anterior ao seu 1º acesso à Trilha." : "Nenhuma etapa de módulo nesta semana." + (tailW && P.revEnd && P.revEnd >= dateFor(0) ? " Revisões: o app lembra até " + fmtBR(P.revEnd) + " (estimado)." : ""))); // X67 (R-a, 📚 🧩 DELA 9): semana da cauda só de revisão
     const dayDate = dateFor(activeIdx);
     const isTDay = dayDate >= POS_CURSO; // dia da Trilha ou de transição (registro próprio; blocos sem tm viram nota)
@@ -3116,7 +3122,7 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, trail, P, onSa
                         tProp && (tProp.kind === "A" || tProp.kind === "B") && React.createElement("button", { onClick: applyTProp, style: tBtnMain }, tProp.kind === "A" ? "Aplicar" : "Começar agora"),
                         React.createElement("button", { onClick: () => setTView(null), style: tBtnSec }, tProp && tProp.kind === "C" ? "Fechar" : "Cancelar")))),
         showExport && React.createElement("div", { "data-t": "trilha-export", style: { ...tBanner, background: "#1a1430", border: "1px solid #7c3aed" } },
-            React.createElement("span", { style: { ...tHead, color: "#c4b5fd" } }, "📦 O acesso à plataforma termina em 01/01/2027: exporte da plataforma o que é seu (apostilas, resumos, cadernos de erros) e faça o 💾 backup do app — é o material que você leva para o cursinho de 04/01."),
+            React.createElement("span", { style: { ...tHead, color: "#c4b5fd" } }, "📦 Aula nova só até 01/01/2027. Depois disso continuam disponíveis as apostilas, as questões, o caderno de erros, o banco de questões, as revisões, os smartcards e os simulados — e uma aula já assistida pode ser revista; só não dá para assistir aula nova. As cadeias abertas seguem em janeiro até fechar. Faça o 💾 backup do app."), // X26 (🧠 DELA 11: o que continua disponível, nada a exportar; o botão 💾 fica dentro do banner)
             React.createElement("div", { style: tRow }, React.createElement("button", { onClick: () => doExportBackup(), style: { ...tBtnMain, background: "#2e1065", border: "1px solid #7c3aed", color: "#ddd6fe" } }, "💾 Baixar backup do app"))),
         finalLog && React.createElement("div", { "data-t": "trilha-final", style: { ...tBanner, background: "#1a1430", border: "1px solid #7c3aed" } },
             React.createElement("span", { style: { ...tHead, color: "#c4b5fd" } }, finalLogText(finalLog))),
@@ -3255,7 +3261,7 @@ function Schedule({ config, effWeek, scheduleOv, events, reviews, trail, P, onSa
                 return React.createElement("div", { "data-pw": "move-ask", style: { display: "flex", flexDirection: "column", gap: 6, background: "#0b1f33", border: "1px solid #1d4ed8", borderRadius: 10, padding: "8px 12px", marginBottom: 12 } },
                 React.createElement("span", { style: { color: "#93c5fd", fontSize: 11, fontWeight: 800, lineHeight: 1.45 } }, "Mover \"" + moveAsk.act.text.slice(0, 48) + (moveAsk.act.text.length > 48 ? "…" : "") + "\" de " + (moveAsk.trail ? dayNameT(moveAsk.fromIso) + " para " + dayNameT(moveAsk.toIso) + " · carga do destino: " + dayCostT(moveAsk.toIso, actHours(moveAsk.act)) : dayName(moveAsk.fromIdx) + " para " + dayName(moveAsk.toIdx) + " · carga do destino: " + dayCost(moveAsk.toIdx, actHours(moveAsk.act)))),
                 moveAsk.trail && moveAsk.short && !SV && React.createElement("span", { "data-t": "move-short", style: { color: "#86efac", fontSize: 11, fontWeight: 700, lineHeight: 1.45 } }, "Este movimento mantém os intervalos."),
-                moveAsk.trail && !SV && moveAsk.toIso < hojeT && React.createElement("span", { "data-t": "move-past", style: { color: "#fbbf24", fontSize: 11, fontWeight: 700, lineHeight: 1.45 } }, PAST_LINE),
+                moveAsk.trail && !SV && moveAsk.toIso < hojeT && React.createElement("span", { "data-t": "move-past", style: { color: "#fbbf24", fontSize: 11, fontWeight: 700, lineHeight: 1.45 } }, endedAtT(moveAsk.id) ? PAST_LINE_E : PAST_LINE),
                 moveAsk.capMsg && !SV && React.createElement("span", { style: { color: "#fbbf24", fontSize: 11, fontWeight: 700, lineHeight: 1.45 } }, moveAsk.capMsg),
                 moveAsk.trail && !SV && moveAsk.aulaN && React.createElement("span", { "data-t": "move-aulas", style: { color: "#e0f2fe", fontSize: 11, lineHeight: 1.45 } }, "ℹ️ " + moveAsk.aulaN.n + "ª aula neste dia (" + dayNameT(moveAsk.aulaN.d) + ")"), // X15 (§3.8; DELA 2 e 3): só informa
                 moveAsk.trail && !SV && moveAsk.aulaLeve && React.createElement("span", { "data-t": "move-leve", style: { color: "#e0f2fe", fontSize: 11, lineHeight: 1.45 } }, "🌿 A aula iria para o dia leve da semana (" + dayNameT(moveAsk.aulaLeve) + ") — o app não põe aula nova nele; se você aplicar, fica assim (só informa)."), // X15
@@ -3898,7 +3904,7 @@ function trilhaTailEndPreview(P, trail, cfg) { // X45 (prévia): o que vai para 
 function trilhaTailEndUndoText(P, cfg) { // X45 (prévia do Desfazer): a ÚLTIMA aplicação volta
     const TE = trilhaTailEndList(cfg), last = TE[TE.length - 1]; if (!last) return "";
     const Q = P.Q || [], code = (id) => (modById(id) || {}).code || String(id), lbl = (id) => { const m = modById(id), c = m && m.code; return c && Q.some(y => Number(y) !== Number(id) && (modById(y) || {}).code === c) ? c + " · " + m.title : code(id); }; // (d′): código que se repete na fila → "código · título"
-    const L = (last.ids || []).map(lbl), list = L.length > 1 ? L.slice(0, -1).join(", ") + " e " + L[L.length - 1] : (L[0] || "");
+    const L = (last.ids || []).filter(id => (P.ended || []).indexOf(Number(id)) >= 0).map(lbl); if (!L.length) return "Desfazer o encerramento de " + fmtBR(last.at) + "."; const list = L.length > 1 ? L.slice(0, -1).join(", ") + " e " + L[L.length - 1] : (L[0] || "");
     return "Desfazer o encerramento de " + fmtBR(last.at) + ": voltam para o calendário e para o ⏳: " + list + " (as datas que já passaram aparecem como ⏳).";
 }
 function TrilhaTailEnd({ P, trail, config, onPatch }) {
@@ -3974,7 +3980,7 @@ function TrilhaTab({ config, trail, progress, P, scheduleOv, onRestore, onSaveCo
     // pomodoros: aulas desta semana (só sugestão — nada muda no cronograma)
     const pomoIds = weekIds.filter(id => !(t[id] || {}).aula);
     const fmtMin = (x) => Math.floor(x / 60) + "h" + String(x % 60).padStart(2, "0");
-    const showExport = hoje >= "2026-12-15" && hoje <= TRILHA_END;
+    const showExport = hoje >= "2026-12-15" && hoje <= AULA_END; // X26 (§2.7 l. 3693): 📦 de 15/12 ao último dia de aula nova
     // ── 🧹 Restaurar o plano ao estado da última atualização (paciente, 07/11): diagnóstico → prévia → "Aplicar"; depois, "Desfazer" ──
     const restoreEl = (() => {
         if (!config.trilhaFirstOpen || !onRestore) return null;
@@ -4019,8 +4025,8 @@ function TrilhaTab({ config, trail, progress, P, scheduleOv, onRestore, onSaveCo
         if (rMsg) kids.push(React.createElement("div", { key: "m", "data-t": "restore-msg", style: { color: "#fbbf24", fontSize: 11, fontWeight: 700, marginTop: 6 } }, rMsg));
         if (rView === "diag") {
             const R = trilhaRestoreCalc(config, scheduleOv, t, hoje, { keepOwn: rOwn }), D = R.diag, N2 = R.next, P2 = R.P2, C2 = R.settled;
-            const pendA = P2.pending.filter(x => x.why !== "simulado").length, pendS = P2.pending.filter(x => x.why === "simulado");
-            const heavy = [], studyHi = []; for (let dd = hoje; dd <= TRILHA_END && dd <= addDaysISO(hoje, 13); dd = addDaysISO(dd, 1)) { const l = N2.sov[dd] || trilhaListFor(dd, { cfg: C2, P: P2, trail: N2.trail, hoje, ov: N2.sov }); const tot = dayLoadHours(l), st = studyHours(l); if (tot > DAY_CAP_H + 1e-9) heavy.push(dn(dd) + " · " + fH(tot) + " no total"); else if (st > studyWarnFor(dd) + 1e-9 && !l.some(a => /SIMULADO NA ÍNTEGRA/.test(a.text || ""))) studyHi.push(dn(dd) + " " + fH(st)); }
+            const pendA = P2.pending.filter(x => x.why === "atrasada").length, pendS = P2.pending.filter(x => x.why === "simulado"), pendD = P2.pending.filter(x => x.why === "semdia").length; // S8 (X50; 🧩 passagem do S4): "semdia" (etapa sem dia, 0b) não é "de dias que já passaram" — conta à parte
+            const heavy = [], studyHi = []; for (let dd = hoje; dd <= PLAN_HZ && dd <= addDaysISO(hoje, 13); dd = addDaysISO(dd, 1)) { /* S8 (§4.6 l. 3738; 🧩 😴): de hoje a 2 semanas também na cauda (antes parava em 01/01) — PLAN_HZ é só o teto técnico do laço */ const l = N2.sov[dd] || trilhaListFor(dd, { cfg: C2, P: P2, trail: N2.trail, hoje, ov: N2.sov }); const tot = dayLoadHours(l), st = studyHours(l); if (tot > DAY_CAP_H + 1e-9) heavy.push(dn(dd) + " · " + fH(tot) + " no total"); else if (st > studyWarnFor(dd) + 1e-9 && !l.some(a => /SIMULADO NA ÍNTEGRA/.test(a.text || ""))) studyHi.push(dn(dd) + " " + fH(st)); }
             const revB = computeReviews(t, hoje).length, revA = computeReviews(N2.trail, hoje).length;
             const body = [];
             if (lastOn && afterMarks.length) body.push(React.createElement("div", { key: "w", "data-t": "restore-after-warn", style: { color: "#fbbf24", fontSize: 11, fontWeight: 700, lineHeight: 1.5, marginTop: 6 } }, "⚠️ Depois da restauração de " + fmtAt(lastR.entry.at) + " você marcou " + nMarks(afterMarks) + " coisa(s): " + afterMarks.map(x => x.name.split(" · ")[0] + " (" + x.items.map(itemTxt).join(", ") + ")").join("; ") + ". Restaurar de novo tira essas marcas da tela (ficam no arquivo do app e dá para desfazer)."));
@@ -4057,9 +4063,9 @@ function TrilhaTab({ config, trail, progress, P, scheduleOv, onRestore, onSaveCo
             body.push(sec("Fica como está", ["1º acesso: " + (D.firstOpen ? fmtBR(D.firstOpen) : "—"), "semanas congeladas (a cota não é recalculada): " + (D.weeks.map(w => fmtBR(w.tue) + " (" + w.q + (w.n < w.q ? ", entraram " + w.n : "") + (w.held ? ", segurada" : "") + ")").join(" · ") || "—")].concat(notes).concat((D.appRec.revFull || D.appRec.final) ? ["o que o app registra sozinho: " + [D.appRec.revFull ? D.appRec.revFull + " dia(s) cheio(s) para a revisão" : "", D.appRec.final ? "a recolocação da semana final" : ""].filter(Boolean).join(" e ")] : []).concat(["tudo o que é de antes da atualização (histórico do curso e transição)"]), "s6"));
             const LWs = FINAL_START; // semana final por data (⚙️ crítica §0.1)
             body.push(React.createElement("div", { key: "reach", "data-t": "restore-reach" }, sec("Alcance: aulas até 01/01 e cadeias completas", ["aulas até 01/01: " + P.N + " agora → " + P2.N + " depois de restaurar · cadeias completas (com janeiro): " + P.NC + " → " + P2.NC + " (supondo que as próximas semanas fechem)", "o ritmo da semana seguinte fica segurado até a semana anterior fechar — e no bloco 04h30 (16/11 a 11/12) o ritmo não sobe. Isso só informa: a decisão é sua."], "s7r")));
-            body.push(sec("Depois de aplicar", [P2.pending.length + " etapa(s) aparecem como ⏳ pendentes" + (pendS.length ? " (" + pendA + " de dias que já passaram + " + pendS.length + " em " + [...new Set(pendS.map(x => dn(x.iso)))].join(", ") + ", que volta a ser simulado)" : "") + " — é esperado: depois de restaurar nada está marcado; você marca no bloco de cada dia o que fez."]
+            body.push(sec("Depois de aplicar", [P2.pending.length + " etapa(s) aparecem como ⏳ pendentes" + (pendS.length || pendD ? " (" + pendA + " de dias que já passaram" + (pendS.length ? " + " + pendS.length + " em " + [...new Set(pendS.map(x => dn(x.iso)))].join(", ") + ", que volta a ser simulado" : "") + (pendD ? " + " + pendD + " sem dia" : "") + ")" : "") /* X50 (S8): + " + D sem dia" quando houver o motivo "semdia"; sem ele, igual a antes */ + " — é esperado: depois de restaurar nada está marcado; você marca no bloco de cada dia o que fez."]
                 .concat(hoje >= addDaysISO(LWs, -7) && hoje < LWs ? ["📦 a partir de " + fmtBR(LWs) + " (semana final): as etapas dos dias que já passaram ficam no bloco de cada dia, para você marcar o que fez — a recolocação automática diária só leva as de cada dia em diante."] : [])
-                .concat(hoje >= LWs && hoje < TRILHA_END ? ["📦 semana final: as etapas dos dias que já passaram ficam no bloco de cada dia, para você marcar o que fez — o que não foi feito aparece no ⏳ (“Ver como recolocar”). A recolocação automática de cada dia continua para as etapas de hoje em diante."] : hoje === TRILHA_END ? ["📦 hoje é o último dia de acesso: marque no bloco de cada dia o que você fez — o que ficar sem marca não é mais recolocado (fica no registro para o cursinho de 04/01)."] : [])
+                .concat(hoje >= LWs && hoje < AULA_END ? ["📦 semana final: as etapas dos dias que já passaram ficam no bloco de cada dia, para você marcar o que fez — o que não foi feito aparece no ⏳ (“Ver como recolocar”). A recolocação automática de cada dia continua para as etapas de hoje em diante."] : hoje === AULA_END ? ["📦 hoje é o último dia de aula nova: marque no bloco de cada dia o que você fez. Questões, apostila e selagem sem marca seguem para janeiro; aula sem marca não tem mais dia depois de hoje."] : hoje > AULA_END ? ["Depois de 01/01, restaurar desmarca também as aulas, e aula sem marca não volta a ter dia: se você assistiu, marque no bloco do dia em que assistiu."] : []) /* S8: X47 (01/01) e X48 (depois de 01/01) — 💬 decisão 75 + SPEC "Restauração com a cauda"; 🧩 a aula conta pela data do ✓ */
                 .concat([heavy.length ? "⚠️ acima do tempo hábil (14,5h), de hoje a 2 semanas: " + heavy.join(" · ") : "nenhum dia de hoje a 2 semanas acima do tempo hábil (14,5h)"])
                 .concat(studyHi.length ? ["📚 acima do limiar de estudo (informativo, o dia já avisa): " + studyHi.join(" · ")] : [])
                 .concat(R.changed && !D.any ? ["o app regrava as marcas do dia — nada seu muda"] : []), "s7"));
@@ -4144,7 +4150,7 @@ function TrilhaTab({ config, trail, progress, P, scheduleOv, onRestore, onSaveCo
                 React.createElement("button", { onClick: () => setAltN(buildTrilhaPlan(config, trail, hoje, { alt: true }).N), style: btnS(false) }, "E se esta semana virar manutenção?"),
                 altN != null && React.createElement("span", { "data-t": "trilha-alt", style: { color: "#94a3b8", fontSize: 11, lineHeight: 1.4 } }, "Se esta semana não fechar, a próxima fica no mesmo ritmo" + (W && W.prop ? " da sua cota cheia (" + W.prop.full + ")" : "") + ": " + nAulasT(altN) + " até 01/01. É só uma conta — muda quando as etapas forem marcadas."))),
         showExport && React.createElement("div", { "data-t": "trilha-export", style: { background: "#1a1430", border: "1px solid #7c3aed", borderRadius: 10, padding: "8px 12px", display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" } },
-            React.createElement("span", { style: { color: "#c4b5fd", fontSize: 11, fontWeight: 800, lineHeight: 1.4 } }, "📦 O acesso à plataforma termina em 01/01/2027: exporte o que é seu (apostilas, resumos, cadernos de erros) e faça o 💾 backup do app."),
+            React.createElement("span", { style: { color: "#c4b5fd", fontSize: 11, fontWeight: 800, lineHeight: 1.4 } }, "📦 Aula nova só até 01/01/2027. Depois disso continuam disponíveis as apostilas, as questões, o caderno de erros, o banco de questões, as revisões, os smartcards e os simulados — e uma aula já assistida pode ser revista; só não dá para assistir aula nova. As cadeias abertas seguem em janeiro até fechar. Faça o 💾 backup do app."), // X26 (🧠 DELA 11), o mesmo texto do Cronograma
             React.createElement("button", { onClick: () => doExportBackup(), style: { background: "#2e1065", border: "1px solid #7c3aed", borderRadius: 8, color: "#ddd6fe", fontSize: 11, fontWeight: 700, padding: "5px 10px", cursor: "pointer" } }, "💾 Baixar backup do app")),
         hoje >= AULA_END && React.createElement(TrilhaBalanco, { P, trail, mode: hoje > AULA_END && !P.live ? "fim" : "aulas", config, onPatch: saveCfg }), // §6 (S5): "aulas" de 01/01 ao fim da cauda; "fim" depois
         React.createElement("div", { "data-t": "trilha-ramp", style: card },
@@ -4203,10 +4209,10 @@ function TrilhaTab({ config, trail, progress, P, scheduleOv, onRestore, onSaveCo
             React.createElement("div", { style: { color: "#f5c518", fontSize: 13, fontWeight: 700, marginBottom: 10 } }, "COMO A TRILHA FUNCIONA"),
             React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 8 } }, [
                 ["1", "Fila única", "Cirurgia primeiro (CIR1 Trauma I e II, CIR2 Urologia, Queimaduras e Cirurgia Pediátrica, CIR3 Pré-operatório e Hérnias, CIR4 I e II); depois a ordem do curso. ↑↓ reordena o que ainda não abriu; 📌 fixa o próximo a abrir."],
-                ["2", "Cadeia completa, sempre", "Aula → questões (1–2 dias) → apostila (1–2, ideal 1) → selagem (2–5, ideal 3), nunca duas etapas do módulo no mesmo dia. Nada visto antes conta como aprendido: o registro da Trilha é próprio; o do curso fica guardado."],
-                ["3", "Rampa", "3 · 4 · 4 · 4 · 4 · 4 · 4 · 4 · 5 · 4 · 0 módulos novos por semana. Sobe só se a semana passada fechou e fora do bloco 04h30. Semana segurada = semana de manutenção do ritmo, não fracasso. Na semana do seu 1º acesso, a cota é proporcional aos dias que restam; para subir ou segurar a seguinte, ela conta pela cota cheia."],
+                ["2", "Cadeia completa, sempre", "Aula → questões (1–2 dias) → apostila (1–2, ideal 1) → selagem (2–5, ideal 3), nunca duas etapas do módulo no mesmo dia. No que o app planejar daqui para frente: até 5 cadeias abertas ao mesmo tempo — o próximo módulo espera uma fechar; aula nova 1 por dia, e a 2ª só quando, com uma, algum dia passaria de 14,5h (no ⏩ também quando não sobra dia sem aula na semana — com aviso, e só se você aplicar); nunca 3. Nada visto antes conta como aprendido: o registro da Trilha é próprio; o do curso fica guardado."], // X62 (📚 DELA 1 e 2; RM25)
+                ["3", "Rampa", Object.values(TRILHA_RAMP_DEFAULT).join(" · ") + " módulos novos por semana. Sobe só se a semana passada fechou e fora do bloco 04h30. Semana segurada = semana de manutenção do ritmo, não fracasso. Na semana do seu 1º acesso, a cota é proporcional aos dias que restam; para subir ou segurar a seguinte, ela conta pela cota cheia."], // X61 (⚙️ a rampa de verdade: 3 · 4 · 4 · 4 · 4 · 4 · 4 · 5 · 4 · 0)
                 ["4", "Plantões e dia leve", "Plantão longo (06h–19h): só Anki + áudio. Curto e 04h30: etapas antes ou depois. O dia leve (sem Venvanse) é previsto antes de distribuir e nunca recebe aula nova; 24, 25 e 31/12 são mais leves (📚 a 3h)."],
-                ["5", "Ficou para trás? Adiantou?", "⏳ o app propõe novos dias (só grava com Aplicar). Semana fechada: ⏩ Adiantar próximo módulo. Na semana final (29/12–01/01) ele recoloca sozinho para selar até 01/01."],
+                ["5", "Ficou para trás? Adiantou?", "⏳ o app propõe novos dias (só grava com Aplicar). Semana fechada: ⏩ Adiantar próximo módulo. De 29/12 a 01/01 ele recoloca sozinho: aula só até 01/01; questões, apostila e selagem podem ir para janeiro. Depois de 01/01 não há aula nova; o que ficar para trás aparece no ⏳ e só muda com Aplicar (a aula sem ✓ vai para o balanço). Nas semanas de janeiro nenhum dia leve é previsto (o seletor 🌿 continua)."], // X63 (💬 DELA 8 · 🧠 DELA 6)
                 ["6", "Ferramentas de foco", "Forest/Flora ligado em TODO bloco de estudo. Body double (FocusMate ou colega) nos blocos que você mais adia."],
                 ["7", "Aprender > zerar", "Cada selagem agenda as revisões D+7/D+30 pelo seu % (e um reforço 14 dias depois se o D+30 ficar abaixo de 60%)." + (P.revEndEst ? " Depois de 01/01 o app continua lembrando até " + fmtBR(P.revEndEst) + " (estimado — muda com os seus %); depois disso, o que sobrar vai para o balanço com a data." : "") + " É memória, não lista riscada."], // X64 (R-a, 📚 DELA 9; revEndEst: com as cadeias da prévia)
             ].map(([n, ti, d]) => React.createElement("div", { key: n, style: { display: "flex", gap: 10 } },
@@ -4470,7 +4476,8 @@ function App() {
         saveConfig({ ...config, fioWeek: { ...log, [wed]: ids } });
     }, [loaded, config, progress]);
     // CONGELAMENTO DA TRILHA (um único efeito, um único saveConfig — ⚙️): 1º acesso, semana corrente (e semanas puladas, retroativamente, como estavam
-    // planejadas) e a recolocação automática da semana final (uma vez por dia, ou de novo se o simulado de 01/01 mudar). Determinístico: o que congela = a prévia.
+    // planejadas — também as semanas T vistas só depois de 01/01, DECISOES_S4 (e)), as semanas da cauda enquanto P.live, e a recolocação automática de
+    // 29/12 a 01/01, por data (uma vez por dia, ou de novo se o simulado de 01/01 mudar; depois de 01/01 nada se move sozinho — DELA 8). Determinístico: o que congela = a prévia.
     useEffect(() => {
         if (!loaded || !config || !trail || !P) return;
         const h = todayISO(); // a guarda (P.live) está dentro de trilhaFreezePatch — a mesma da restauração (§2.2)
