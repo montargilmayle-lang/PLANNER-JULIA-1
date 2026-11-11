@@ -12,7 +12,7 @@
 //       em diante; os mesmos invariantes de 17/11 em diante, menos o herdado (09/11 = 4 aulas, 15/11 = 2, picos de K antes de 17/11); imprime os dois
 //       números, os dias com 2 aulas (esperado 22/11, 29/11 e 06/12) e a carga dia a dia de 29/12 até o fim. Variante "marcas incompletas": as 3
 //       selagens da T1 sem ✓ (ela fez e não marcou; C2) — imprime a T4;
-//   (4) unidades U1–U24 das regras de colocação (§10.3, item 4), em estados montados à mão;
+//   (4) unidades U1–U27 das regras de colocação (§10.3, item 4; U25–U26 da revisão S10rv1; U27 da S10rv2), em estados montados à mão (o U27, numa linha do tempo curta);
 //   (5) medições para o relatório (imprimem, não são checks): decisão 7 nos dois ramos (CLOSE_BY_ON true × false, por patch só no vm) no realista e nos
 //       estresses S-a…S-d (I × II, confere com o measure7); C1: ofertas do ⏩ em cada dia do realista com a semana fechada (leitura adv × estrita, por
 //       patch) e o alcance com a T10 de 0 a 4 (gatilho estrito × largo, por patch; confere com o M-c).
@@ -304,8 +304,8 @@ if (ON('realista')) section('(3) realista', () => {
     }
 });
 
-// ══════════ (4) UNIDADES U1–U24 ══════════
-if (ON('unidades')) { console.log('\n══════════ (4) UNIDADES U1–U24: regras de colocação em estados montados à mão ══════════'); units(); }
+// ══════════ (4) UNIDADES U1–U27 ══════════
+if (ON('unidades')) { console.log('\n══════════ (4) UNIDADES U1–U27: regras de colocação em estados montados à mão ══════════'); units(); }
 
 // ══════════ (5) MEDIÇÕES (imprimem, não são checks) ══════════
 if (ON('medicoes')) section('(5) medições', () => {
@@ -567,5 +567,43 @@ function units() {
         let out = null, err = null; try { out = JSON.parse(execFileSync(process.execPath, ['-e', code], { timeout: TO, encoding: 'utf8' }).trim().split('\n').pop()); } catch (e) { err = e.killed ? 'morto em ' + TO / 1000 + ' s' : String(e.message).slice(0, 200); }
         const g = (a, b) => out && out.r && out.r[a] && out.r[b] ? dd(out.r[a], out.r[b]) : null;
         check('U24 · comprimido com end = lastFirst = PLAN_HZ (pior caso montado, as 4 etapas a partir de 29/12): termina em ≤ ' + LIM + ' ms (janela limitada), aula ≤ 01/01 e janelas de no máximo 2× a faixa', !!out && out.ms <= LIM && !!out.r && out.r.aula <= '2027-01-01' && g('aula', 'quest') <= 4 && g('quest', 'apost') <= 4 && g('apost', 'seal') <= 10, err || J(out)); });
+
+    // U25 · S10rv1-pend-carga (😴 14,5h; SPEC "Leitura operacional" P1; §3.3 linha 5; revisão r1-C-motor-1): no ⏳ "Ver como recolocar", o módulo que fica SEM proposta
+    // mantém as datas antigas — a carga dele continua no dia para os outros. Estado mínimo da fuzz (sementes 267/725, reduzido): 03/11, CIR1 (6) e CIR2 (14) congelados, o 14
+    // com aula e questões ✓ e a apostila de 02/11 no ⏳, sem proposta (ancorada nas questões marcadas de 01/11, não tem dia nas faixas; a selagem fica em 05/11); o 6 inteiro no ⏳; simulado de 06/11 desligado por ela.
+    // Antes: o P1 do 6 punha as questões em QUI 05/11, onde fica a selagem do 14 → 15,00h depois de Aplicar. Agora: ≤ 14,5h em todo dia da proposta P1–P3.
+    run('U25', () => { const S0 = {"d":"2026-11-03","cfg":{"startDate":"2026-01-07","manualWeek":null,"trilhaFirstOpen":"2026-10-26","trilhaWeeks":{"2026-10-26":{"q":2,"base":3,"held":false,"why":null,"mods":[6,14],"adv":[],"rise":[],"short":0,"light":"2026-10-31","at":"2026-10-26"},"2026-11-03":{"q":0,"base":0,"held":false,"why":null,"mods":[],"adv":[],"rise":[],"short":0,"light":"2026-11-07","at":"2026-11-03"}},"trilhaPlan":{"6":{"wk":"2026-10-26","via":"ramp","aula":"2026-11-02","quest":"2026-11-04","apost":"2026-11-05","seal":"2026-11-08","orig":{"aula":"2026-10-28","quest":"2026-10-29","apost":"2026-10-30","seal":"2026-11-02"},"hist":[{"ts":"aula","from":"2026-10-28","to":"2026-11-02","at":"2026-10-29","why":"recolocar"},{"ts":"quest","from":"2026-10-29","to":"2026-11-04","at":"2026-10-29","why":"recolocar"},{"ts":"apost","from":"2026-10-30","to":"2026-11-05","at":"2026-10-29","why":"recolocar"},{"ts":"seal","from":"2026-11-02","to":"2026-11-08","at":"2026-10-29","why":"recolocar"}]},"14":{"wk":"2026-10-26","via":"ramp","aula":"2026-10-30","quest":"2026-11-01","apost":"2026-11-02","seal":"2026-11-05","orig":{"aula":"2026-10-30","quest":"2026-11-01","apost":"2026-11-02","seal":"2026-11-05"},"hist":[]}},"trilhaRamp":{"2026-11-10":0,"2026-11-17":0,"2026-11-24":0,"2026-12-01":0,"2026-12-08":0,"2026-12-15":0,"2026-12-22":0,"2026-12-29":0},"simOverrides":{"2026-11-06":false}},"trail":{"14":{"aula":true,"aulaAt":"2026-10-30","questoesD2":true,"questoesD2At":"2026-11-01"}}}, d = S0.d, E = UL(d);
+        const P = E.buildTrilhaPlan(S0.cfg, S0.trail, d), jobs = E.trilhaProposeRecolocar(P, S0.cfg, S0.trail, d, {}); const j6 = jobs.find(j => j.id === 6), j14 = jobs.find(j => j.id === 14);
+        const plan = clone(S0.cfg.trilhaPlan); jobs.forEach(j => { if (!j.days) return; j.rem.forEach(x => { plan[j.id][x] = j.days[x]; }); }); const cfg2 = { ...S0.cfg, trilhaPlan: plan }, P2 = E.buildTrilhaPlan(cfg2, S0.trail, d);
+        const days = [...new Set(jobs.filter(j => j.days && /^P[123]/.test((j.info || {}).pass || '')).flatMap(j => Object.values(j.days)))].sort(), ld = days.map(x => [x, E.dayLoadHours(E.trilhaListFor(x, { cfg: cfg2, P: P2, trail: S0.trail, hoje: d }))]);
+        check('U25 · ⏳ com um módulo sem proposta (CIR2, as datas antigas ficam): a proposta P1–P3 do outro (CIR1) não põe nenhum dia acima de 14,5h depois de Aplicar — antes, as questões iam para QUI 05/11 (com a selagem do CIR2) e o dia ficava com 15,00h',
+            !!j14 && !j14.days && !!j6 && !!j6.days && /^P[123]/.test((j6.info || {}).pass || '') && ld.length > 0 && ld.every(([, h]) => h <= CAP + 1e-9), J({ j6: j6 && j6.days, pass: j6 && j6.info && j6.info.pass, j14: j14 && j14.days, ld: ld.map(([x, h]) => fmt(x) + ' ' + h2(h)) })); });
+
+    // U26 · S10rv1-leve-feriado (🧠 DELA 2 "questões só como última saída e com aviso 🌿"; §3.6; X18; revisão r1-A-fidelidade-1 — CONFLITO apresentado: o §3.6 escreve
+    // prot === "leve" e os feriados "seguem como hoje"): o dia leve que ela escolhe no seletor 🌿 em 24, 25 ou 31/12 vale como dia leve. 1º acesso 22/12, ela faz tudo até
+    // 23/12; CIR2 · Cicatrização (19) com a aula ✓ 23/12 e as questões de 24/12 no ⏳; dia leve da T9 = SEX 25/12 (lightDayOverrides). As questões só cabem em 25/12
+    // (faixa 1–2 dias): antes, entravam pelo P1, sem a nota 🌿; agora P.prot = "leve", passo P3 e info.questLeve = 25/12 (a nota X18 da proposta).
+    run('U26', () => { const S = progress(FILE, '2026-12-22', '2026-12-23', true), id = Object.keys(S.cfg.trilhaPlan).map(Number).find(i => (S.trail[i] || {}).aulaAt === '2026-12-23' && !(S.trail[i] || {}).questoesD2);
+        const cfg = clone(S.cfg), trail = clone(S.trail), hoje = '2026-12-25'; if (id != null) { const p = cfg.trilhaPlan[id]; p.quest = '2026-12-24'; p.orig = { ...p.orig, quest: '2026-12-24' }; } cfg.lightDayOverrides = { '2026-12-22': 3 };
+        const E = UL(hoje), P = E.buildTrilhaPlan(cfg, trail, hoje), j = id != null ? E.trilhaProposeRecolocar(P, cfg, trail, hoje, {}).find(x => x.id === id) : null, inf = (j && j.info) || {};
+        check('U26 · dia leve escolhido por ela em SEX 25/12 (feriado): vale como dia leve — P.prot = "leve", as questões do ⏳ (só cabem nele) entram pelo P3 com info.questLeve = 25/12 (nota 🌿 "última saída"), não pelo P1 sem aviso; a 2ª aula continua fora (aula2Ok falso)',
+            id != null && P.prot['2026-12-25'] === 'leve' && !!j && !!j.days && j.days.quest === '2026-12-25' && /^P3/.test(inf.pass || '') && inf.questLeve === '2026-12-25' && !E.aula2Ok('2026-12-25', P.prot), J({ id, prot: P.prot['2026-12-25'], days: j && j.days, pass: inf.pass, questLeve: inf.questLeve })); });
+    // U27 · S10rv2-comprimido-ancora (🧩 o que o 📦 anunciou não some no dia seguinte sem ação dela · 📚 · SPEC "Leitura operacional" P4 "nunca sem proposta numa cadeia
+    // JÁ aberta"; §4.1 "com a cauda sempre há dia em janeiro"; revisão r2-D-tela-1 — CONFLITO apresentado): 1º acesso 08/12, ela faz tudo no dia do plano, T10 = 3
+    // (escolhida em 22/12), simulado de 01/01 ligado em 30/12. Em 30/12 o comprimido põe em janeiro a cadeia de um módulo com a aula em 30/12; ela marca a aula de 30/12.
+    // Em 31/12 a faixa da aula fixa → questões é 31/12–01/01 (feriado com 📚 3h e simulado): a recolocação não pode deixar as três sem dia — o comprimido da âncora fixa
+    // (até 2× a faixa) as põe de novo em datas, em ordem. Antes: questões, apostila e selagem ficavam sem dia (nocabe ×3) e o ⏳ de 01/01 não tinha proposta.
+    run('U27', () => { let cfg = { ...CFG }, trail = {}; const snap = {};
+        const markP = (lim) => { const tr = clone(trail); Object.entries(cfg.trilhaPlan || {}).forEach(([id, p]) => { for (const ts of STG) { const r0 = tr[id] || {}; if (r0[TSFf[ts]]) continue; if (!p[ts] || p[ts] > lim) break; const r = (tr[id] = tr[id] || {}); r[TSFf[ts]] = true; r[STF[TSFf[ts]]] = p[ts]; } const r = tr[id]; if (r && STG.every(ts => r[TSFf[ts]]) && !r.completedAt) { r.completedAt = r.smartcardAt; r.accSelagem = 70; } }); trail = tr; }; // marca pela data do plano, em ordem
+        for (let d = '2026-12-08'; d <= '2026-12-31'; d = add(d, 1)) { if (d > '2026-12-08') markP(add(d, -1)); if (d === '2026-12-22') cfg = { ...cfg, trilhaRamp: { ...(cfg.trilhaRamp || {}), '2026-12-29': 3 } };
+            const E = load(FILE, d), settle = () => { const P = E.buildTrilhaPlan(cfg, trail, d), pt = E.trilhaFreezePatch(cfg, trail, d, P, {}); if (pt) cfg = { ...cfg, ...pt }; }; settle();
+            if (d === '2026-12-30') { cfg = { ...cfg, simOverrides: { ...(cfg.simOverrides || {}), '2027-01-01': true } }; settle(); }
+            snap[d] = { plan: clone(cfg.trilhaPlan || {}), log: clone(cfg.trilhaFinalLog || null), trail: clone(trail) }; }
+        const s30 = snap['2026-12-30'], s31 = snap['2026-12-31'];
+        const ids = ((s30.log || {}).compressed || []).filter(id => { const p = s30.plan[id]; return !!p && p.aula === '2026-12-30' && ['quest', 'apost', 'seal'].every(ts => p[ts] && p[ts] > '2027-01-01'); });
+        const r31 = ids.map(id => { const p = s31.plan[id] || {}, t = s31.trail[id] || {}, a = t.aula ? (t.aulaAt || p.aula) : null, q = p.quest || null, ap = p.apost || null, s = p.seal || null;
+            return { id, a, q, ap, s, ok: a === '2026-12-30' && !!q && !!ap && !!s && q >= '2026-12-31' && dd(a, q) >= 1 && dd(a, q) <= 2 * GAP.quest[1] && dd(q, ap) >= 1 && dd(q, ap) <= 2 * GAP.apost[1] && dd(ap, s) >= 1 && dd(ap, s) <= 2 * GAP.seal[1] && !(((s31.log || {}).nocabe) || []).some(x => x.id === id) }; });
+        check('U27 · semana final com o simulado de 01/01 ligado em 30/12: a cadeia que o comprimido de 30/12 pôs em janeiro (aula em 30/12, marcada no dia) não fica sem dia em 31/12 — questões, apostila e selagem continuam com data, em ordem, até 2× a faixa da etapa anterior (comprimido também da etapa fixa), sem nocabe',
+            ids.length > 0 && r31.every(x => x.ok), J({ ids, d30: ids.map(id => { const p = s30.plan[id]; return [p.aula, p.quest, p.apost, p.seal]; }), d31: r31, nocabe31: (s31.log || {}).nocabe, compressed31: (s31.log || {}).compressed })); });
 }
 }

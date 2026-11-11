@@ -2822,6 +2822,74 @@ function partOkT(b) { if (!b) return false; const p = b.part, c = b.lines.counts
         check('TR19g · 03/01: a prévia da restauração olha de hoje a 2 semanas também na cauda e avisa "📚 acima do limiar de estudo (informativo, o dia já avisa): TER 05/01 …h" (3 questões + 1 apostila no dia) — com o laço até 01/01 ela olharia 0 dia', hl.some(l => /^📚 acima do limiar de estudo \(informativo, o dia já avisa\): TER 05\/01 \d+,\dh/.test(l)), JSON.stringify(hl));
         check('TR19g · 03/01: abrir a prévia não grava nada', JSON.stringify(await getLS(page, CFG)) === JSON.stringify(c0) && (await rArc(page)).length === 0);
     });
+    // ── TR19rv1 · revisão do S10, rodada 1 (S10rv1): os checks de regressão das correções na tela ──
+    // TR19rv1-desfazer-restauracao-depois-de-0101 · S10rv1-undo-final (💬 ela decide com a prévia; 🧩 nada muda calado; DELA 8; r1-B-dados-1): restauração em 23/12 (1º acesso
+    //   22/12, ela marcou 22/12), app fechado até 29/12 (a recolocação automática grava datas novas, inclusive em janeiro), Desfazer em 03/01. Depois de 01/01 o app não refaz
+    //   a recolocação: as datas que ela gravou voltam para as de antes — a prévia do Desfazer tem de listá-las ("(mudada depois da restauração) → volta para", linha que já
+    //   existia). Antes, o filtro "a recolocação da semana final é do app" as escondia.
+    await scenario(browser, 'TR19rv1-desfazer-restauracao-depois-de-0101', '2026-12-22', {}, async (S) => {
+        let page = S.page; await markUntil(page, '2026-12-22'); page = await S.reopen('2026-12-23');
+        await clickTab(page, 'TRILHA'); await rClick(page, /^Ver o que mudou desde a atualização$/); await rClick(page, /^Aplicar a restauração$/); const c23 = await getLS(page, CFG);
+        await mwG(page); page = await S.reopen('2026-12-29'); const c29 = await getLS(page, CFG);
+        await mwG(page); page = await S.reopen('2027-01-03'); const c0 = await getLS(page, CFG);
+        await clickTab(page, 'TRILHA'); await rClick(page, /^Desfazer a restauração$/); const up = await page.evaluate(() => document.querySelector('[data-t="restore-undo"]').innerText);
+        await rClick(page, /^Confirmar: desfazer$/); const cU = await getLS(page, CFG);
+        const TSW = { aula: 'aula', quest: 'questões', apost: 'apostila', seal: 'selagem' }, M = [];
+        Object.entries(c0.trilhaPlan || {}).forEach(([id, p]) => STG.forEach(ts => { const a = p[ts] || null, b = ((cU.trilhaPlan || {})[id] || {})[ts] || null; if (a !== b && (p.hist || []).some(h => h.ts === ts && h.why === 'final')) M.push({ id, ts, a, b, ln: ' — ' + TSW[ts] + ': ' + (a ? dnT(a) : 'sem data') + ' (mudada depois da restauração) → volta para ' + (b ? dnT(b) : 'sem data') }); }));
+        const miss = M.filter(m => !up.split('\n').some(l => l.endsWith(m.ln)));
+        console.log('   📋 03/01 · Desfazer da restauração de 23/12 · datas da recolocação automática que voltam: ' + M.map(m => m.id + '.' + m.ts + ' ' + (m.a ? br(m.a) : '—') + '→' + (m.b ? br(m.b) : '—')).join(', '));
+        check('TR19rv1 · 03/01 (depois de 01/01, a recolocação não é refeita): a prévia do Desfazer da restauração de 23/12 lista, em "Saem da tela", cada data que a recolocação automática de 29/12 gravou e que volta para a de antes ("… (mudada depois da restauração) → volta para …") — ' + M.length + ' etapa(s)',
+            c23.trilhaFinalKeep === '2026-12-23' && /^2026-12-29\|/.test(c29.trilhaFinalAutoAt || '') && M.length > 0 && !miss.length, JSON.stringify({ keep: c23.trilhaFinalKeep, auto: c29.trilhaFinalAutoAt, M: M.length, miss: miss.map(m => m.id + '.' + m.ts + m.ln), prev: up.slice(0, 400) }));
+    });
+    // TR19rv1-aba-trilha-encerrado · S10rv1-tab-encerrado (🧩 a tela não promete o que não entrega; §4.4; S5 conflito 7 / S7_fix1 CONFLITO 10; r1-E-codigo-1): 07/01, PED2 (26)
+    //   com aula e questões ✓, apostila 06/01 e selagem 09/01; NEF3 (9) fechado mantém a cauda viva. Depois de "⏹ Encerrar a cauda agora" + Aplicar, a aba Trilha › MÓDULOS
+    //   DESTA SEMANA mostra o PED2 como o painel do Cronograma: badge "ENCERRADO EM 07/01" e "selagem —" (a selagem de 09/01 saiu do calendário); a apostila de 06/01 fica.
+    await scenario(browser, 'TR19rv1-aba-trilha-encerrado', '2027-01-07', { [CFG]: { ...baseCfg, trilhaFirstOpen: '2026-12-22', trilhaFinalAutoAt: '2027-01-01|0', trilhaWeeks: { '2026-12-22': { q: 1, base: 4, held: false, why: null, mods: [26], adv: [], rise: [] } }, trilhaPlan: mkPlan({ 26: ['2026-12-28', '2026-12-30', '2027-01-06', '2027-01-09'] }, '2026-12-22') }, [TRL]: { 26: trKk[26], 9: trKk[9] } }, async (S) => {
+        const page = S.page; await clickTab(page, 'TRILHA');
+        const row = () => page.evaluate(() => { const r = document.querySelector('[data-t="trilha-week"] [data-id="26"]'); return r ? r.innerText.split('\n').slice(0, 4).join(' / ') : null; }); const r0 = await row();
+        await clickIn(page, 'trilha-tailend', '⏹ Encerrar a cauda agora'); await page.waitForTimeout(300); await clickIn(page, 'trilha-tailend', 'Aplicar'); await page.waitForTimeout(400);
+        const te = (await getLS(page, CFG)).trilhaTailEnd || [], r1 = await row();
+        check('TR19rv1 · aba Trilha › MÓDULOS DESTA SEMANA depois de encerrar a cauda em 07/01: o PED2 tem o badge "ENCERRADO EM 07/01" e "selagem —" (não a SÁB 09/01, que saiu do calendário); a apostila de QUA 06/01 fica; antes de encerrar, "selagem SÁB 09/01" sem badge',
+            JSON.stringify(te) === '[{"at":"2027-01-07","ids":[26]}]' && !!r0 && /selagem SÁB 09\/01/.test(r0) && !/ENCERRADO/.test(r0) && !!r1 && /ENCERRADO EM 07\/01/.test(r1) && /selagem —/.test(r1) && !/09\/01/.test(r1) && /apostila QUA 06\/01/.test(r1), JSON.stringify({ te, r0, r1 }));
+    });
+    // TR19rv1-encerrar-depois-do-horizonte · S10rv1-tailend-hz (🧩 o app não promete o que não faz; X45; C14; r1-F-robustez-1): PED2 (26) aberto. Em 28/06/2027 (último dia do
+    //   horizonte técnico) a prévia do Encerrar diz "Elas saem do calendário e do ⏳."; em 29/06/2027 (depois de PLAN_HZ não há calendário nem ⏳) a frase sai, e a prévia do
+    //   Desfazer fica na forma cortada já aprovada: "Desfazer o encerramento de 29/06." (antes: "voltam para o calendário e para o ⏳: …", e nada voltava).
+    await scenario(browser, 'TR19rv1-encerrar-depois-do-horizonte', '2027-06-28', { [CFG]: cfgKk([26]), [TRL]: { 26: trKk[26] } }, async (S) => {
+        let page = S.page; await clickTab(page, 'TRILHA'); await clickIn(page, 'trilha-tailend', '⏹ Encerrar a cauda agora'); await page.waitForTimeout(300); const k28 = await teK(page); await clickIn(page, 'trilha-tailend', 'Cancelar');
+        page = await S.reopen('2027-06-29'); await clickTab(page, 'TRILHA'); await clickIn(page, 'trilha-tailend', '⏹ Encerrar a cauda agora'); await page.waitForTimeout(300); const k29 = await teK(page);
+        await clickIn(page, 'trilha-tailend', 'Aplicar'); await page.waitForTimeout(400); const cA = await getLS(page, CFG);
+        await clickIn(page, 'trilha-tailend', 'Desfazer'); await page.waitForTimeout(300); const kU = await teK(page); await clickIn(page, 'trilha-tailend', 'Desfazer'); await page.waitForTimeout(400); const cU = await getLS(page, CFG);
+        check('TR19rv1 · encerrar a cauda depois de PLAN_HZ: em 28/06/2027 a prévia ainda diz "Elas saem do calendário e do ⏳."; em 29/06/2027 a frase sai (o resto do X45 fica) e a prévia do Desfazer é "Desfazer o encerramento de 29/06." (sem "voltam para o calendário e para o ⏳"); Aplicar e Desfazer gravam como antes',
+            !!k28 && /Elas saem do calendário e do ⏳\./.test(k28.prev) && !!k29 && /^Encerrar a cauda agora \(prévia — nada muda até Aplicar\)\. Vão para o balanço, com a data de hoje \(29\/06\): PED2 — Aleitamento Materno/.test(k29.prev) && !/Elas saem do calendário/.test(k29.prev) && /Nada é apagado: o plano e as suas marcas ficam, e dá para desfazer\./.test(k29.prev)
+            && JSON.stringify(cA.trilhaTailEnd) === '[{"at":"2027-06-29","ids":[26]}]' && !!kU && kU.undo === 'Desfazer o encerramento de 29/06.' && JSON.stringify(cU.trilhaTailEnd) === '[]' && JSON.stringify(cU.trilhaTailEndHist) === JSON.stringify([{ at: '2027-06-29', ids: [26], undoneAt: '2027-06-29' }]), JSON.stringify({ p28: k28 && k28.prev, p29: k29 && k29.prev, undo: kU && kU.undo, te: cU.trilhaTailEnd, h: cU.trilhaTailEndHist }));
+    });
+    // ── TR19rv2 · revisão do S10, rodada 2 (S10rv2): check de regressão da correção na tela ──
+    // TR19rv2-refazer-restauracao-depois-de-0101 · S10rv2-refazer-app (🧩 💬 ela decide sabendo quem mudou o quê; r2-D-tela-2 — regressão do S10rv1-undo-final): restauração
+    //   em 23/12 (1º acesso 22/12, ela marcou 22/12), Desfazer em 29/12, app aberto em 30/12, 31/12 e 01/01 sem marcar nada (a recolocação automática grava datas novas
+    //   depois do Desfazer), prévia do "Refazer a restauração" em 02/01. As datas que o APP gravou depois do Desfazer voltam com o Refazer: a linha "… (mudada depois de
+    //   desfazer) → volta para …" (que já existia) vai para a seção que já existe "Saem de novo (a restauração volta a valer — fica tudo no arquivo)", não para "Mudanças
+    //   suas depois de desfazer que saem" — que fica "nada — você não mudou nada depois de desfazer" (ela não mudou nada). Antes: as linhas do app sob "Mudanças suas".
+    await scenario(browser, 'TR19rv2-refazer-restauracao-depois-de-0101', '2026-12-22', {}, async (S) => {
+        let page = S.page; await markUntil(page, '2026-12-22'); page = await S.reopen('2026-12-23');
+        await clickTab(page, 'TRILHA'); await rClick(page, /^Ver o que mudou desde a atualização$/); await rClick(page, /^Aplicar a restauração$/);
+        await mwG(page); page = await S.reopen('2026-12-29');
+        await clickTab(page, 'TRILHA'); await rClick(page, /^Desfazer a restauração$/); await rClick(page, /^Confirmar: desfazer$/); await page.waitForTimeout(400); const cU = await getLS(page, CFG);
+        for (const d of ['2026-12-30', '2026-12-31', '2027-01-01', '2027-01-02']) { await mwG(page); page = await S.reopen(d); }
+        const c0 = await getLS(page, CFG);
+        await clickTab(page, 'TRILHA'); await rClick(page, /^Refazer a restauração$/);
+        const secs = await page.evaluate(() => { const r = document.querySelector('[data-t="restore-redo"]'); return r ? [...r.children].slice(1).map(s => ({ t: s.children[0] ? s.children[0].innerText.trim() : '', l: [...s.children].slice(1).map(x => x.innerText.trim()) })) : null; });
+        const c1 = await getLS(page, CFG);
+        const TSW = { aula: 'aula', quest: 'questões', apost: 'apostila', seal: 'selagem' }, M = [];
+        Object.entries(c0.trilhaPlan || {}).forEach(([id, p]) => STG.forEach(ts => { const a = p[ts] || null, u = ((cU.trilhaPlan || {})[id] || {})[ts] || null, h = (p.hist || []).filter(x => x.ts === ts).pop();
+            if (a !== u && h && h.why === 'final' && h.at >= '2026-12-30' && h.at <= '2027-01-01') M.push({ id, ts, ln: ' — ' + TSW[ts] + ': ' + (a ? dnT(a) : 'sem data') + ' (mudada depois de desfazer) → volta para ' }); }));
+        const sec = (re) => ((secs || []).find(s => re.test(s.t)) || { l: null }).l, again = sec(/^Saem de novo \(a restauração volta a valer — fica tudo no arquivo\)$/), mine = sec(/^Mudanças suas depois de desfazer que saem \(ficam no arquivo\)$/);
+        const has = (L, m) => !!L && L.some(l => l.includes(m.ln));
+        console.log('   📋 02/01 · prévia do Refazer · datas que a recolocação automática gravou depois do Desfazer (30/12–01/01): ' + M.map(m => m.id + '.' + m.ts).join(', ') + ' · seções: ' + (secs || []).map(s => s.t + ' (' + s.l.length + ')').join(' | '));
+        check('TR19rv2 · 02/01 (depois de 01/01): na prévia do "Refazer a restauração", as ' + M.length + ' data(s) que a recolocação automática gravou depois do Desfazer (30/12–01/01) estão em "Saem de novo (a restauração volta a valer — fica tudo no arquivo)" com a linha "… (mudada depois de desfazer) → volta para …", e "Mudanças suas depois de desfazer que saem" diz "nada — você não mudou nada depois de desfazer" (não atribui a ela o que o app fez); abrir a prévia não grava nada',
+            M.length > 0 && !!again && M.every(m => has(again, m)) && !!mine && !M.some(m => has(mine, m)) && JSON.stringify(mine) === JSON.stringify(['nada — você não mudou nada depois de desfazer']) && JSON.stringify(c1) === JSON.stringify(c0),
+            JSON.stringify({ M: M.map(m => m.id + '.' + m.ts + m.ln), again, mine, same: JSON.stringify(c1) === JSON.stringify(c0) }).slice(0, 1500));
+    });
     await browser.close();
     H.summary('trilha');
 })();
