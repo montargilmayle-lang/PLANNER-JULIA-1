@@ -16,7 +16,7 @@ async function openPlanner(browser, dateISO, seeds = {}, opts = {}) {
         window.Date = M;
     }, dateISO);
     await page.addInitScript(([s, raw]) => {
-        if (sessionStorage.getItem('__pw_seeded')) return; // seeds só na 1ª carga (reload não sobrescreve o que o app gravou)
+        if (sessionStorage.getItem('__pw_seeded')) return; // seeds só na 1ª carga do contexto. Em file://, esta guarda NÃO protege uma recarga (page.reload ou novo goto no mesmo contexto): o documento pode chegar com o armazenamento vazio ou ser semeado de novo por cima do que o app gravou (Chromium do Playwright, r4-F-robustez-2; ver README). A bateria não recarrega: use reopen
         sessionStorage.setItem('__pw_seeded', '1');
         // evita o seed da semana da prova (27/06) interferir: marca como já aplicado
         localStorage.setItem('medplanner_seed_weekend_20260627', 'true');
