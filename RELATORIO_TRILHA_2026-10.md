@@ -1,10 +1,269 @@
-# Relatório — TRILHA AUTÔNOMA (26/10/2026 → 01/01/2027; transição 20–25/10)
+# Relatório — TRILHA AUTÔNOMA (26/10/2026 → aula nova até 01/01/2027, cauda em janeiro; transição 20–25/10)
 
-Entregue antes do merge, como pedido ("bateria completa verde, `cmp` do `index.html`, PR sem merge e relatório antes"). Plano aprovado: *TRILHA AUTÔNOMA — substitui o cronograma do cursinho a partir de 20/10/2026*. Data do relatório: 20/10/2026. **Revisão de 07/11/2026 (2): mover o fio todo junto (pedido da paciente; PR próprio) — §C.** **Revisão de 07/11/2026: restaurar o plano ao estado da última atualização (pedido da paciente) — §B.** **Revisão de 26/10/2026: início adiado para 26/10 (pedido da paciente), com 20–25/10 de transição — §A.** As seções §0–§14 ficam como estavam (medidas com início em 20/10, decisões já tomadas); os números do plano vigente estão em §A.
+Entregue antes do merge, como pedido ("bateria completa verde, `cmp` do `index.html`, PR sem merge e relatório antes"). Plano aprovado: *TRILHA AUTÔNOMA — substitui o cronograma do cursinho a partir de 20/10/2026*. Data do relatório: 20/10/2026. **Revisão de 10–11/11/2026: regra de 01/01 — aula nova só até 01/01, questões, apostila e selagem seguem em janeiro (decisões finais da paciente de 10/11) — §D.** **Revisão de 07/11/2026 (2): mover o fio todo junto (pedido da paciente; PR próprio) — §C.** **Revisão de 07/11/2026: restaurar o plano ao estado da última atualização (pedido da paciente) — §B.** **Revisão de 26/10/2026: início adiado para 26/10 (pedido da paciente), com 20–25/10 de transição — §A.** As seções §0–§14 ficam como estavam (medidas com início em 20/10, decisões já tomadas); os números do plano de 26/10 estão em §A, e os da regra de 01/01 (o plano vigente) em §D.
+
+## D · Regra de 01/01 (decisões finais de 10/11/2026) — decisões 77–91
+
+**Quem pede:** a paciente (💬 📚 🧩), com o mecanismo proposto em 09/11 e as decisões finais de 10/11 (itens 1 a 11, aqui "DELA 1–11"), mais a correção 0b ("sem dia" nunca some calado), que ela pediu neste mesmo PR. Implementado em etapas (S0 a S10), cada uma com checkpoint e conferência independente; depois, três rodadas de revisão do diff inteiro. **Não fazer merge antes do aval.** No briefing: §11-T, §14 N e §16, decisões 77–91.
+
+### D.0 · Em linguagem simples — o que muda para você
+
+- **Aula nova: até 01/01.** Depois disso o app não põe aula nova em dia nenhum. Todo o resto continua: apostilas, questões, caderno de erros, banco de questões, revisões, smartcards e simulados — e você pode rever uma aula que já assistiu.
+- **O que começou em dezembro termina em janeiro.** Questões, apostila e selagem de um módulo aberto seguem nos dias de janeiro (a "cauda"), com os mesmos intervalos de sempre. Na simulação com os seus dados (fazendo cada etapa no dia), tudo fecha até **domingo 03/01**, antes do 1º dia do cursinho novo (04/01).
+- **01/01 virou um dia comum.** Pode ter aula. Não tem simulado pela regra (se quiser fazer, o botão religa). Tem o 🏁 lembrando de conferir o que segue aberto para janeiro e de fazer o 💾 backup. Nenhuma tela pede para "exportar antes de perder": os materiais continuam com você.
+- **Janeiro:** os dias aparecem como "livre provisório (a grade do cursinho novo ainda não chegou)", sem horário inventado. Nas semanas de janeiro nenhum dia leve é marcado sozinho; se quiser, você escolhe um no seletor 🌿. Os simulados seguem a quinzena de sempre (15/01 e 29/01), com o botão liga/desliga.
+- **No máximo 5 módulos abertos ao mesmo tempo** (da aula até a selagem). Quando já há 5, o próximo módulo espera, e o app diz por quê: "Já há 5 cadeias abertas — o próximo módulo espera uma fechar". Isso só vale para começar módulo novo; nunca atrasa o que já está aberto.
+- **No máximo 2 aulas no mesmo dia.** A 2ª só entra quando, com uma aula por dia, algum dia passaria de 14,5h, e só em dia sem plantão, fora do dia leve, do dia depois do plantão noturno e de 24, 25 e 31/12. Na simulação com os seus dados, isso acontece em 3 domingos (22/11, 29/11 e 06/12). Os dias que já estavam combinados (09/11 com 4 aulas, 15/11 com 2) ficam como estão: o app só mostra.
+- **No dia leve:** apostila ou selagem. Questões só como última saída, e com o aviso 🌿. Aula nova, nunca.
+- **A aula conta pela data do ✓.** Se você assistiu e não marcou, marque no bloco do dia em que assistiu. Um módulo sem nenhuma marca, cuja aula não foi marcada até 01/01, sai do calendário a partir de 02/01 (fica só o bloco da aula, no dia em que ela estava) e aparece no balanço como "aula não assistida até 01/01". Nada é apagado: se você marcar, o módulo volta e o ⏳ propõe os dias.
+- **De 29/12 a 01/01** o app continua recolocando sozinho o que estiver aberto, uma vez por dia (é a única coisa que ele grava sem o seu "Aplicar"), e agora pode usar dias de janeiro. **Depois de 01/01 nada se move sozinho:** o ⏳ propõe, você decide com "Aplicar".
+- **Revisões:** o app lembra até a última revisão prevista e mostra "lembro até DD/MM (estimado)". Nessa data o cartão de revisões fecha, e o que sobrou aparece no balanço, com a data.
+- **Botão novo "⏹ Encerrar a cauda agora":** se você quiser parar a cauda antes, ele mostra o que vai para o balanço, só grava com "Aplicar" e tem "Desfazer". Nada é apagado.
+- **O alcance tem dois números:** "Aulas até 01/01" e "Cadeias completas (com janeiro)".
+- **Nada some calado:** uma etapa que ficou sem dia aparece como "sem dia" no aviso ⚠️, no painel da semana, no 📦 e no ⏳.
+
+### D.1 · As decisões (10/11) e onde estão
+
+| Dela | Decisão (briefing §16) | O que o app faz | Testes |
+|---|---|---|---|
+| mecanismo de 09/11 | 77 | aula só até 01/01 por todo caminho; questões, apostila e selagem nas faixas, sem data-limite; semana final por data; cauda C1 = SÁB 02/01–SEG 04/01 e depois TER→SEG; o calendário termina sozinho; aula não assistida até 01/01; dois números | TR19a–c, TR19h, TR19i, TR19q, TR19s, TR19n; `simTrilha` |
+| 1 | 78 | K = 5, inclusivo, só ao abrir cadeia nova, com o motivo na tela | TR19f, TR19v, TR19n-b; `simTrilha` |
+| 2 | 79 | 2ª aula só com o gatilho de 14,5h, nunca 3, só em dia permitido, área diferente no desempate; questões no dia leve só como última saída, com 🌿 | TR19e, TRleve; `intervalsTrilha`, `simTrilha` |
+| 3 | 80 | ⏩ pode usar a 2ª aula, com " · 2ª aula neste dia" e Aplicar | TR19e-i |
+| 4 | 81 | T10 com ritmo 0; −/+ para ela decidir; ⏩ na T10 como antes | TR19u |
+| 5 | 82 | 01/01 dia comum: aula, 📚 8h, sem simulado pela regra, 🏁 | TR19a, TR19s, TR19p |
+| 6 | 83 | nenhum dia leve previsto na cauda; seletor 🌿 continua | TR19i, TRleve |
+| 7 | 84 | medido: cabe; regra ligada (selagem até 03/01) | TR19t; `simTrilha` (I × II) |
+| 8 | 85 | recolocação de 29/12 a 01/01 grava janeiro; depois só ⏳ + Aplicar | TR19r, TR19p, TR19a-iii, TR18j/k |
+| 9 | 86 | R‑a: "lembro até DD/MM (estimado)", card fecha, sobras no balanço | TR15e, TR19j; `simTrilha` |
+| 10 | 87 | "⏹ Encerrar a cauda agora" com prévia, Aplicar e Desfazer | TR19k, TR19rv1 |
+| 11 | 88 | materiais depois de 01/01; 📦 e balanço sem exportação; 🎬 em janeiro; simulados 15/01 e 29/01 | TR19m, TR19o |
+| 0b | 89 | "sem dia" no ⚠️, no painel, no 📦 e no ⏳ | TR19l, TR19d, TR19g-x50 |
+| orquestrador | 90 | DECISOES do S4: (g) fora de ordem, (e) semana sem app depois de 01/01, (f) começado sem plano, (d′) rótulos do 📦, "Deixar neste dia" no ⏳ | TR19w, TR19y, TR19z, TR19d-iii/iv |
+| — | 91 | conflitos aplicados pelo padrão (§D.7) | — |
+
+### D.2 · O mecanismo, resumido
+
+- **Dois tetos.** `AULA_END` = 01/01 vale só para a aula, em todo caminho (rampa, ⏳, recolocação automática, ⏩, 🔓, Reorganizar, "Propor a aula primeiro", movimentos). Questões, apostila e selagem vão até `PLAN_HZ` = 28/06/2027, um horizonte técnico que nunca aparece; na prática as faixas seguram.
+- **Calendário.** Depois da T10 vêm as semanas da cauda, com ritmo 0. O que ela vê vai até o fim da semana da última etapa ou revisão; quando não há mais nada, o app para de gravar e mostra o encerramento.
+- **Colocação em passos.** P1 (1 aula por dia, sem questões no dia leve, até 14,5h) → P2 (2ª aula, só com o gatilho) → P3 (questões no dia leve, última saída) → P4 (o comportamento de antes, com 1 aula por dia, só para cadeia já aberta). Módulo novo que não cabe em P1–P3 não entra ("não coube"). Dentro de cada passo vale a ordem de sempre (decisão 69), com "fechar até 03/01" logo depois do tempo hábil e "área diferente" logo antes de "aula mais cedo".
+- **K = 5** só ao abrir cadeia nova; o motivo aparece na rampa, no painel, no 🔓, no ⏩ e na restauração.
+- **Semana final por data (29/12–01/01).** A recolocação diária pode gravar janeiro. Aula sem outro dia até 01/01 fica na data (o bloco continua lá para ela marcar) e as seguintes ficam "sem dia".
+- **Depois de 01/01:** aula não assistida sai do calendário e vai para o balanço; ⏳ com o motivo novo "sem dia"; revisões até o horizonte R‑a; "⏹ Encerrar a cauda agora"; balanço em três modos ("aulas" na aba Trilha, uma linha "compacta" no Cronograma, "fim" quando a cauda acaba).
+- **Dados que já estão no aparelho dela:** nada é migrado. T1–T3, o plano com `orig`/`hist`/`keep`, as revisões e as restaurações carregam iguais.
+
+### D.3 · A tela de hoje (09/11 e 10/11) e de 17/11 em diante
+
+Medido pelo TR19n: a versão de antes (409e1f9) usada de 26/10 a 10/11, ela fazendo tudo no dia; depois a versão nova abre os mesmos dados.
+
+- **Nada muda no que já estava combinado.** Config, registro e dias gravados ficam byte a byte iguais. Os 22 dias de 26/10 a 16/11 (T1–T3) mostram a mesma lista na versão de antes e na nova.
+  - **SEG 09/11** (plantão 06h–09h30): 4 aulas — CIR2 Cicatrização de Feridas e Queimaduras, CIR2 Cirurgia Pediátrica, CIR3 Preparo Pré-operatório e Risco Cirúrgico, CIR3 Hérnias da Parede Abdominal. Só reportado, nunca alterado.
+  - **DOM 15/11** (feriado, "📚 8,2h de estudo — acima de 8h: se não der, mova blocos"): 2 aulas — CIR4 Especialidade Cirúrgica Parte I e Parte II — mais GIN1 questões e NEF1 apostila.
+- **17/11 (T4) com as regras novas:** NEF1 Glomerulopatias II, GIN1 Amenorreia, NEF2 Distúrbio Hidroeletrolítico e OBS1 Diagnóstico de Gravidez; aulas em 18/11, 20/11 e DOM 22/11 (NEF2 + OBS1, 2ª aula em domingo sem plantão); no máximo 5 cadeias abertas (em 18/11). Com estes dados, a versão de antes congelaria a mesma T4.
+- **De 17/11 a 01/01 (realista, `simTrilha`):** 3 dias com 2 aulas — DOM 22/11 (NEF2 + OBS1), DOM 29/11 (PRE1 + PED1) e DOM 06/12 (REU1 + PED1) —, nunca 3. A versão de antes punha mais de 1 aula em 7 dias desse trecho (os mesmos 3 + 15/12 com 2, 17/12 com 3, 22/12 e 27/12 com 2).
+- **Se a semana de 10/11 (T3) ainda não tiver congelado** quando a versão nova abrir pela 1ª vez (TR19n-b), a T3 congela pelas regras novas: com as cadeias da T1–T2 ainda abertas, entra 1 módulo (CIR4 Parte I, aula em 15/11) e 3 esperam, com o motivo na tela. A versão de antes punha 4 e chegava a 8 cadeias abertas em 15/11. Depois de uma restauração feita na versão de antes (TR19n-c, restaurada em 07/11), a T3 congela na nova com 0 módulos (4 esperam). Restauração, Desfazer e Refazer da versão de antes continuam funcionando na nova.
+
+### D.4 · A tela com etapa sem dia (TR19l)
+
+**Caso A′ — simulado religado em 01/01 e a apostila do PED2 deixada em 01/01** (as questões e a selagem ficam sem dia). Em 31/12 e em 01/01:
+- ⚠️ "PED2 (Aleitamento Materno) aberto — questões, selagem sem dia. A aula só tem dia até 01/01: se você assistiu, marque no bloco do dia em que assistiu."
+- painel da semana: "aula 30/12 · questões sem dia · apostila 01/01 · selagem sem dia";
+- ⏳ "Ficaram para trás 1 etapa (PED2 · aula de QUA 30/12) — sem culpa: posso propor novos dias.";
+- 📦 "Semana final (31/12): nenhuma etapa recolocada (as etapas sem dia estão no aviso ⚠️ acima). Aula sem outro dia até 01/01: PED2 · Aleitamento Materno (fica no ⏳; se você assistiu, marque no bloco do dia em que assistiu). Carga dia a dia: TER 29/12 3,3h · QUA 30/12 5,2h · QUI 31/12 1,3h · SEX 01/01 10,1h · SÁB 02/01 2,3h · 01/01 com simulado (sua escolha): sem etapa de módulo."
+- **Em 02/01**, sem nenhuma marca no módulo: ele sai do ⚠️ e do ⏳; o balanço diz "Aula não assistida até 01/01: PED2 · Aleitamento Materno (planejada QUA 30/12) … — se você assistiu, marque no bloco do dia em que assistiu e a cadeia volta."; o bloco da aula continua em 30/12; 31/12 e 01/01 não mostram mais etapa do PED2 (nunca questões sem aula). A conta fecha: 32 fechados + 1 aberto + 1 não assistida + 59 fora = 93.
+
+**Caso B′ — dias editados por ela e a aula do HEM1 Anemias I em 28/12 sem outro dia até 01/01.** A recolocação de 29/12 deixa a aula em 28/12 e as três etapas seguintes sem dia (com o histórico "final"). De 29/12 a 01/01 aparecem o ⚠️ ("… aberto — questões, apostila, selagem sem dia. A aula só tem dia até 01/01: …"), o painel ("questões sem dia · apostila sem dia · selagem sem dia"), o ⏳, o 📦 ("Aula sem outro dia até 01/01: HEM1 · Anemias I …") e, no dia em que a selagem estava, "↷ Trilha · HEM1 — selagem sem dia (veja o aviso ⚠️ e o ⏳)". Em 02/01 o módulo vai para o balanço, como no caso A′.
+
+### D.5 · Decisão 7 — "fechar até 03/01", com e sem a regra
+
+Medido antes de implementar (measure7, conferido por verify7, 0 divergências) e de novo no build final (`simTrilha`, medições; igual ao measure7 em todas as células comparáveis). I = intervalo ideal (sem a regra) · II = fechar até 03/01 (o que está no app). Cenário realista (T1–T3 pela versão de antes; ela faz tudo no dia) e estresses ("fora" = abre o app, mas não marca nem aplica).
+
+| Cenário | Ramo | Aulas até 01/01 | Cadeias completas | Fechadas até 01/01 | Até 03/01 | Todas até 03/01? | Última etapa |
+|---|---|---|---|---|---|---|---|
+| S0 realista | I | 36 | 36 | 34 | 35 | não | SEG 04/01 (selagem HEM1 Anemia II) |
+| S0 realista | **II** | 36 | 36 | 34 | **36** | **sim** | **DOM 03/01** |
+| S-a (fora 29–30/12) | I | 36 | 36 | 34 | 34 | não | TER 05/01 |
+| S-a | II | 36 | 36 | 34 | 35 | não | TER 05/01 |
+| S-b (fora 02–08/01) | I = II | 36 | 36 | 34 | 34 | não | SÁB 09/01 (⏳ em 7 dias) |
+| S-c (para em 04/01) | I | 36 | **35** | 34 | 35 | não | HEM1 Anemia II fica aberta; ⏳ até o horizonte |
+| S-c | II | 36 | 36 | 34 | 36 | sim | DOM 03/01 |
+| S-d (fora 22–26/12) | I | 36 | 36 | 31 | 32 | não | QUI 07/01 |
+| S-d | II | 36 | 36 | 32 | 34 | não | QUA 06/01 |
+
+- **Cabe sem dia leve na cauda: sim.** Por isso a regra está ligada.
+- No realista, **a única data que muda** é a selagem de HEM1 Anemia II: 04/01 → 03/01 (cadeia 28/12 → 30/12 → 01/01 → 03/01, intervalos 2 · 2 · 2, dentro das faixas). Ela é decidida na T9 (22/12); antes de 22/12 nada muda.
+- Carga de 29/12 a 04/01 (📚 · total), igual nos dois ramos exceto 03/01 e 04/01: 29/12 🌿 1,33 · 2,33 · 30/12 5,50 · 6,50 · 31/12 🎄 1,33 · 2,33 · 01/01 2,08 · 3,08 · 02/01 2,25 · 2,25 · **03/01** com a regra 2,00 · 3,00 (selagem) / sem a regra 1,33 · 2,33 · **04/01** sem a regra 2,00 · 3,00 (selagem).
+- "Lembro até" (último horizonte): 31/01 com a regra, 01/02 sem.
+
+### D.6 · Carga dia a dia de 29/12 até o fim da cauda, e o alcance nos dois números
+
+**Com os seus dados** (realista: T1–T3 como estão no aparelho; de 17/11 em diante ela faz tudo no dia e aplica o ⏳):
+
+| Dia | 📚 estudo / limiar | Total / 14,5h | Etapas |
+|---|---|---|---|
+| TER 29/12 (🌿 dia leve) | 1,33 / 8 | 2,33 | — (revisão 45 min) |
+| QUA 30/12 | 5,50 / 8 | 6,50 | HEM1 Anemia II questões · PED2 apostila · HEM2 Linfomas selagem (+ revisão) |
+| QUI 31/12 (🎄) | 1,33 / 3 | 2,33 | — (revisão) |
+| SEX 01/01 | 2,08 / 8 | 3,08 | HEM1 Anemia II apostila |
+| SÁB 02/01 | 2,25 / 8 | 2,25 | PED2 selagem (+ revisão) |
+| DOM 03/01 | 2,00 / 8 | 3,00 | HEM1 Anemia II selagem — a última (+ revisão) |
+| 04/01 → 31/01 | ≤ 1,33 / 8 | ≤ 2,33 | só revisões (45 min), em alguns dias |
+| SEX 15/01 e 29/01 (simulado) | 8,58 / 8 | 9,58 | simulado + correção, sem etapa de módulo |
+
+- Nenhum dia acima de 14,5h; os únicos acima do 📚 de 8h na cauda são as duas sextas de simulado. Calendário até 08/02 (6 semanas da cauda); em 02/01 o app "lembra até 02/02 (estimado)"; o último horizonte cai em 31/01 e a cauda acaba em 01/02.
+- Cadeias que terminam depois de 22/12: PRE3 (17/12 → 23/12), REU2 Vasculites (20/12 → 27/12), HEM1 Anemias I (19/12 → 27/12), HEM2 Leucemias (22/12 → 27/12), HEM2 Linfomas (23/12 → 30/12), PED2 Crescimento (27/12 → 02/01), HEM1 Anemia II (28/12 → 03/01), todas nas faixas.
+
+**Alcance nos dois números:**
+- **Com os seus dados:** "Aulas até 01/01: 36 · Cadeias completas (com janeiro): 36" — iguais em 17/11, 15/12, 01/01 e 02/01; 34 cadeias fecham até 01/01 e as 36 até 03/01.
+- **Prévia de config nova** (19/10, ou 1º acesso em 26/10): 34 aulas = 34 cadeias (antes 36). A diferença vem de 1 aula por dia (a T2 fica com 1 "não coube") e do K (a T3 com 1 "espera").
+- **Progressiva** (1º acesso 26/10, tudo no dia, selagens a 50, 70 e 85%): 34 aulas · 34 cadeias (32 até 01/01, 2 em janeiro, até 03/01); nenhuma aula depois de 01/01; nenhum dia acima de 14,5h (pior 13,95h); 0 intervalos fora das faixas; 0 questões no dia leve; K máx. 5; revisão desliza no máximo 1 dia.
+- **Varredura do 1º acesso** (64 datas, 26/10 → 28/12): nenhum dia acima de 14,5h; aulas até 01/01 = 34 (26 e 27/10), 33 (28–30/10), 32 (31/10–02/11).
+- **Se ela subir a T10 em 15/12** (−/+ da DELA 4; aulas só em 30/12 e 01/01): T10 = 0 → 36/36 · 1 → 37/37 · 2 → 38/38 · 3 → 38/38 · 4 → 38/38 (o 3º e o 4º aparecem como "· N não coube"). Na leitura larga do gatilho seriam 39 com a T10 em 3 ou 4 (2ª aula em 01/01) — conflito C1/C12.
+- **Marcas incompletas** (3 selagens da T1 feitas e não marcadas até 16/11): a T4 congela com 2 módulos (1 espera pelo K); aulas até 01/01 36 → 29 (1 pelo K; os outros pela semana segurada e pelo bloco 04h30, regras de antes). Na prévia de 17/11 o número cai para 21 e volta a 29 quando ela aplica o ⏳ das 3 selagens. O motivo aparece na rampa e no painel (conflito C2).
+
+### D.7 · Conflitos e escolhas — o padrão aplicado, a alternativa e os números
+
+Nada aqui foi decidido por ela. Em cada um ficou o padrão conservador do desenho ("padrão até o aval dela"); a alternativa está pronta para ser trocada se ela preferir.
+
+**Do desenho (C1–C24):**
+
+| Id | Ponto | Padrão aplicado | Alternativa | Números |
+|---|---|---|---|---|
+| C1 | Quando entra a 2ª aula | estrito (DELA 2) na rampa, 🔓, ⏳, recolocação e Reorganizar; no ⏩ também quando falta dia sem aula (DELA 3) | (a) estrito também no ⏩; (b) largo em tudo | ⏩ no realista (42 dias): 14 ofertas com 2ª aula, que no estrito virariam "não cabe"; alcance só difere com a T10 ≥ 3 (38 × 39) |
+| C2 | K com selagem atrasada ou sem dia | conta como aberta até ganhar data ou fechar, julgada em `min(from, hoje)` | só até a selagem planejada | marcas incompletas: 36 → 29 (1 pelo K) |
+| C3 | Cadeia nova que não cabe em P1–P3 | não entra ("não coube") | o comportamento de antes (14,5h como penalidade) | no realista, o mesmo resultado |
+| C4 | Aula sem outro dia até 01/01 | fica na data; seguintes sem dia; depois de 02/01 o bloco da aula continua no dia | aula nula; ou "sai do calendário" | TR19l-b, TR19e-ii |
+| C5 | 01/01 candidato a dia leve | sim (dia comum) | fora | a T10 continua com 29/12 |
+| C6 | Encerrar × revisões | as revisões continuam até o horizonte | encerrar também as revisões | — |
+| C7 | Depois do horizonte R‑a | o card **e** o "🔁 REVISAR" da aba Módulos somem | manter o "REVISAR" | — |
+| C8 | Restauração × encerramento | o encerramento volta ao padrão; o Desfazer da restauração o devolve | a restauração não toca nele | — |
+| C9 | Etapa marcada, aula sem marca, depois de 01/01 | fica no ⏳ só com "Marquei a aula" | ir para o balanço como não assistida | TR9c-0301 |
+| C10 | Aula marcada pelo card depois de 01/01 | a cadeia volta, mas a aula não conta em "Aulas até 01/01" | contar | TR19q |
+| C11 | Posição da "área diferente" | logo antes de "aula mais cedo" | antes dos intervalos | antes dos intervalos, 30/12 subiria de 9,2h para 10,9h |
+| C12 | T10 subindo | no máximo 2 aulas (1 por dia) | leitura larga | T10 em 4: 01/01 com 5,78h de 📚 e 30/12 com 7,2h; larga: 01/01 com 2 aulas e 7,48h |
+| C13 | Selagem em 04/01 | resolvido pela decisão 84 | — | §D.5 |
+| C14 | Horizonte técnico | 28/06/2027 (depois dele, encerramento) | fim de 2027 | cobre o R‑a com folga |
+| C15 | Dia leve escolhido por ela na cauda | vale | — | TR19i |
+| C16 | 2ª aula na recolocação automática | só pelo gatilho estrito, registrada no 📦 | larga, ou nunca | estresse S-a com T10 ≥ 2: o estrito perde a aula de 30/12 (vai para o balanço); o largo a põe em 01/01 |
+| C17 | Aviso de 2ª aula no bloco da rampa | não (só ⏩, ⏳ e movimentos avisam) | sufixo no bloco | 3 domingos |
+| C18 | Aula que ela pôs no dia leve, de 29/12 a 01/01 | a recolocação a tira de lá; o aviso do movimento deixa de dizer "fica assim" nesses dias | respeitar como escolha dela | TR18k, TR18f |
+| C19 | Teto do 📚 na recolocação automática | mantido; o que só cabe acima vai para o ⏳ (até 14,5h) | até 14,5h | é a única gravação sem Aplicar |
+| C20 | A T10 é "semana de janeiro"? | não: mantém o 🌿 previsto em 29/12 | sem dia leve na T10 | sem ele, o intervalo ideal já fecharia tudo até 02/01 |
+| C21 | Módulo com a aula marcada pela rampa | como cadeia já aberta (sem K, com P4) | só P1–P3 | sem o P4 a rampa da semana inteira poderia travar |
+| C22 | Mover a aula para depois de 01/01 | o movimento inteiro é recusado, sem pergunta | "aula fica sem dia" | o seletor nunca oferece esse dia |
+| C23 | Merge entre 29/12 e 01/01 | sem reexecução por versão; o que o código velho deixou sem dia aparece no ⚠️/⏳ e a recolocação nova roda no dia seguinte | reexecutar uma vez | a reexecução quebraria o Desfazer da restauração |
+| C24 | Começado (etapa marcada) sem plano depois da última semana com ritmo | só aviso (badge, ⚠️, balanço) | proposta no ⏳, criando a entrada no plano | — |
+
+**Do orquestrador no S4 (DECISOES; aplicam regras já aprovadas):**
+- **(g) começado fora de ordem** (etapa marcada depois de etapa sem marca): não recebe cadeia nova pela rampa, ⏩ ou 🔓 (é pulado só nesse caso, fica fora do K, aviso neutro); guarda de ordem em todos os caminhos. Alternativa: deixar como no HEAD, que travava a rampa (30 → 9) ou propunha a selagem antes da aula. Dentro disso: "Propor X primeiro" continua valendo como escolha dela (a guarda não vale no reabrir); na recolocação automática, um módulo com marca fora de ordem fica com as seguintes "sem dia" em vez de ganhar cadeia fora de ordem.
+- **(e) semana sem app vista depois de 01/01:** congela como estava planejada (regra de 19–20/10); também com a cauda já parada. Na 2ª semana seguida sem abrir o app, congela como teria congelado no início dela (em 3 de 7 casos medidos difere do que ela viu na véspera; os módulos que ficam de fora continuam na fila).
+- **(f) começado sem plano:** visível pelo badge e no balanço, sem manter o calendário vivo.
+- **(d′) rótulos do 📦:** "código · título" quando o código se repete na fila (alternativa: só quando se repete dentro do próprio 📦).
+- **"Deixar neste dia" no ⏳:** o ⏳ pode recolocar a etapa que ela deixou (ela decide com Aplicar), com a nota "inclui a etapa que você tinha deixado em DIA".
+
+**Da implementação (S5 a S10):**
+- Badges do mais específico ao mais geral (fechado → encerrado → etapa sem dia → aberto — falta … → nesta semana → aula não assistida → planejado → prévia → aula até 01/01 → fora); efeito: um módulo desta semana com alguma etapa marcada aparece como "ABERTO — FALTA …". Alternativa: "NESTA SEMANA" antes.
+- Balanço: "código · título" quando o código se repete (CIR2 = Urologia e Cicatrização); "próxima DIA" = a 1ª etapa sem marca; o "recoloquei" do 📦 fica (é o registro do que o app gravou) com a frase do balanço para quem virou não assistida; "—" nas etapas escondidas do painel; concordância "1 aula"/"N aulas".
+- 01/01: "aula ainda sem ✓: H" (corte de "de hoje", porque H conta também aulas de dias anteriores).
+- R‑a: a seção REVISÕES ESPAÇADAS do dia corta junto com o card; sem linha quando não há horizonte ou sobra; no último dia, o card corta no horizonte mesmo que a revisão fosse deslizar (alternativas: horizonte no dia em que ela desliza; card até o fim da semana).
+- Encerrar: cartão nos modos "aulas" e "fim" (o Cronograma compacto fica uma linha); a prévia usa o horizonte de depois do Aplicar; uma linha por aplicação ativa, um Desfazer (a última); o começado sem plano entra; a etapa do próprio dia da aplicação fica como histórico; mover etapa de encerrado só até a data do encerramento. Em 18 de 219 aplicações medidas o Aplicar fecha o card de revisões na hora e a prévia não diz (frase própria = texto novo, pendente).
+- Restauração: "+ D sem dia" no fim dos parênteses do X50; X48 em toda prévia depois de 01/01; X47 "seguem para janeiro" mantido (só as cadeias cuja aula ela marcar).
+- "Como a Trilha funciona": a frase nova do item 2 logo depois de "nunca duas etapas do módulo no mesmo dia.".
+- Recolocação automática: o guloso só grava dentro das faixas (antes gravava, sem Aplicar, aula→questões de 5 dias e apostila→selagem de 1 dia num caso); o que não cabe fica sem dia e volta às faixas no dia seguinte.
+- Cortes de frase que ficaram falsas (nenhum texto novo): X14/X15 sem "; se você aplicar, fica assim" de 29/12 a 01/01 (C18); ⏩ B sem "para a semana seguinte" quando a selagem passa dela; 📦 sem "fica no ⏳" para aula futura que não está no ⏳; prévia da restauração sem a linha do ritmo segurado depois de 01/01.
+- **Revisões finais do S10:** (rv1) o dia leve que ela escolhe em 24, 25 ou 31/12 vale como dia leve (questões só como última saída, com 🌿; antes ficava como feriado comum) — nenhuma data muda em 36 variações, só o passo e a nota; (rv1) Desfazer depois de 01/01 de uma restauração feita entre 22 e 31/12 continua devolvendo o registro 📦 da T10 do arquivo (fica em "antes de desfazer"; o Refazer o traz) — alternativa: não devolver essas chaves depois de 01/01; (rv2) se a recolocação de 31/12 não acha dia nem no normal nem no comprimido de antes, o comprimido também vale da etapa fixa até a 1ª a colocar (até 2× a faixa) — leitura (a); a leitura (b) deixaria a cadeia sem dia (⚠️/⏳ e Aplicar), com 402 casos medidos; a (c) mudaria a validação além do desenho; (rv2) no Refazer, as datas que o app recolocou vão para "Saem de novo", não para "Mudanças suas…"; (rv3) "Intervalos encurtados" no 📦 só quando o intervalo ficou abaixo do mínimo da faixa (leitura (a); a (b), abaixo do ideal, não muda nada em 396 entradas e 297 linhas do tempo). Na semente E de 31/12 o 📦 deixa de dizer "Intervalos encurtados: NEF2 · Distúrbio Hidroeletrolítico", que era falso (3 dias numa faixa de 1–2 é alongamento); as datas do 📦 são as mesmas.
+
+**Textos propostos e NÃO criados (aguardam o aval dela; sem aval a tela fica com o texto aprovado ou com a frase falsa cortada):**
+- X22b para o começado fora de ordem: "… sem dia. Tem questões marcadas, mas a aula não. Marque cada uma no card da aba Módulos quando fizer."
+- ⏩ B, quando a selagem passa da semana seguinte: "… e deixar X DIA (Xh) e Y DIA (Xh) para os próximos dias."
+- X14/X15 de 29/12 a 01/01: "🌿 A aula iria para o dia leve da semana (DIA) — o app não põe aula nova nele; de 29/12 a 01/01 a recolocação do dia seguinte a tira de lá (só informa)."
+- X27 com o mês da semana (fevereiro em diante): "🌿 Nas semanas de " + mês + " nenhum dia leve é previsto — se quiser, escolha um dia no seletor."
+- X58 de semana congelada que perdeu módulo para o K: "congelada: " + (cota − esperaram) + " novo(s) · N esperou (…)" (hoje mostra a cota, como no HEAD).
+- 📦, para o comprimido que alonga um intervalo: "Intervalos fora da faixa: CÓD (questões 3 dias após a aula — fora de 1–2)."
+- Frase própria quando o Aplicar do encerramento fecha o card de revisões; posição do "+ D sem dia" antes do simulado no X50; condição do X48 só quando a restauração desmarca aula; os textos do balanço do S5 (ordem dos badges, rótulos, "aula sem ✓; falta …").
+
+**Pendência anotada (DELA 11):** revisitar os simulados quando ela mandar a grade do cursinho novo.
+
+### D.8 · Passagem pelos oito
+
+- 🩺 **Método e fila:** a ordem da fila não muda; cadeia completa sempre; módulo fora de ordem nunca recebe cadeia nova fora de ordem.
+- 📚 **Cadeia e intervalos:** aula sempre antes; faixas `GAP_T` em todo caminho (0 intervalos fora nas progressivas e no realista); fechar até 03/01 medido e ligado; K = 5 só ao abrir.
+- 🧩 **O app lembra por ela:** "sem dia" no ⚠️/painel/📦/⏳; aula não assistida no balanço com o bloco ainda marcável; revisões até "lembro até DD/MM"; o motivo do K na tela; nada some calado.
+- 😴 **Sono / 14,5h:** nenhum dia acima de 14,5h na varredura (64 datas), nas progressivas e no realista; 2ª aula só pelo gatilho de 14,5h, nunca 3, nunca em dia de plantão ou depois do noturno.
+- 🧠 **Dia leve:** nenhum dia leve previsto em janeiro (o seletor continua); no dia leve, questões só como última saída e com aviso; aula nova nunca. Nenhum texto novo trata do tema da regra permanente 🧠: as 38 linhas do planner que a busca da regra encontra são as mesmas do HEAD, com o mesmo conteúdo e na mesma ordem, e 0 aparecem nas linhas novas do diff.
+- 💬 **Ela decide:** tudo grava só com Aplicar (⏳, ⏩, 🔓, Reorganizar, encerrar, restaurar), menos a recolocação diária de 29/12 a 01/01, já aprovada; depois de 01/01, nada se move sozinho.
+- ⚙️ **Dados intactos:** nada migrado nem apagado; T1–T3 byte a byte; histórico até 19/10 idêntico (148 linhas iguais); `cmp` ok.
+- 🏃 **Academia:** sem mudança (sábado sem treino, também em janeiro); audit, coverage41, loads16 e intervals16 idênticos à bateria anterior.
+
+### D.9 · Bateria, `cmp`, buscas e tempos (11/11/2026, planner final)
+
+| Suíte | Checks | Tempo | Antes (409e1f9) |
+|---|---|---|---|
+| audit | 396 ✅ | 165 s | 396 |
+| trilha (+ TR19a–z, TR19rv1–rv3, TR8c/TR11b/TR9c-…-aplicar) | 762 ✅ | 987 s | 410 |
+| historico | 148 ✅ | 426 s | 148 |
+| coverage41 | 80 ✅ | 100 s | 80 |
+| coverageTrilha | 8 ✅ | 22 s | 8 |
+| intervalsTrilha | 13 ✅ | 17 s | 11 |
+| intervals16 | 7 ✅ | 15 s | 7 |
+| loads16 | 12 ✅ | 32 s | 12 |
+| simTrilha | 67 ✅ | 75 s | 6 |
+| **total** | **1493 ✅ · 0 ❌** | **1839 s (≈ 31 min)** | 1078 |
+
+- `cmp planner_residencia_2026_offline.html index.html`: idênticos. `node --check` ok nos 10 arquivos de `tests/`. 0 `pageerror`, 0 `console.error`.
+- Comparada com a bateria anterior do S10 (1484), nenhuma linha antiga mudou de resultado (a do U24 só no tempo medido, 11 → 15 ms, limite 2000): as 9 novas são as das revisões (TR19rv1 ×3, TR19rv2, TR19rv3; U25–U28). historico, audit, coverage41, coverageTrilha, intervalsTrilha, intervals16 e loads16 dão saída idêntica, linha a linha.
+- Buscas: `TRILHA_END` = 0 no planner e no `index.html`; a busca da regra permanente 🧠: 38 linhas no planner e 38 no HEAD, mesmo conteúdo e ordem.
+- **Desempenho** (Playwright, CPU 4× mais lenta, um toque num ✓ do Cronograma até a tela pintar, mediana; A/B alternado com o HEAD sobre as mesmas fotos; ruído A/A desta sessão 1,03 / 1,01). Orçamento: build ≤ 1,3 × HEAD.
+
+| Foto | Data | HEAD | Build | Razão |
+|---|---|---|---|---|
+| tudo feito | 10/12 | 177,1 ms | 141,9 ms | 0,80 |
+| tudo feito | 30/12 | 138,7 ms | 152,4 ms | 1,10 |
+| tudo feito (confirmação, N = 20) | 30/12 | 143,1 ms | 148,9 ms | 1,04 |
+| com atraso | 10/12 | 155,4 ms | 160,2 ms | 1,03 |
+| com atraso | 30/12 | 159,8 ms | 139,9 ms | 0,88 |
+
+  Dentro do orçamento em todas. Registro: em 30/12 ("tudo feito") a CPU do toque ficou 1,16–1,25 × a do HEAD (cerca de 28–43 ms a mais com a CPU 4× mais lenta), sem aparecer no tempo até a tela pintar (1,04 com N = 20); a causa não foi investigada. Janeiro (só no build; o HEAD não tem calendário em janeiro): 05/01 ≈ 157 ms e 20/01 165–194 ms, do mesmo tamanho de dezembro na mesma sessão (10/12: 148–172 ms).
+
+### D.10 · Conferência — item pedido → código → teste
+
+| Item | Código | Teste |
+|---|---|---|
+| aula só até 01/01, por todo caminho | `AULA_END`, `stageCap`, janelas presas em `chainEnum`; `moveOptsFor`, `aulaFim` em `trilhaShiftPlan`, defesa em `applyMoveT` | TR19a, TR19b, TR19h; U10–U16 |
+| questões, apostila e selagem em janeiro, nas faixas | `stageCap` = `PLAN_HZ`; `GAP_T`; `trilhaFinalPlan` (`valid`, guloso nas faixas) | TR19c, TR19r, TR18j/k; `intervalsTrilha` |
+| semana final por data; cauda; calendário termina sozinho | `FINAL_START`, `POST_WEEKS` com `TAIL_START`/`TAIL_GRID`, `P.LWv`/`P.endISO`, `P.live` em `trilhaFreezePatch` | TR19i, TR19c (nada gravado depois do fim), TR5b, TR0, TRstart |
+| K = 5 (DELA 1) | `K_OPEN`, `kCount`, `st.open`, `shortWhy`, `K_TXT` | TR19f, TR19v, TR19n-b; U-unidades |
+| 2ª aula e dia leve (DELA 2) | escada em `placeChain` (`aula2Ok`, `aulaDayOk`, gatilho `g2`), `AREA`, X02 | TR19e-ii/iii, TRleve; `intervalsTrilha`, `simTrilha` |
+| ⏩ com 2ª aula (DELA 3) | `trilhaProposeAdvance` (passos × A/B, `adv`), X21 | TR19e-i |
+| T10 ritmo 0 (DELA 4) | `TRILHA_RAMP_DEFAULT`, −/+ até congelar, ⏩ "final" | TR19u, TR19a-i |
+| 01/01 dia comum (DELA 5) | saiu `prot.fim` e o 01/01 de `trilhaBlockedWhy`; `simForCfg`; 🏁 X06/X07, botão X32 | TR19s, TR19a, TR19p |
+| sem dia leve na cauda (DELA 6) | pré-passe com `light: null` depois de 01/01; X27 | TR19i, TRleve |
+| fechar até 03/01 (DELA 7) | `LATE03` no score (fora do comprimido) | TR19t; `simTrilha` medições |
+| recolocação grava janeiro; depois só ⏳ (DELA 8) | `trilhaFinalPlan` de `FINAL_START` a `AULA_END`; `pending` "semdia" | TR19r, TR19p, TR19a-iii, TR19d |
+| R‑a (DELA 9) | `trilhaRevLast`, `P.revEnd`, `reviewsLive`, X41/X64/X65/X67 | TR15e, TR19j |
+| encerrar a cauda (DELA 10) | `trilhaTailEnd`/`trilhaTailEndHist`, `P.ended`, X45, X40 | TR19k, TR19rv1 |
+| materiais e simulados depois de 01/01 (DELA 11) | X05, X26, X43, 📦 sem exportação; paridade 15/01 e 29/01 | TR19m, TR19o |
+| dois números, partição sem contagem dupla | `aulaIn`, `fullC`, `P.N`/`P.NC`/`P.reach`, `trilhaModStatus`, `TrilhaBalanco` (modos) | TR19q, TR10, TR12 |
+| aula não assistida até 01/01 | `P.noAula`, `hidden`, bloco da aula no dia | TR19d, TR19l, TR19y |
+| 0b "sem dia" | `P.semDia` → X22/X22b, X31, X23, X25, X03 | TR19l (A′, B′), TR19g-x50 |
+| restauração com a cauda | `FINAL_KEEP_FROM`, `trilhaTailEnd` em `RESTORE_CFG_KEYS`, X46–X51, `leaveLines` | TR19g, TR17e/i/z, TR19rv1, TR19rv2 |
+| dados já gravados carregam iguais | sem migração; RM11 só na memória | TR19n (a–d), `historico.js` |
+
+### D.11 · Testes que mudaram
+
+Uma expectativa antiga só mudou quando a regra nova explica; cada troca tem a linha "antes → depois — motivo". Os motivos:
+- **1 aula por dia** (DELA 2): a T2 congela com 3 módulos (19, 24, 32) e 1 "não coube"; o 🔓 da T2 deixa de ter proposta; "Ver como reorganizar" com a aula de hoje fica sem proposta; um teste do ⏩ ganhou a premissa certa (o carimbo é o dia do bloco).
+- **K** (DELA 1): a T3 da prévia com 1 "espera"; os testes do "Mover o fio" passam a montar o estado "ela fez tudo no dia" (com o app fechado desde 26/10, as selagens atrasadas seguram a rampa).
+- **Teto por etapa e 01/01 dia comum** (DELA 5/8): "cadeia completa até 01/01" → "aula até 01/01, intervalos nas faixas (a selagem pode ir para janeiro)"; "01/01 só selagem" saiu; ▶ além da Sem.52 vai para a C1; os TR18f/j/k ("nada depois de 01/01") foram reescritos com o simulado religado em 01/01 e a selagem em janeiro.
+- **Fechar até 03/01** (DELA 7): "última selagem até 01/01" → "última selagem: 03/01".
+- **Alcance** (decisão 77): os números "cabem 36" passaram a "34 aulas até 01/01" na prévia; o alcance pelo dia do 1º acesso, de 36·36·35… para 34·34·33…
+- Testes novos: TR19a–z e TR19rv1–rv3 (49 cenários), TR8c, TR11b e TR9c-…-aplicar (o Aplicar do 🔓, do Reorganizar e do "Propor X primeiro", que tinham perdido cobertura), TR9c-0301, 2 invariantes no `intervalsTrilha` e o `simTrilha` inteiro (varredura, progressiva até o fim da cauda, realista pelo git, U1–U28, medições). Cada teste novo falha na versão de antes (HEAD) ou num mutante de uma troca, e passa no build.
 
 ## C · Mover o fio todo junto (pedido de 07/11/2026) — decisão 76
 
 **Quem pede:** a paciente (💬 🧩), com as decisões de 07/11 ("Mover o fio todo junto" e a entrega final, itens 2.1–2.6). Ela quer adiar ou adiantar um módulo sem desmontar os intervalos que o app já tinha montado. PR próprio, a partir da `main` depois do merge do PR #18. **Não fazer merge antes do aval.**
+
+> **Nota de 11/11 (regra de 01/01, §D):** onde esta seção diz "nada depois de 01/01", "último dia de acesso — só selagem" ou "Aplicar o deslocamento parcial", vale hoje a regra nova: só a **aula** tem fim em 01/01 (o movimento que a levaria para depois é recusado inteiro, sem pergunta); questões, apostila e selagem andam para janeiro; 01/01 não é mais dia bloqueado. Os casos TR18f, TR18j e TR18k foram reescritos (simulado religado em 01/01, selagem em janeiro) — §D.11. O texto abaixo fica como foi entregue em 07–08/11.
 
 ### C.1 · Quando a opção aparece
 - Mover uma etapa que tem etapas **sem marca** depois dela, no mesmo módulo, abre sempre o diálogo.
@@ -534,6 +793,8 @@ A conta usa a data efetiva: o carimbo, se marcada; a data do plano, se não. No 
 Testes: TR9c (os dois caminhos), com TR1 e TR9 ajustados ao novo texto.
 
 ## A · Início em 26/10 (pedido de 26/10/2026) — decisão 74
+
+> **Nota de 11/11 (regra de 01/01, §D):** os números desta seção são do plano de 26/10 ("cabem 36 até 01/01", Sem.52 = T10 de 4 dias como última semana, "01/01 só selagem"). Com a regra de 01/01 a prévia de config nova dá 34 aulas até 01/01 = 34 cadeias completas, e, com as T1–T3 já congeladas no aparelho dela, 36 aulas e 36 cadeias (34 fecham até 01/01 e as 36 até 03/01); depois da T10 vêm as semanas da cauda (C1 = 02–04/01, depois TER→SEG) — §D.6. O texto abaixo fica como foi entregue.
 
 A paciente não iniciou em 20/10. A Trilha começa **hoje, SEG 26/10**, com a 1ª aula da fila (**CIR1 · Trauma I**) à tarde, depois do plantão curto 06h–12h; **a ordem da fila não muda** — tudo só desliza para começar hoje. Nada que é ancorado no calendário se desloca: plantões nas datas reais, simulados de 06/11 e 18/12, bloco 04h30 de 16/11 a 11/12, feriados de 3h (24, 25 e 31/12) e o encerramento em 01/01.
 

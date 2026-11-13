@@ -16,7 +16,7 @@ async function openPlanner(browser, dateISO, seeds = {}, opts = {}) {
         window.Date = M;
     }, dateISO);
     await page.addInitScript(([s, raw]) => {
-        if (sessionStorage.getItem('__pw_seeded')) return; // seeds só na 1ª carga (reload não sobrescreve o que o app gravou)
+        if (sessionStorage.getItem('__pw_seeded')) return; // seeds só na 1ª carga do contexto. Em file://, esta guarda NÃO protege uma recarga (page.reload ou novo goto no mesmo contexto): o documento pode chegar com o armazenamento vazio ou ser semeado de novo por cima do que o app gravou (Chromium do Playwright, r4-F-robustez-2; ver README). A bateria não recarrega: use reopen
         sessionStorage.setItem('__pw_seeded', '1');
         // evita o seed da semana da prova (27/06) interferir: marca como já aplicado
         localStorage.setItem('medplanner_seed_weekend_20260627', 'true');
@@ -29,7 +29,7 @@ async function openPlanner(browser, dateISO, seeds = {}, opts = {}) {
     return { ctx, page };
 }
 
-async function listDayTabs(page) { // abas da semana visível: [{ code, date }] (Sem.41 = 6 · Sem.42 transição = 6, TER→DOM · Sem.43 = T1 = 8, SEG 26/10 → SEG 02/11, duas SEG: use clickDate, nunca clickDay('SEG') · depois TER→SEG · Sem.52 = 4)
+async function listDayTabs(page) { // abas da semana visível: [{ code, date }] (Sem.41 = 6 · Sem.42 transição = 6, TER→DOM · Sem.43 = T1 = 8, SEG 26/10 → SEG 02/11, duas SEG: use clickDate, nunca clickDay('SEG') · depois TER→SEG · Sem.52 = 4 · cauda: C1 = 3 (SÁB a SEG), depois TER→SEG)
     return page.evaluate(() => [...document.querySelectorAll('button')].map(b => b.innerText.split('\n').map(s => s.trim())).filter(t => t.length >= 3 && /^\d\d\/\d\d$/.test(t[2])).map(t => ({ code: t[1], date: t[2] })));
 }
 async function clickDate(page, ddmm) {
@@ -111,7 +111,7 @@ async function readDay(page) {
         const title = titleEl ? titleEl.textContent.trim() : '';
         const date = (title.match(/(\d\d\/\d\d)/) || [])[1] || '';
         const warn = [...document.querySelectorAll('div')].filter(d => d.style && (d.style.color === 'rgb(248, 113, 113)' || d.style.color === 'rgb(245, 197, 24)') && /acima d[eo]/.test(d.textContent) && d.style.fontSize === '9px').map(d => d.textContent.trim());
-        const simBtn = [...document.querySelectorAll('button')].map(b => b.innerText.trim()).find(t => /Simulado marcado|Sexta de estudo ativo|Sexta de plantão|último dia de acesso: sem simulado/.test(t)) || null;
+        const simBtn = [...document.querySelectorAll('button')].map(b => b.innerText.trim()).find(t => /Simulado marcado|Sexta de estudo ativo|Sexta de plantão|último dia de acesso: sem simulado|último dia de aula nova: sem simulado/.test(t)) || null;
         const weekBadge = ([...document.querySelectorAll('span')].map(s => s.textContent.trim()).find(t => /^Sem\.\d+$/.test(t))) || '';
         const hdr = [...document.querySelectorAll('span')].map(s => s.textContent.trim()).find(t => /% das semanas/.test(t)) || '';
         const lsel = [...document.querySelectorAll('select')].find(s => [...s.options].some(o => /^Auto · /.test(o.textContent)));
